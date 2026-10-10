@@ -134,6 +134,7 @@ CONF_EQUITHERMAL_DUTY_ENABLED: Final = "equithermal_duty_enabled"
 CONF_BOILER_FIXED_FLOW_TEMP: Final = "boiler_fixed_flow_temp"
 CONF_BOILER_CYCLE_PERIOD: Final = "boiler_cycle_period"
 CONF_DUTY_MIN: Final = "duty_min"
+CONF_USE_FORECAST: Final = "use_forecast"
 
 # --- Frost, system level (FR-FROST-02) -----------------------------------
 CONF_FROST_OUTDOOR_PROTECTION: Final = "frost_outdoor_protection"
@@ -244,6 +245,7 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_BOILER_FIXED_FLOW_TEMP: 70,
     CONF_BOILER_CYCLE_PERIOD: 20,
     CONF_DUTY_MIN: 0.2,
+    CONF_USE_FORECAST: False,
     # Frost (system)
     CONF_FROST_OUTDOOR_PROTECTION: False,
     CONF_FROST_OUTDOOR_TEMP: -10,

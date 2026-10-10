@@ -68,6 +68,7 @@ class House:
         self.ignore: set[str] = set()
         self.commands: list[Command] = []
         self.fresh_sensors = True
+        self.forecast: float | None = None
         self.set(BOILER, "off")
         for room_ctrl in controller.rooms.values():
             for v in room_ctrl.cfg.valves:
@@ -105,7 +106,7 @@ class House:
                     self.states[entity_id] = EntityReading(
                         reading.state, reading.value, self.now, reading.attributes
                     )
-        plan = self.ctrl.step(Snapshot(self.now, dict(self.states)))
+        plan = self.ctrl.step(Snapshot(self.now, dict(self.states), self.forecast))
         for cmd in plan.commands:
             self.commands.append(cmd)
             if cmd.entity_id in self.ignore:

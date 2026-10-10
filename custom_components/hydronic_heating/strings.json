@@ -287,12 +287,14 @@
           "equithermal_duty_enabled": "Limit boiler duty by the curve",
           "boiler_fixed_flow_temp": "Water temperature set on the boiler",
           "boiler_cycle_period": "Duty cycle period",
-          "duty_min": "Minimum duty"
+          "duty_min": "Minimum duty",
+          "use_forecast": "Use weather forecast"
         },
         "data_description": {
           "design_flow_temp": "Water temperature the house needs at the design outdoor temperature.",
           "heating_limit": "Above this damped outdoor temperature the system switches to summer.",
-          "equithermal_duty_enabled": "For non-condensing boilers enable it only after verifying the minimum water temperature."
+          "equithermal_duty_enabled": "For non-condensing boilers enable it only after verifying the minimum water temperature.",
+          "use_forecast": "Mean of the damped temperature and the 24 h forecast of the weather entity, for the heating limit and the curve."
         }
       },
       "equithermal_confirm": {
@@ -320,7 +322,8 @@
       "notify_service_not_found": "Notification service not found. Use the form notify.name.",
       "exercise_too_short": "Must be at least {minimum} s (longest valve travel time + 60 s).",
       "invalid_durations": "Enter 1 to 6 whole numbers between 1 and 720.",
-      "flow_range": "The minimum must be lower than the maximum."
+      "flow_range": "The minimum must be lower than the maximum.",
+      "forecast_needs_weather": "Select a weather entity in Outdoor temperature first."
     }
   },
   "config_subentries": {
@@ -603,6 +606,12 @@
       },
       "open_windows": {
         "name": "Open windows"
+      },
+      "flow_setpoint": {
+        "name": "Flow temperature (curve)"
+      },
+      "duty_limit": {
+        "name": "Duty limit"
       },
       "temperature": {
         "name": "Temperature"

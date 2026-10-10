@@ -117,6 +117,7 @@ from .const import (
     CONF_SUMMER_SWITCH_DELAY,
     CONF_TPI_COEF_EXT,
     CONF_TPI_COEF_INT,
+    CONF_USE_FORECAST,
     CONF_VALVE_CLOSE_TIME,
     CONF_VALVE_ENTITY,
     CONF_VALVE_MIN_STATE_TIME,
@@ -440,6 +441,7 @@ def _equithermal_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_BOILER_FIXED_FLOW_TEMP, values): _number(30, 85, unit=_CELSIUS),
             _required(CONF_BOILER_CYCLE_PERIOD, values): _number(10, 60, unit="min"),
             _required(CONF_DUTY_MIN, values): _number(0, 1, step=0.05),
+            _required(CONF_USE_FORECAST, values): _BOOL,
         }
     )
 
@@ -873,6 +875,8 @@ class HydronicHeatingOptionsFlow(_SystemSteps, OptionsFlow):
         if user_input is not None:
             if user_input[CONF_FLOW_TEMP_MIN] >= user_input[CONF_FLOW_TEMP_MAX]:
                 errors[CONF_FLOW_TEMP_MIN] = "flow_range"
+            elif user_input[CONF_USE_FORECAST] and not self._values.get(CONF_WEATHER_ENTITY):
+                errors[CONF_USE_FORECAST] = "forecast_needs_weather"
             else:
                 self._values = _apply(self._values, schema, user_input)
                 # FR-EQ-05: a curve above the fixed boiler temperature disables the limit.

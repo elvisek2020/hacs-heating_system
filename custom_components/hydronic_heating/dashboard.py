@@ -37,6 +37,8 @@ TEXTS = {
         "boiler_starts_today": "Starty dnes",
         "shadow_mode": "Shadow režim",
         "manual_ends_at": "Konec manuálu",
+        "flow_setpoint": "Teplota vody (křivka)",
+        "duty_limit": "Omezení střídy",
         "temperature": "Teplota",
         "demand": "Požadavek",
         "valve_state": "Ventily",
@@ -73,6 +75,8 @@ TEXTS = {
         "boiler_starts_today": "Starts today",
         "shadow_mode": "Shadow mode",
         "manual_ends_at": "Manual ends",
+        "flow_setpoint": "Flow temperature (curve)",
+        "duty_limit": "Duty limit",
         "temperature": "Temperature",
         "demand": "Demand",
         "valve_state": "Valves",
@@ -135,6 +139,8 @@ def build_dashboard(runtime: HydronicHeatingRuntime) -> dict[str, Any]:
         _tile(
             system_id("sensor", "outdoor_temperature_damped"), text["outdoor_temperature_damped"]
         ),
+        _tile(system_id("sensor", "flow_setpoint"), text["flow_setpoint"]),
+        _tile(system_id("sensor", "duty_limit"), text["duty_limit"]),
         _tile(system_id("binary_sensor", "summer"), text["summer"]),
         _tile(system_id("binary_sensor", "window_block"), text["window_block"]),
         _tile(system_id("sensor", "boiler_duty"), text["boiler_duty"]),
@@ -188,6 +194,7 @@ def build_dashboard(runtime: HydronicHeatingRuntime) -> dict[str, Any]:
             "entities": [
                 system_id("binary_sensor", "boiler_command"),
                 system_id("sensor", "demand_total"),
+                system_id("sensor", "flow_setpoint"),
                 system_id("sensor", "state"),
             ]
             + ([layout.boiler.entity_id] if layout else [])

@@ -65,6 +65,9 @@ class BoilerSequencer:
         self.overrun_since: datetime | None = None
         self.overrun_valves: set[str] = set()
         self.no_flow = False
+        # FR-EQ-05: after a duty-limited stop the next start waits for the cycle end.
+        self.duty_hold_until: datetime | None = None
+        self.duty_stopped = False
 
     # --- Anti-cycling -----------------------------------------------------
 
@@ -80,7 +83,13 @@ class BoilerSequencer:
         recent = sorted(s for s in self.starts if (now - s).total_seconds() < 3600)
         if len(recent) >= cfg.boiler_max_starts:
             candidates.append(recent[len(recent) - cfg.boiler_max_starts] + timedelta(hours=1))
+        if self.duty_hold_until is not None:
+            candidates.append(self.duty_hold_until)
         return max(candidates)
+
+    def duty_holding(self, now: datetime) -> bool:
+        """Return True while a duty-limited cycle keeps the boiler off."""
+        return self.duty_hold_until is not None and now < self.duty_hold_until
 
     def can_start(self, now: datetime, cfg: SystemConfig) -> bool:
         """Minimum pause and starts per hour are respected."""
@@ -126,9 +135,16 @@ class BoilerSequencer:
         flow_ok: bool,
         open_valves: set[str],
         max_travel_s: float,
+        duty_run_s: float | None = None,
     ) -> None:
-        """Advance the sequence by one step."""
+        """Advance the sequence by one step.
+
+        `duty_run_s` is the allowed run time per cycle (FR-EQ-05), None = no limit.
+        """
         wants_heat = request and not blocked
+        if self.duty_hold_until is not None and now >= self.duty_hold_until:
+            self.duty_hold_until = None
+            self.duty_stopped = False
         if self.phase is BoilerPhase.OVERRUN and wants_heat:
             self.phase = BoilerPhase.PRE_OPEN
             self.pre_open_since = now
@@ -153,6 +169,16 @@ class BoilerSequencer:
                 self._turn_off(now, open_valves)
             elif not wants_heat and (stop_immediate or self.min_on_done(now, cfg)):
                 self._turn_off(now, open_valves)
+            elif (
+                duty_run_s is not None
+                and self.on_since is not None
+                and (now - self.on_since).total_seconds() >= max(duty_run_s, cfg.boiler_min_on_s)
+            ):
+                # Duty limit reached: stop until the cycle ends (never before min_on).
+                cycle_end = self.on_since + timedelta(seconds=cfg.boiler_cycle_period_s)
+                self._turn_off(now, open_valves)
+                self.duty_hold_until = cycle_end
+                self.duty_stopped = True
         if (
             self.phase is BoilerPhase.OVERRUN
             and (now - self.overrun_since).total_seconds() >= cfg.boiler_overrun_s  # type: ignore[operator]
@@ -204,6 +230,7 @@ class BoilerSequencer:
             "off_since": iso(self.off_since),
             "starts": [s.isoformat() for s in self.starts],
             "on_intervals": [[iso(a), iso(b)] for a, b in self.on_intervals],
+            "duty_hold_until": iso(self.duty_hold_until),
         }
 
     def restore(self, data: dict[str, Any], now: datetime) -> None:
@@ -219,6 +246,8 @@ class BoilerSequencer:
         self.off_since = parse(data.get("off_since"))
         self.starts = [datetime.fromisoformat(s) for s in data.get("starts", [])]
         self.on_intervals = [[parse(a), parse(b)] for a, b in data.get("on_intervals", [])]
+        self.duty_hold_until = parse(data.get("duty_hold_until"))
+        self.duty_stopped = self.duty_hold_until is not None
         if data.get("boiler_on"):
             # Continue a run that was active before the restart.
             self.boiler_on = True

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from .. import const as c
-from .equithermal import OutdoorEngine
+from .equithermal import OutdoorEngine, duty_limit, flow_setpoint
 from .exercise import ExerciseScheduler
 from .heat_source import Arbitration, BoilerSequencer, RoomDemand, arbitrate
 from .model import (
@@ -51,6 +51,8 @@ class HydronicController:
         self.ready = False
         self.state = SystemState.STARTUP
         self.summer = False
+        self.flow_setpoint: float | None = None
+        self.duty: float | None = None
         self.arbitration = Arbitration(False, 0.0, 0)
         self.heat_request = False
         self.window_block = False
@@ -149,6 +151,7 @@ class HydronicController:
             self.started_at = now
         self.modes.tick(now)
         self.outdoor.update(snap, cfg)
+        self._update_equithermal()
         self._update_ready(snap)
 
         mode = self.modes.mode
@@ -208,6 +211,7 @@ class HydronicController:
                 flow_ok=flow_ok,
                 open_valves=self._valves_in(now, {ValvePhysical.OPEN, ValvePhysical.OPENING}),
                 max_travel_s=max((v.travel_time_s for _, v in self.valve_configs), default=0),
+                duty_run_s=self._duty_run_s(manual=manual),
             )
         self._stop_immediate = False
 
@@ -227,6 +231,26 @@ class HydronicController:
         return plan
 
     # --- Step helpers -----------------------------------------------------
+
+    def _update_equithermal(self) -> None:
+        """Heating curve and duty limit (FR-EQ-04, FR-EQ-05)."""
+        outdoor = self.outdoor.effective
+        if outdoor is None:
+            self.flow_setpoint = self.duty = None
+            return
+        self.flow_setpoint = flow_setpoint(outdoor, self.cfg)
+        self.duty = duty_limit(self.flow_setpoint, self.cfg)
+
+    @property
+    def duty_active(self) -> bool:
+        """Return True when the duty limit restricts the boiler run time."""
+        return self.cfg.duty_enabled and self.duty is not None and self.duty < 1.0
+
+    def _duty_run_s(self, *, manual: bool) -> float | None:
+        """Return the allowed run time per cycle; None in manual or without a curve."""
+        if manual or not self.duty_active:
+            return None
+        return self.duty * self.cfg.boiler_cycle_period_s  # type: ignore[operator]
 
     def _update_ready(self, snap: Snapshot) -> None:
         """FR-SAFE-01: wait for required entities, at most startup_grace."""
@@ -474,6 +498,8 @@ class HydronicController:
         if self.sequencer.phase is BoilerPhase.PRE_OPEN:
             if not flow_ok:
                 reasons.append("waiting_for_valves")
+            elif self.sequencer.duty_holding(now):
+                reasons.append("duty_limit")
             elif not self.sequencer.can_start(now, self.cfg):
                 reasons.append("anti_cycling")
         return reasons

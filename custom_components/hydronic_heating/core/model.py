@@ -297,6 +297,18 @@ class SystemConfig:
     frost_outdoor_protection: bool
     frost_outdoor_temp: float
     frost_idle_max_s: float
+    design_outdoor_temp: float = -12.0
+    design_flow_temp: float = 65.0
+    reference_room_temp: float = 20.0
+    radiator_exponent: float = 1.3
+    curve_offset: float = 0.0
+    flow_temp_min: float = 30.0
+    flow_temp_max: float = 75.0
+    duty_enabled: bool = False
+    boiler_fixed_flow_temp: float = 70.0
+    boiler_cycle_period_s: float = 1200.0
+    duty_min: float = 0.2
+    use_forecast: bool = False
     timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo("UTC"))
 
     @classmethod
@@ -371,6 +383,18 @@ class SystemConfig:
             frost_outdoor_protection=bool(opt(c.CONF_FROST_OUTDOOR_PROTECTION)),
             frost_outdoor_temp=num(c.CONF_FROST_OUTDOOR_TEMP),
             frost_idle_max_s=num(c.CONF_FROST_IDLE_MAX) * 3600,
+            design_outdoor_temp=num(c.CONF_DESIGN_OUTDOOR_TEMP),
+            design_flow_temp=num(c.CONF_DESIGN_FLOW_TEMP),
+            reference_room_temp=num(c.CONF_REFERENCE_ROOM_TEMP),
+            radiator_exponent=num(c.CONF_RADIATOR_EXPONENT),
+            curve_offset=num(c.CONF_CURVE_OFFSET),
+            flow_temp_min=num(c.CONF_FLOW_TEMP_MIN),
+            flow_temp_max=num(c.CONF_FLOW_TEMP_MAX),
+            duty_enabled=bool(opt(c.CONF_EQUITHERMAL_DUTY_ENABLED)),
+            boiler_fixed_flow_temp=num(c.CONF_BOILER_FIXED_FLOW_TEMP),
+            boiler_cycle_period_s=num(c.CONF_BOILER_CYCLE_PERIOD) * 60,
+            duty_min=num(c.CONF_DUTY_MIN),
+            use_forecast=bool(opt(c.CONF_USE_FORECAST)),
             timezone=timezone,
         )
 
@@ -402,6 +426,7 @@ class Snapshot:
 
     now: datetime
     entities: Mapping[str, EntityReading]
+    forecast_24h: float | None = None
 
     def get(self, entity_id: str | None) -> EntityReading:
         """Return the reading of an entity, MISSING when unknown."""

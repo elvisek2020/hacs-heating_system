@@ -47,6 +47,10 @@ def _now(ctrl: HydronicController) -> datetime | None:
     return ctrl.last_step
 
 
+def _round(value: float | None) -> float | None:
+    return None if value is None else round(value, 1)
+
+
 SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
     SystemSensorDescription(
         key="manual_ends_at",
@@ -77,6 +81,36 @@ SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
         attrs_fn=lambda ctrl: {
             "current": ctrl.outdoor.current,
             "source": ctrl.outdoor.source,
+            "forecast_24h": ctrl.outdoor.forecast,
+            "effective": _round(ctrl.outdoor.effective),
+        },
+    ),
+    SystemSensorDescription(
+        key="flow_setpoint",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda ctrl: ctrl.flow_setpoint,
+        attrs_fn=lambda ctrl: {
+            "outdoor_effective": _round(ctrl.outdoor.effective),
+            "virtual": True,
+        },
+    ),
+    SystemSensorDescription(
+        key="duty_limit",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda ctrl: None if ctrl.duty is None else round(ctrl.duty * 100),
+        attrs_fn=lambda ctrl: {
+            "enabled": ctrl.cfg.duty_enabled,
+            "cycle_min": round(ctrl.cfg.boiler_cycle_period_s / 60),
+            "run_per_cycle_min": None
+            if ctrl.duty is None
+            else round(
+                max(ctrl.duty * ctrl.cfg.boiler_cycle_period_s, ctrl.cfg.boiler_min_on_s) / 60, 1
+            ),
+            "holding": ctrl.last_step is not None and ctrl.sequencer.duty_holding(ctrl.last_step),
         },
     ),
     SystemSensorDescription(

@@ -51,6 +51,8 @@ from .notifications import notification_text, reason_text
 _LOGGER = logging.getLogger(__name__)
 
 SAVE_DELAY_S = 10
+FORECAST_INTERVAL = timedelta(minutes=30)
+FORECAST_HOURS = 24
 
 type HydronicConfigEntry = ConfigEntry[HydronicHeatingRuntime]
 
@@ -82,6 +84,26 @@ def room_configs(entry: ConfigEntry) -> list[RoomConfig]:
         for sub in entry.subentries.values()
         if sub.subentry_type == SUBENTRY_ROOM
     ]
+
+
+FORECAST_ENTRIES = {"hourly": FORECAST_HOURS, "twice_daily": 2, "daily": 1}
+
+
+def _forecast_mean(forecast: list[dict[str, Any]], forecast_type: str) -> float | None:
+    """Mean forecast temperature of the next 24 hours (24 hourly, 2 half-day or 1 day)."""
+    since = dt_util.utcnow() - timedelta(hours=1)
+    upcoming = [
+        item
+        for item in forecast
+        if (when := dt_util.parse_datetime(str(item.get("datetime", "")))) is None or when >= since
+    ][: FORECAST_ENTRIES[forecast_type]]
+    values = [
+        float(item[key])
+        for item in upcoming
+        for key in ("temperature", "templow")
+        if isinstance(item.get(key), int | float)
+    ]
+    return round(sum(values) / len(values), 1) if values else None
 
 
 def _numeric(entity_id: str, state: str, attributes: Mapping[str, Any]) -> float | None:
@@ -129,6 +151,7 @@ class HydronicHeatingRuntime:
         self._known_problems: dict[str, Problem] = {}
         self._mirror_ends_at: datetime | None = None
         self._stopped = False
+        self.forecast_24h: float | None = None
 
     def _system_config(self) -> SystemConfig:
         options = {**DEFAULT_OPTIONS, **self.entry.options}
@@ -170,7 +193,11 @@ class HydronicHeatingRuntime:
                 self.hass, self._async_tick, timedelta(seconds=UPDATE_INTERVAL_S)
             )
         )
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._async_forecast_tick, FORECAST_INTERVAL)
+        )
         self.async_step()
+        self._schedule_forecast()
 
     async def async_stop(self) -> None:
         """Unsubscribe and save the state. Outputs are left as they are."""
@@ -192,6 +219,7 @@ class HydronicHeatingRuntime:
         self.controller.reconfigure(*self._controller_configs())
         self._subscribe()
         self.async_step()
+        self._schedule_forecast()
 
     @callback
     def _subscribe(self) -> None:
@@ -230,7 +258,7 @@ class HydronicHeatingRuntime:
                 last_reported=state.last_reported,
                 attributes=state.attributes,
             )
-        return Snapshot(dt_util.utcnow(), entities)
+        return Snapshot(dt_util.utcnow(), entities, self.forecast_24h)
 
     @callback
     def async_step(self) -> None:
@@ -261,6 +289,45 @@ class HydronicHeatingRuntime:
             and entry.platform == DOMAIN
             and entry.config_entry_id == self.entry.entry_id
         )
+
+    # --- Weather forecast (FR-EQ-06) -------------------------------------------
+
+    @callback
+    def _schedule_forecast(self) -> None:
+        self.entry.async_create_background_task(
+            self.hass, self.async_update_forecast(), f"{DOMAIN} forecast"
+        )
+
+    @callback
+    def _async_forecast_tick(self, now: datetime) -> None:
+        self._schedule_forecast()
+
+    async def async_update_forecast(self) -> None:
+        """Average forecast temperature for the next 24 hours."""
+        cfg = self.controller.cfg
+        entity = cfg.weather_entity
+        if not cfg.use_forecast or not entity:
+            self.forecast_24h = None
+            return
+        value = None
+        for forecast_type in ("hourly", "twice_daily", "daily"):
+            try:
+                response = await self.hass.services.async_call(
+                    "weather",
+                    "get_forecasts",
+                    {"entity_id": entity, "type": forecast_type},
+                    blocking=True,
+                    return_response=True,
+                )
+            except Exception:  # unsupported forecast type or unavailable entity
+                continue
+            value = _forecast_mean(response.get(entity, {}).get("forecast", []), forecast_type)
+            if value is not None:
+                break
+        if value is None:
+            _LOGGER.debug("No forecast available from %s", entity)
+        self.forecast_24h = value
+        self.async_step()
 
     async def _async_execute(self, command: Command) -> None:
         if self.demo is not None and not self._owned(command.entity_id):

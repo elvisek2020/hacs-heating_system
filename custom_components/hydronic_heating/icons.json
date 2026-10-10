@@ -68,6 +68,12 @@
       },
       "demo_temperature": {
         "default": "mdi:home-thermometer-outline"
+      },
+      "flow_setpoint": {
+        "default": "mdi:thermometer-water"
+      },
+      "duty_limit": {
+        "default": "mdi:sine-wave"
       }
     },
     "switch": {

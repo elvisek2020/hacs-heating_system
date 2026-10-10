@@ -9,7 +9,8 @@ Vlastní integrace pro Home Assistant, která řídí teplovodní ústřední to
 | **F0** ✅ | kostra, config flow, nastavení systému, místnosti, ikona, CI |
 | **F1** ✅ | místnosti, čidla, ventily NO/NC, kotel, arbitr požadavků, sekvence ventily → kotel → doběh, ochrana kotle proti cyklování, manuál s odpočtem, režimy, rozvrh, shadow, ukládání stavu |
 | **F2** ✅ | okna a globální práh, protimrazová ochrana, venkovní teplota a mez vytápění (léto), protáčení ventilů, notifikace, repair issues, diagnostika |
-| F3 | ekviterm: topná křivka, omezení střídy kotle |
+| **F3** ✅ | ekviterm: topná křivka (virtuální teplota vody), omezení střídy kotle, předpověď počasí |
+| F5 | modulované řízení (OpenTherm/eBUS) – až s kotlem, který ho umí |
 
 ## Instalace přes HACS
 
@@ -57,6 +58,8 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 - **Okna:** po zpoždění zavřou ventily místnosti. Při otevření oken ve více místnostech (globální práh) se zastaví kotel, kromě manuálu.
 - **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a v létě. Tuto ochranu nejde vypnout.
 - **Léto:** tlumená venkovní teplota nad mezí vytápění po nastavenou dobu přepne systém do léta. Pod mezí mínus hysterezi se vrátí do zimy hned.
+- **Ekviterm:** z tlumené venkovní teploty se podle topné křivky počítá teplota vody, kterou by soustava potřebovala (`sensor.hh_flow_setpoint`). U kotle řízeného jen kontaktem je to virtuální hodnota: kotel si vodu drží sám. Z ní a z teploty nastavené na kotli vychází povolená střída (`sensor.hh_duty_limit`). Po zapnutí omezení střídy (Konfigurovat → Ekviterm) kotel v cyklu (výchozí 20 min) běží jen tuto část času, nikdy ale kratší dobu, než je jeho minimální doba běhu. Ve výchozím stavu je omezení vypnuté. U nekondenzačního kotle ho zapínejte až po ověření minimální teploty vody v návodu kotle, protože zkracuje běhy.
+- **Předpověď (volitelně):** s entitou počasí se pro mez vytápění i křivku bere průměr tlumené teploty a průměrné předpovědi na příštích 24 hodin.
 - **Ochrany:** ověření každého povelu s opakováním, keep-alive, obnovení stavu ventilů po výpadku, bezpečný stav při nedostupném kotli, heartbeat pro watchdog v Loxone, upozornění na zastaralá čidla.
 
 ## Entity
@@ -69,7 +72,9 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 | `sensor.hh_manual_ends_at` | konec manuálu (časové razítko) |
 | `sensor.hh_state` | stav automatu (start, auto, pryč, vypnuto, léto, manuál, porucha) |
 | `sensor.hh_demand_total` | vážený požadavek místností |
-| `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota |
+| `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota (atributy: aktuální, předpověď, efektivní) |
+| `sensor.hh_flow_setpoint` | teplota vody podle topné křivky (virtuální) |
+| `sensor.hh_duty_limit` | povolená střída kotle a doba běhu v cyklu |
 | `sensor.hh_boiler_duty`, `sensor.hh_boiler_starts_today` | střída kotle za 24 h a počet startů dnes |
 | `sensor.hh_open_windows` | počet místností s otevřeným oknem |
 | `binary_sensor.hh_heat_demand`, `_boiler_command`, `_window_block`, `_summer`, `_problem` | požadavek, povel kotli, blokace okny, léto, porucha |
