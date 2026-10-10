@@ -1,21 +1,25 @@
 """Constants for the Hydronic Heating Controller integration.
 
-Keys and defaults follow the PRD, chapter 10.2.
+Keys and defaults follow the PRD, chapter 10.2. This module has no Home Assistant
+imports, so the pure core can share the keys (NFR-08).
 """
 
 from __future__ import annotations
 
 from typing import Any, Final
 
-from homeassistant.const import Platform
-
 DOMAIN: Final = "hydronic_heating"
 DEFAULT_NAME: Final = "Topení"
 
-# F0 has no entities yet; platforms are added from F1 on.
-PLATFORMS: Final[list[Platform]] = []
-
 SUBENTRY_ROOM: Final = "room"
+
+STORAGE_VERSION: Final = 1
+UPDATE_INTERVAL_S: Final = 30
+ENTITY_PREFIX: Final = "hh"
+
+SERVICE_START_MANUAL: Final = "start_manual"
+SERVICE_STOP: Final = "stop"
+ATTR_DURATION: Final = "duration"
 
 # --- General -------------------------------------------------------------
 CONF_SHADOW_MODE: Final = "shadow_mode"

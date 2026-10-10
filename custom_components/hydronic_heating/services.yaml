@@ -1,0 +1,12 @@
+start_manual:
+  fields:
+    duration:
+      required: true
+      example: 60
+      selector:
+        number:
+          min: 1
+          max: 720
+          unit_of_measurement: min
+          mode: box
+stop:

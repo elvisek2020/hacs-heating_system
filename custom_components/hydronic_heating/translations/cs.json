@@ -503,5 +503,140 @@
         "tpi": "TPI"
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "heat_demand": {
+        "name": "Požadavek na teplo"
+      },
+      "boiler_command": {
+        "name": "Povel kotli"
+      },
+      "window_block": {
+        "name": "Blokace okny"
+      },
+      "summer": {
+        "name": "Léto (mez vytápění)"
+      },
+      "problem": {
+        "name": "Porucha"
+      },
+      "window": {
+        "name": "Okno"
+      }
+    },
+    "button": {
+      "manual": {
+        "name": "Topit {minutes} min"
+      },
+      "stop": {
+        "name": "Zastavit manuál"
+      }
+    },
+    "number": {
+      "comfort": {
+        "name": "Komfortní teplota"
+      },
+      "eco": {
+        "name": "Útlumová teplota"
+      }
+    },
+    "select": {
+      "system_mode": {
+        "name": "Režim systému",
+        "state": {
+          "auto": "Automaticky",
+          "away": "Pryč",
+          "off": "Vypnuto",
+          "summer": "Léto",
+          "manual": "Manuál"
+        }
+      }
+    },
+    "sensor": {
+      "manual_ends_at": {
+        "name": "Konec manuálu"
+      },
+      "state": {
+        "name": "Stav",
+        "state": {
+          "startup": "Start",
+          "auto": "Automaticky",
+          "away": "Pryč",
+          "off": "Vypnuto",
+          "summer": "Léto",
+          "manual": "Manuál",
+          "fault_safe": "Porucha"
+        }
+      },
+      "demand_total": {
+        "name": "Celkový požadavek"
+      },
+      "outdoor_temperature_damped": {
+        "name": "Tlumená venkovní teplota"
+      },
+      "boiler_duty": {
+        "name": "Střída kotle (24 h)"
+      },
+      "boiler_starts_today": {
+        "name": "Starty kotle dnes"
+      },
+      "open_windows": {
+        "name": "Otevřená okna"
+      },
+      "temperature": {
+        "name": "Teplota"
+      },
+      "demand": {
+        "name": "Požadavek"
+      },
+      "valve_state": {
+        "name": "Stav ventilů",
+        "state": {
+          "opening": "Otevírá se",
+          "open": "Otevřeno",
+          "closing": "Zavírá se",
+          "closed": "Zavřeno",
+          "unknown": "Neznámý",
+          "mixed": "Smíšený"
+        }
+      }
+    },
+    "switch": {
+      "shadow_mode": {
+        "name": "Režim shadow"
+      }
+    }
+  },
+  "issues": {
+    "fault_safe": {
+      "title": "Topení je v poruše",
+      "description": "Kotel byl přepnut do bezpečného stavu: {reason}. Topení je vypnuté a ventily jsou v klidovém stavu. Systém se vrátí sám, jakmile bude kotel dostupný a bude poslouchat povely."
+    },
+    "sensor_failure": {
+      "title": "Výpadek teplotních čidel: {room}",
+      "description": "Žádné teplotní čidlo místnosti {room} nemá platnou hodnotu. Místnost jede v záložním režimu podle svého nastavení. Zkontrolujte čidla nebo je změňte v nastavení místnosti."
+    }
+  },
+  "services": {
+    "start_manual": {
+      "name": "Spustit manuál",
+      "description": "Topí po zadanou dobu bez ohledu na požadavky místností.",
+      "fields": {
+        "duration": {
+          "name": "Délka",
+          "description": "Délka v minutách (1 až 720)."
+        }
+      }
+    },
+    "stop": {
+      "name": "Zastavit manuál",
+      "description": "Ukončí manuální topení."
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Integrace Hydronic Heating Controller není načtená."
+    }
   }
 }

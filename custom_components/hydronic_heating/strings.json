@@ -503,5 +503,140 @@
         "tpi": "TPI"
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "heat_demand": {
+        "name": "Heat demand"
+      },
+      "boiler_command": {
+        "name": "Boiler command"
+      },
+      "window_block": {
+        "name": "Window block"
+      },
+      "summer": {
+        "name": "Summer (heating limit)"
+      },
+      "problem": {
+        "name": "Problem"
+      },
+      "window": {
+        "name": "Window"
+      }
+    },
+    "button": {
+      "manual": {
+        "name": "Heat for {minutes} min"
+      },
+      "stop": {
+        "name": "Stop manual"
+      }
+    },
+    "number": {
+      "comfort": {
+        "name": "Comfort temperature"
+      },
+      "eco": {
+        "name": "Eco temperature"
+      }
+    },
+    "select": {
+      "system_mode": {
+        "name": "System mode",
+        "state": {
+          "auto": "Automatic",
+          "away": "Away",
+          "off": "Off",
+          "summer": "Summer",
+          "manual": "Manual"
+        }
+      }
+    },
+    "sensor": {
+      "manual_ends_at": {
+        "name": "Manual ends at"
+      },
+      "state": {
+        "name": "State",
+        "state": {
+          "startup": "Starting",
+          "auto": "Automatic",
+          "away": "Away",
+          "off": "Off",
+          "summer": "Summer",
+          "manual": "Manual",
+          "fault_safe": "Fault"
+        }
+      },
+      "demand_total": {
+        "name": "Total demand"
+      },
+      "outdoor_temperature_damped": {
+        "name": "Damped outdoor temperature"
+      },
+      "boiler_duty": {
+        "name": "Boiler duty (24 h)"
+      },
+      "boiler_starts_today": {
+        "name": "Boiler starts today"
+      },
+      "open_windows": {
+        "name": "Open windows"
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "demand": {
+        "name": "Demand"
+      },
+      "valve_state": {
+        "name": "Valve state",
+        "state": {
+          "opening": "Opening",
+          "open": "Open",
+          "closing": "Closing",
+          "closed": "Closed",
+          "unknown": "Unknown",
+          "mixed": "Mixed"
+        }
+      }
+    },
+    "switch": {
+      "shadow_mode": {
+        "name": "Shadow mode"
+      }
+    }
+  },
+  "issues": {
+    "fault_safe": {
+      "title": "Heating is in fault state",
+      "description": "The boiler was switched to the safe state: {reason}. Heating is off and the valves are in their idle position. The system returns by itself once the boiler is available and follows commands again."
+    },
+    "sensor_failure": {
+      "title": "Temperature sensors of {room} failed",
+      "description": "No temperature sensor of {room} has a valid value. The room runs in the fallback mode from its settings. Check the sensors or change them in the room settings."
+    }
+  },
+  "services": {
+    "start_manual": {
+      "name": "Start manual heating",
+      "description": "Heats for the given time, regardless of the room demand.",
+      "fields": {
+        "duration": {
+          "name": "Duration",
+          "description": "Duration in minutes (1 to 720)."
+        }
+      }
+    },
+    "stop": {
+      "name": "Stop manual heating",
+      "description": "Ends manual heating."
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Hydronic Heating Controller is not loaded."
+    }
   }
 }

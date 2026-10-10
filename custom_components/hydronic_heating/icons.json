@@ -1,0 +1,37 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "heat_demand": { "default": "mdi:fire-alert" },
+      "window_block": { "default": "mdi:window-open-variant" },
+      "summer": { "default": "mdi:weather-sunny", "state": { "off": "mdi:snowflake" } }
+    },
+    "button": {
+      "manual": { "default": "mdi:fire" },
+      "stop": { "default": "mdi:stop-circle-outline" }
+    },
+    "number": {
+      "comfort": { "default": "mdi:sofa-outline" },
+      "eco": { "default": "mdi:leaf" }
+    },
+    "select": {
+      "system_mode": { "default": "mdi:radiator" }
+    },
+    "sensor": {
+      "manual_ends_at": { "default": "mdi:timer-outline" },
+      "state": { "default": "mdi:state-machine" },
+      "demand_total": { "default": "mdi:gauge" },
+      "boiler_duty": { "default": "mdi:percent-outline" },
+      "boiler_starts_today": { "default": "mdi:counter" },
+      "open_windows": { "default": "mdi:window-open-variant" },
+      "demand": { "default": "mdi:gauge" },
+      "valve_state": { "default": "mdi:pipe-valve" }
+    },
+    "switch": {
+      "shadow_mode": { "default": "mdi:ghost-outline" }
+    }
+  },
+  "services": {
+    "start_manual": { "service": "mdi:fire" },
+    "stop": { "service": "mdi:stop-circle-outline" }
+  }
+}

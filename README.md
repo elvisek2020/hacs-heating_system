@@ -4,14 +4,12 @@ Vlastní integrace pro Home Assistant, která řídí teplovodní ústřední to
 
 ## Stav
 
-**Fáze F0: jen konfigurace.** Integrace se nainstaluje, projde nastavením a uloží všechny parametry systému i místností. Zatím nic neřídí a nevytváří žádné entity. Řízení přijde ve fázi F1.
-
 | Fáze | Obsah |
 |---|---|
 | **F0** ✅ | kostra, config flow, nastavení systému, místnosti, ikona, CI |
-| F1 | místnosti, ventily, kotel, arbitr, ochrana kotle, manuál, režimy, shadow |
-| F2 | okna, mráz, léto, protáčení, notifikace, diagnostika |
-| F3 | ekviterm: topná křivka, omezení střídy |
+| **F1** ✅ | místnosti, čidla, ventily NO/NC, kotel, arbitr požadavků, sekvence ventily → kotel → doběh, ochrana kotle proti cyklování, manuál s odpočtem, režimy, rozvrh, shadow, ukládání stavu |
+| **F2** ✅ | okna a globální práh, protimrazová ochrana, venkovní teplota a mez vytápění (léto), protáčení ventilů, notifikace, repair issues, diagnostika |
+| F3 | ekviterm: topná křivka, omezení střídy kotle |
 
 ## Instalace přes HACS
 
@@ -22,15 +20,53 @@ Vlastní integrace pro Home Assistant, která řídí teplovodní ústřední to
 
 Vyžaduje Home Assistant 2026.3 nebo novější.
 
-## Nastavení
+## Jak začít
 
-- **Průvodce při přidání:** název, režim shadow, zdroj tepla (spínač, dvojice akcí nebo select), venkovní teplota a hlavní ochrana kotle.
-- **Místnosti:** v integraci tlačítko **Přidat místnost**. Průvodce projde název a teploty, čidla, ventily (u každého NO/NC a doby přestavení), okenní kontakty, rozvrh a regulaci. Místnost jde kdykoli upravit.
-- **Ostatní parametry:** v integraci **Konfigurovat**. Menu je rozdělené na obecné, zdroj tepla, venkovní teplotu, kotel a požadavky, bezpečnost, ventily, okna, manuál, ekviterm a mráz.
+1. Přidejte integraci. **Režim shadow** nechte zapnutý: integrace všechno počítá, ale nic nespíná.
+2. V integraci přidejte místnosti tlačítkem **Přidat místnost** (čidla, ventily, okna, rozvrh).
+3. Nechte systém běžet vedle stávající regulace. Na `climate.hh_system` ukazují atributy `would_command_boiler` a `would_command_valves`, co by integrace udělala.
+4. Až rozhodnutí sedí, vypněte `switch.hh_shadow_mode`. Od té chvíle integrace spíná kotel a hlavice.
 
-Všechno se mění jen v nastavení, bez úprav kódu a bez restartu HA.
+Všechno se mění jen v nastavení, bez úprav kódu a bez restartu HA. Změna místností nebo délek manuálu integraci krátce znovu načte, ostatní změny se projeví hned.
 
-### Příprava v Loxone
+## Jak řídí
+
+- **Místnost:** teplota z 1..n čidel (průměr, minimum, maximum, medián nebo první platné). Požadavek 0–100 % počítá algoritmus TPI nebo hystereze. Ventily jedou v PWM (perioda 30 min, synchronní začátek), s minimální dobou stavu kvůli pomalým hlavicím.
+- **Kotel:** zapne se, když vážený požadavek místností překročí práh (s hysterezí), nebo když volá dost místností. Nejdřív se otevřou ventily, kotel startuje až po době přestavení (nebo hned, když má soustava obtok). Hlídá minimální dobu běhu, minimální pauzu a počet startů za hodinu. Po vypnutí drží ventily otevřené po dobu doběhu.
+- **Priority:** porucha > protimrazová ochrana > manuál > blokace okny > léto > zvolený režim (vypnuto, pryč, automaticky).
+- **Okna:** po zpoždění zavřou ventily místnosti. Při otevření oken ve více místnostech (globální práh) se zastaví kotel, kromě manuálu.
+- **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a v létě. Tuto ochranu nejde vypnout.
+- **Léto:** tlumená venkovní teplota nad mezí vytápění po nastavenou dobu přepne systém do léta. Pod mezí mínus hysterezi se vrátí do zimy hned.
+- **Ochrany:** ověření každého povelu s opakováním, keep-alive, obnovení stavu ventilů po výpadku, bezpečný stav při nedostupném kotli, heartbeat pro watchdog v Loxone, upozornění na zastaralá čidla.
+
+## Entity
+
+| Entita | Popis |
+|---|---|
+| `climate.hh_system` | souhrn systému; vypnuto / automaticky / topit (= manuál) |
+| `select.hh_system_mode` | auto, manual, off, away, summer |
+| `button.hh_manual_30` … `_180`, `button.hh_stop` | manuální topení a jeho zastavení |
+| `sensor.hh_manual_ends_at` | konec manuálu (časové razítko) |
+| `sensor.hh_state` | stav automatu (start, auto, pryč, vypnuto, léto, manuál, porucha) |
+| `sensor.hh_demand_total` | vážený požadavek místností |
+| `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota |
+| `sensor.hh_boiler_duty`, `sensor.hh_boiler_starts_today` | střída kotle za 24 h a počet startů dnes |
+| `sensor.hh_open_windows` | počet místností s otevřeným oknem |
+| `binary_sensor.hh_heat_demand`, `_boiler_command`, `_window_block`, `_summer`, `_problem` | požadavek, povel kotli, blokace okny, léto, porucha |
+| `switch.hh_shadow_mode` | shadow režim |
+| `climate.hh_<místnost>` | termostat místnosti s presety komfort, eco, pryč a ruční teplota |
+| `sensor.hh_<místnost>_temperature`, `_demand`, `_valve_state` | teplota, požadavek, stav ventilů |
+| `number.hh_<místnost>_comfort`, `_eco` | komfortní a útlumová teplota |
+| `binary_sensor.hh_<místnost>_window`, `_problem` | blokace oknem, porucha místnosti |
+
+Ruční změna teploty nebo presetu místnosti v režimu automaticky platí trvale: místnost přejde do režimu topit a rozvrh se ignoruje, dokud ji nevrátíte na automaticky. Atribut `override_active` ukazuje, kde rozvrh neběží.
+
+## Služby
+
+- `hydronic_heating.start_manual` s parametrem `duration` (1–720 min): spustí nebo prodlouží manuální topení.
+- `hydronic_heating.stop`: ukončí manuál.
+
+## Příprava v Loxone
 
 Kotel a každá hlavice musí být v Loxone Config jako stavový blok **Switch**, ne Pushbutton, a výstup smí řídit jen jeden vlastník: buď Loxone, nebo tato integrace. Doporučený je i watchdog v Loxone: když integrace přestane přepínat výstup heartbeat, Loxone vypne kotel a odpojí napájení NO hlavic.
 
@@ -42,6 +78,8 @@ python3.14 -m venv .venv
 .venv/bin/pytest
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
+
+Jádro řízení (`custom_components/hydronic_heating/core/`) je čistý Python bez importů Home Assistantu a testuje se s falešným časem v `tests/core/`.
 
 Validace stejná jako v CI:
 
