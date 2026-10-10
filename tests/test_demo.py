@@ -257,3 +257,47 @@ async def test_reload_in_demo_raises_no_false_fault(
     # The saved state is not a fault either.
     await _run(hass, freezer, 30)
     assert hass.states.get("sensor.hh_state").state != "fault_safe"
+
+
+async def test_dashboard_structure(hass: HomeAssistant) -> None:
+    """Overview with badges and one section per room; charts never mix units."""
+    await _setup(hass, **{CONF_DEMO_MODE: DEMO_VIRTUAL_HOUSE})
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    overview, history = dashboard["views"]
+    assert overview["type"] == "sections"
+    assert {b["entity"] for b in overview["badges"]} >= {
+        "sensor.hh_state",
+        "binary_sensor.hh_boiler_command",
+        "sensor.hh_flow_setpoint",
+    }
+    headings = [s["cards"][0]["heading"] for s in overview["sections"]]
+    assert headings[-2:] == ["Obývák", "Ložnice"]
+    living = overview["sections"][-2]["cards"]
+    assert living[0]["icon"] == "mdi:sofa-outline"
+    assert living[1]["entity"] == "climate.hh_obyvak"
+    assert {f["type"] for f in living[1]["features"]} == {
+        "target-temperature",
+        "climate-preset-modes",
+    }
+    # Manual buttons press the button entity directly.
+    system = overview["sections"][0]["cards"]
+    manual = [c for c in system if c.get("entity", "").startswith("button.hh_manual_")]
+    assert len(manual) == 4
+    assert manual[0]["tap_action"]["perform_action"] == "button.press"
+    # Each room temperature chart shows only its climate entity.
+    room_charts = [c for c in history["sections"][0]["cards"] if c["type"] == "history-graph"]
+    assert [len(c["entities"]) for c in room_charts] == [1, 1]
+    demand_chart = history["sections"][1]["cards"][1]
+    assert all(e["entity"].endswith("_demand") for e in demand_chart["entities"])
+
+
+async def test_dashboard_room_without_demo_shows_real_heads(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    living = dashboard["views"][0]["sections"][-2]["cards"]
+    assert living[-1]["entity"] == "input_boolean.hlavice_obyvak"
+    assert living[-1]["name"] == "Valve head"  # test instance runs in English
