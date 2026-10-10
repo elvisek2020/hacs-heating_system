@@ -134,6 +134,9 @@ async def test_virtual_house_heats_and_reacts_to_events(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
     """Simulated rooms warm up, windows block, sensor faults are detected."""
+    # A fixed start makes the PWM phase deterministic. At this moment the boiler
+    # stops when the window blocks, so the test also covers the overrun.
+    freezer.move_to("2026-10-10 20:00:00+00:00")
     await _setup(hass, **{CONF_DEMO_MODE: DEMO_VIRTUAL_HOUSE})
     before = _real_states(hass)
     temperature = hass.states.get("sensor.hh_obyvak_demo_temperature")
@@ -152,6 +155,8 @@ async def test_virtual_house_heats_and_reacts_to_events(
     )
     await _run(hass, freezer, 90)
     assert hass.states.get("binary_sensor.hh_obyvak_window").state == "on"
+    # Valves that were open stay open during the boiler overrun (180 s), then close.
+    await _run(hass, freezer, 180)
     assert hass.states.get("switch.hh_obyvak_demo_valve_1").state == "on"  # closed
 
     await hass.services.async_call(
