@@ -1,0 +1,507 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Teplovodní topení",
+        "description": "Základní nastavení. Místnosti přidáte potom v integraci tlačítkem Přidat místnost.",
+        "data": {
+          "name": "Název",
+          "shadow_mode": "Režim shadow"
+        },
+        "data_description": {
+          "name": "Název topného systému.",
+          "shadow_mode": "Vše se počítá, ale nic se nespíná. Doporučeno na první týdny souběhu s Loxone."
+        }
+      },
+      "heat_source": {
+        "title": "Zdroj tepla",
+        "description": "Jak Home Assistant povoluje topení kotle.",
+        "data": {
+          "heat_source_type": "Způsob ovládání"
+        }
+      },
+      "heat_source_switch": {
+        "title": "Spínač kotle",
+        "data": {
+          "heat_source_entity": "Spínač kotle",
+          "feedback_entity": "Zpětná vazba (volitelné)"
+        },
+        "data_description": {
+          "heat_source_entity": "Spínač nebo input_boolean, který povoluje topení kotle (stavový blok Switch v Loxone, ne Pushbutton).",
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+        }
+      },
+      "heat_source_actions": {
+        "title": "Akce kotle",
+        "data": {
+          "heat_source_on_entity": "Akce pro zapnutí",
+          "heat_source_off_entity": "Akce pro vypnutí",
+          "feedback_entity": "Zpětná vazba (volitelné)"
+        },
+        "data_description": {
+          "heat_source_on_entity": "Skript nebo tlačítko, které kotel zapne.",
+          "heat_source_off_entity": "Skript nebo tlačítko, které kotel vypne.",
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+        }
+      },
+      "heat_source_select": {
+        "title": "Výběr pro kotel",
+        "data": {
+          "heat_source_select_entity": "Entita výběru",
+          "heat_source_select_on": "Volba pro zapnuto",
+          "heat_source_select_off": "Volba pro vypnuto",
+          "feedback_entity": "Zpětná vazba (volitelné)"
+        },
+        "data_description": {
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+        }
+      },
+      "outdoor": {
+        "title": "Venkovní teplota",
+        "data": {
+          "outdoor_sensors": "Čidla venkovní teploty",
+          "weather_entity": "Entita počasí (záloha)"
+        },
+        "data_description": {
+          "outdoor_sensors": "V pořadí priority, použije se první platné.",
+          "weather_entity": "Použije se, když žádné čidlo nemá platnou hodnotu. Bez venkovní teploty se ekvitermní funkce vypnou."
+        }
+      },
+      "protection": {
+        "title": "Ochrana kotle",
+        "description": "Ostatní parametry změníte později v nastavení integrace.",
+        "data": {
+          "boiler_min_on": "Minimální doba běhu",
+          "boiler_min_off": "Minimální pauza",
+          "boiler_max_starts_per_hour": "Maximální počet startů za hodinu",
+          "boiler_overrun": "Doběh ventilů po vypnutí kotle",
+          "has_bypass": "Soustava má obtok",
+          "min_open_valves": "Minimální počet otevřených ventilů"
+        },
+        "data_description": {
+          "boiler_overrun": "Tak dlouho zůstanou ventily po vypnutí kotle otevřené. Má být aspoň tak dlouhý jako doběh čerpadla v kotli.",
+          "has_bypass": "Obtok, přepouštěcí ventil nebo radiátor bez hlavice, který protéká vždy.",
+          "min_open_valves": "Podmínka startu kotle, když soustava nemá obtok."
+        }
+      }
+    },
+    "error": {
+      "select_options_equal": "Volby pro zapnuto a vypnuto se musí lišit.",
+      "invalid_select_option": "Tuto volbu vybraná entita nenabízí.",
+      "not_temperature_sensor": "Vyberte čidla, která měří teplotu."
+    },
+    "abort": {
+      "single_instance_allowed": "Už je nastaveno. Podporovaný je jen jeden topný systém."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Nastavení",
+        "menu_options": {
+          "general": "Obecné",
+          "heat_source": "Zdroj tepla",
+          "outdoor": "Venkovní teplota",
+          "boiler": "Kotel a požadavky",
+          "safety": "Bezpečnost a notifikace",
+          "valves": "Klidový stav a protáčení ventilů",
+          "windows": "Okna",
+          "manual": "Manuální režim",
+          "equithermal": "Ekviterm",
+          "frost": "Ochrana proti mrazu"
+        }
+      },
+      "general": {
+        "title": "Obecné",
+        "data": {
+          "shadow_mode": "Režim shadow"
+        },
+        "data_description": {
+          "shadow_mode": "Vše se počítá, ale nic se nespíná. Doporučeno na první týdny souběhu s Loxone."
+        }
+      },
+      "heat_source": {
+        "title": "Zdroj tepla",
+        "description": "Jak Home Assistant povoluje topení kotle.",
+        "data": {
+          "heat_source_type": "Způsob ovládání"
+        }
+      },
+      "heat_source_switch": {
+        "title": "Spínač kotle",
+        "data": {
+          "heat_source_entity": "Spínač kotle",
+          "feedback_entity": "Zpětná vazba (volitelné)"
+        },
+        "data_description": {
+          "heat_source_entity": "Spínač nebo input_boolean, který povoluje topení kotle (stavový blok Switch v Loxone, ne Pushbutton).",
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+        }
+      },
+      "heat_source_actions": {
+        "title": "Akce kotle",
+        "data": {
+          "heat_source_on_entity": "Akce pro zapnutí",
+          "heat_source_off_entity": "Akce pro vypnutí",
+          "feedback_entity": "Zpětná vazba (volitelné)"
+        },
+        "data_description": {
+          "heat_source_on_entity": "Skript nebo tlačítko, které kotel zapne.",
+          "heat_source_off_entity": "Skript nebo tlačítko, které kotel vypne.",
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+        }
+      },
+      "heat_source_select": {
+        "title": "Výběr pro kotel",
+        "data": {
+          "heat_source_select_entity": "Entita výběru",
+          "heat_source_select_on": "Volba pro zapnuto",
+          "heat_source_select_off": "Volba pro vypnuto",
+          "feedback_entity": "Zpětná vazba (volitelné)"
+        },
+        "data_description": {
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+        }
+      },
+      "outdoor": {
+        "title": "Venkovní teplota",
+        "data": {
+          "outdoor_sensors": "Čidla venkovní teploty",
+          "weather_entity": "Entita počasí (záloha)"
+        },
+        "data_description": {
+          "outdoor_sensors": "V pořadí priority, použije se první platné.",
+          "weather_entity": "Použije se, když žádné čidlo nemá platnou hodnotu. Bez venkovní teploty se ekvitermní funkce vypnou."
+        }
+      },
+      "boiler": {
+        "title": "Kotel a požadavky",
+        "data": {
+          "boiler_min_on": "Minimální doba běhu",
+          "boiler_min_off": "Minimální pauza",
+          "boiler_max_starts_per_hour": "Maximální počet startů za hodinu",
+          "boiler_overrun": "Doběh ventilů po vypnutí kotle",
+          "boiler_demand_threshold": "Práh požadavku",
+          "boiler_demand_hysteresis": "Hystereze požadavku",
+          "room_call_threshold": "Práh volání místnosti",
+          "min_rooms_calling": "Minimální počet volajících místností",
+          "combine": "Kombinace podmínek",
+          "area_weighting": "Vážit plochou místnosti",
+          "has_bypass": "Soustava má obtok",
+          "min_open_valves": "Minimální počet otevřených ventilů"
+        },
+        "data_description": {
+          "boiler_overrun": "Tak dlouho zůstanou ventily po vypnutí kotle otevřené. Má být aspoň tak dlouhý jako doběh čerpadla v kotli.",
+          "boiler_demand_threshold": "Vážený požadavek všech místností, při kterém se kotel zapne.",
+          "boiler_demand_hysteresis": "Kotel se vypne pod prahem mínus hystereze.",
+          "room_call_threshold": "Místnost s alespoň tímto požadavkem se počítá jako volající.",
+          "combine": "Jak se kombinuje práh požadavku a počet volajících místností.",
+          "area_weighting": "Vyžaduje vyplněnou plochu u všech místností.",
+          "has_bypass": "Obtok, přepouštěcí ventil nebo radiátor bez hlavice, který protéká vždy.",
+          "min_open_valves": "Podmínka startu kotle, když soustava nemá obtok."
+        }
+      },
+      "safety": {
+        "title": "Bezpečnost a notifikace",
+        "data": {
+          "keep_alive": "Opakování povelu (keep-alive)",
+          "command_verify_timeout": "Časový limit ověření povelu",
+          "command_retries": "Počet opakování povelu",
+          "startup_grace": "Čekání po startu Home Assistantu",
+          "fault_recovery_time": "Doba pro návrat z poruchy",
+          "heartbeat_entity": "Výstup heartbeat (volitelné)",
+          "heartbeat_interval": "Interval heartbeatu",
+          "notify_service": "Notifikační služba (volitelné)"
+        },
+        "data_description": {
+          "keep_alive": "Pravidelně zopakuje aktuální povel, 0 = vypnuto.",
+          "startup_grace": "Výstupy se nespínají, dokud nejsou dostupné povinné entity, nejdéle po tuto dobu.",
+          "fault_recovery_time": "Jak dlouho musí být kotel dostupný a souhlasit s povelem, než se systém vrátí z poruchy.",
+          "heartbeat_entity": "Pravidelně se přepíná pro watchdog v hardwaru, například v Loxone.",
+          "notify_service": "Například notify.mobile_app_telefon."
+        }
+      },
+      "valves": {
+        "title": "Klidový stav a protáčení ventilů",
+        "data": {
+          "idle_valve_policy": "Ventily mimo topnou sezónu",
+          "exercise_interval_days": "Interval protáčení",
+          "exercise_duration": "Délka protáčení",
+          "exercise_time": "Čas protáčení",
+          "exercise_parallel": "Současně protáčené ventily"
+        },
+        "data_description": {
+          "idle_valve_policy": "Bez proudu znamená, že NO hlavice jsou otevřené a nic neodebírají.",
+          "exercise_interval_days": "0 = vypnuto.",
+          "exercise_duration": "Aspoň doba přestavení ventilu + 60 s."
+        }
+      },
+      "windows": {
+        "title": "Okna",
+        "description": "Okenní kontakty se přiřazují v nastavení místností.",
+        "data": {
+          "window_open_delay": "Zpoždění po otevření okna",
+          "window_close_delay": "Zpoždění po zavření okna",
+          "window_outdoor_condition": "Jen když je venku chladněji",
+          "window_max_block": "Maximální doba blokace oknem",
+          "global_window_mode": "Způsob globálního prahu",
+          "global_window_count": "Počet místností s otevřeným oknem",
+          "global_window_ratio": "Podíl místností s otevřeným oknem",
+          "global_window_delay": "Zpoždění globálního prahu"
+        },
+        "data_description": {
+          "window_outdoor_condition": "Blokovat jen tehdy, když je venku chladněji než v místnosti."
+        }
+      },
+      "manual": {
+        "title": "Manuální režim",
+        "data": {
+          "manual_durations": "Délky manuálu (min)",
+          "manual_restart_policy": "Opakované spuštění",
+          "manual_scope": "Manuál otevírá ventily",
+          "stop_policy": "Po zastavení",
+          "stop_respects_min_on": "Stop respektuje minimální dobu běhu",
+          "mirror_timer_entity": "Zrcadlit do časovače (volitelné)"
+        },
+        "data_description": {
+          "manual_durations": "Pro každou délku jedno tlačítko, 1 až 6 hodnot od 1 do 720 minut.",
+          "mirror_timer_entity": "Pomocník časovač pro průběžný odpočet na dashboardu."
+        }
+      },
+      "equithermal": {
+        "title": "Ekviterm",
+        "data": {
+          "design_outdoor_temp": "Výpočtová venkovní teplota",
+          "design_flow_temp": "Výpočtová teplota vody",
+          "reference_room_temp": "Referenční teplota místnosti",
+          "radiator_exponent": "Exponent otopných těles",
+          "curve_offset": "Posun křivky",
+          "flow_temp_min": "Minimální teplota vody",
+          "flow_temp_max": "Maximální teplota vody",
+          "heating_limit": "Mez vytápění",
+          "heating_limit_hysteresis": "Hystereze meze vytápění",
+          "outdoor_damping_hours": "Tlumení venkovní teploty",
+          "summer_switch_delay": "Zpoždění přechodu do léta",
+          "equithermal_duty_enabled": "Omezit střídu kotle podle křivky",
+          "boiler_fixed_flow_temp": "Teplota vody nastavená na kotli",
+          "boiler_cycle_period": "Perioda střídy",
+          "duty_min": "Minimální střída"
+        },
+        "data_description": {
+          "design_flow_temp": "Teplota vody, kterou dům potřebuje při výpočtové venkovní teplotě.",
+          "heating_limit": "Nad touto tlumenou venkovní teplotou se přejde do léta.",
+          "equithermal_duty_enabled": "U nekondenzačních kotlů zapínat až po ověření minimální teploty vody."
+        }
+      },
+      "equithermal_confirm": {
+        "title": "Kontrola topné křivky",
+        "description": "Výpočtová teplota vody {design_flow_temp} °C je vyšší než teplota nastavená na kotli {boiler_fixed_flow_temp} °C. Omezení střídy pak bude většinu zimy fungovat jen málo. Přesto uložit?"
+      },
+      "frost": {
+        "title": "Ochrana proti mrazu",
+        "data": {
+          "frost_outdoor_protection": "Cirkulační běh při mrazu",
+          "frost_outdoor_temp": "Venkovní teplota mrazu",
+          "frost_idle_max": "Maximální nečinnost kotle v mrazu"
+        },
+        "data_description": {
+          "frost_outdoor_protection": "Pro rozvody v nevytápěných prostorách."
+        }
+      }
+    },
+    "error": {
+      "select_options_equal": "Volby pro zapnuto a vypnuto se musí lišit.",
+      "invalid_select_option": "Tuto volbu vybraná entita nenabízí.",
+      "not_temperature_sensor": "Vyberte čidla, která měří teplotu.",
+      "hysteresis_too_large": "Hystereze musí být menší než práh požadavku.",
+      "area_missing": "Nejdřív vyplňte plochu těchto místností: {rooms}",
+      "notify_service_not_found": "Notifikační služba neexistuje. Použijte tvar notify.název.",
+      "exercise_too_short": "Musí být aspoň {minimum} s (nejdelší doba přestavení ventilu + 60 s).",
+      "invalid_durations": "Zadejte 1 až 6 celých čísel od 1 do 720.",
+      "flow_range": "Minimum musí být nižší než maximum."
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Místnost",
+      "initiate_flow": {
+        "user": "Přidat místnost",
+        "reconfigure": "Upravit místnost"
+      },
+      "step": {
+        "basics": {
+          "title": "Místnost",
+          "data": {
+            "name": "Název místnosti",
+            "comfort_temp": "Komfortní teplota",
+            "eco_temp": "Útlumová teplota (eco)",
+            "away_temp": "Teplota při nepřítomnosti",
+            "frost_temp": "Protimrazová teplota",
+            "area_m2": "Plocha",
+            "weight": "Váha"
+          },
+          "data_description": {
+            "area_m2": "0 = nevyplněno.",
+            "weight": "Váha místnosti při rozhodování o kotli."
+          }
+        },
+        "sensors": {
+          "title": "Teplotní čidla",
+          "data": {
+            "sensors": "Teplotní čidla",
+            "aggregation": "Spojení čidel",
+            "sensor_min": "Nejnižší platná hodnota",
+            "sensor_max": "Nejvyšší platná hodnota",
+            "sensor_stale_timeout": "Hodnota je zastaralá po",
+            "sensor_fallback": "Při výpadku všech čidel",
+            "fallback_hold": "Držet poslední hodnotu",
+            "fallback_demand": "Pevný požadavek"
+          },
+          "data_description": {
+            "sensor_stale_timeout": "Loxone posílá hodnoty jen při změně, proto ponechte delší. 0 = nekontrolovat."
+          }
+        },
+        "valves": {
+          "title": "Ventily",
+          "data": {
+            "valves": "Ventily"
+          },
+          "data_description": {
+            "valves": "Spínače nebo entity ventilů termohlavic."
+          }
+        },
+        "valve": {
+          "title": "Nastavení ventilu",
+          "description": "Ventil {valve}.",
+          "data": {
+            "normally_open": "Bez proudu otevřeno (NO)",
+            "valve_open_time": "Doba otevření",
+            "valve_close_time": "Doba zavření"
+          },
+          "data_description": {
+            "normally_open": "Zapnuto = hlavice pod proudem = ventil zavřený."
+          }
+        },
+        "windows": {
+          "title": "Okna",
+          "description": "Nechte prázdné, když místnost nemá kontakty. Přidat je můžete později.",
+          "data": {
+            "windows": "Okenní kontakty (volitelné)",
+            "window_invert": "Obrátit kontakty"
+          },
+          "data_description": {
+            "window_invert": "Použijte, když kontakt hlásí zapnuto pro zavřené okno."
+          }
+        },
+        "schedule": {
+          "title": "Rozvrh",
+          "data": {
+            "schedule_entity": "Rozvrh (volitelné)",
+            "presence_entity": "Přítomnost (volitelné)"
+          },
+          "data_description": {
+            "schedule_entity": "Zapnuto = komfort, vypnuto = eco.",
+            "presence_entity": "Při nepřítomnosti se místnost přepne na away."
+          }
+        },
+        "control": {
+          "title": "Regulace",
+          "data": {
+            "control_algorithm": "Algoritmus regulace",
+            "cold_tolerance": "Tolerance pod cílem",
+            "hot_tolerance": "Tolerance nad cílem",
+            "tpi_coef_int": "Koeficient TPI (místnost)",
+            "tpi_coef_ext": "Koeficient TPI (venku)",
+            "valve_pwm_period": "Perioda PWM ventilu",
+            "valve_min_state_time": "Minimální doba stavu ventilu"
+          },
+          "data_description": {
+            "cold_tolerance": "Jen pro hysterezi.",
+            "hot_tolerance": "Jen pro hysterezi.",
+            "valve_min_state_time": "Ne kratší než doba přestavení ventilu."
+          }
+        }
+      },
+      "error": {
+        "name_invalid": "Zadejte název.",
+        "name_exists": "Místnost s tímto názvem už existuje.",
+        "eco_above_comfort": "Eco teplota nesmí být vyšší než komfortní.",
+        "frost_too_high": "Protimrazová teplota musí být nižší než eco teplota a teplota při nepřítomnosti.",
+        "sensors_required": "Vyberte aspoň jedno čidlo.",
+        "not_temperature_sensor": "Vyberte čidla, která měří teplotu.",
+        "sensor_range": "Nejnižší hodnota musí být menší než nejvyšší.",
+        "valves_required": "Vyberte aspoň jeden ventil.",
+        "min_state_too_short": "Musí být aspoň doba přestavení ventilu ({valve_time} s)."
+      }
+    }
+  },
+  "selector": {
+    "heat_source_type": {
+      "options": {
+        "switch": "Spínač nebo input_boolean",
+        "actions": "Dvě akce (skript nebo tlačítko)",
+        "select": "Výběr (select)"
+      }
+    },
+    "combine": {
+      "options": {
+        "any": "Stačí jedna podmínka",
+        "all": "Obě podmínky"
+      }
+    },
+    "idle_valve_policy": {
+      "options": {
+        "deenergize": "Bez proudu",
+        "open": "Otevřené",
+        "closed": "Zavřené"
+      }
+    },
+    "global_window_mode": {
+      "options": {
+        "count": "Počet místností",
+        "ratio": "Podíl místností",
+        "any": "Kterákoli místnost"
+      }
+    },
+    "manual_restart_policy": {
+      "options": {
+        "replace": "Přepsat zbývající čas",
+        "extend": "Prodloužit"
+      }
+    },
+    "manual_scope": {
+      "options": {
+        "all_rooms": "Všechny místnosti",
+        "calling_rooms": "Jen volající místnosti"
+      }
+    },
+    "stop_policy": {
+      "options": {
+        "resume": "Vrátit předchozí režim",
+        "off": "Vypnout"
+      }
+    },
+    "aggregation": {
+      "options": {
+        "mean": "Průměr",
+        "min": "Minimum",
+        "max": "Maximum",
+        "median": "Medián",
+        "priority": "První platné"
+      }
+    },
+    "sensor_fallback": {
+      "options": {
+        "last_known": "Poslední známá hodnota",
+        "fixed_demand": "Pevný požadavek",
+        "valve_open": "Otevřít ventil"
+      }
+    },
+    "control_algorithm": {
+      "options": {
+        "hysteresis": "Hystereze",
+        "tpi": "TPI"
+      }
+    }
+  }
+}

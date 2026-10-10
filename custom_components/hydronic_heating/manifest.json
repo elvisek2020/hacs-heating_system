@@ -1,0 +1,13 @@
+{
+  "domain": "hydronic_heating",
+  "name": "Hydronic Heating Controller",
+  "codeowners": ["@elvisek2020"],
+  "config_flow": true,
+  "documentation": "https://github.com/elvisek2020/hacs-heating_system",
+  "integration_type": "hub",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/elvisek2020/hacs-heating_system/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

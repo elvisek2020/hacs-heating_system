@@ -1,0 +1,2 @@
+# Pins Home Assistant 2026.10.0 for tests.
+pytest-homeassistant-custom-component==0.13.371

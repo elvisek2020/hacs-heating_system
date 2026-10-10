@@ -1,0 +1,507 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hydronic heating",
+        "description": "Basic settings. Rooms are added afterwards in the integration with Add room.",
+        "data": {
+          "name": "Name",
+          "shadow_mode": "Shadow mode"
+        },
+        "data_description": {
+          "name": "Name of the heating system.",
+          "shadow_mode": "Everything is calculated, but no outputs are switched. Recommended for the first weeks next to Loxone."
+        }
+      },
+      "heat_source": {
+        "title": "Heat source",
+        "description": "How Home Assistant enables the boiler.",
+        "data": {
+          "heat_source_type": "Control type"
+        }
+      },
+      "heat_source_switch": {
+        "title": "Boiler switch",
+        "data": {
+          "heat_source_entity": "Boiler switch",
+          "feedback_entity": "Feedback (optional)"
+        },
+        "data_description": {
+          "heat_source_entity": "Switch or input_boolean that enables the boiler (a stateful Loxone Switch block, not a Pushbutton).",
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+        }
+      },
+      "heat_source_actions": {
+        "title": "Boiler actions",
+        "data": {
+          "heat_source_on_entity": "Turn-on action",
+          "heat_source_off_entity": "Turn-off action",
+          "feedback_entity": "Feedback (optional)"
+        },
+        "data_description": {
+          "heat_source_on_entity": "Script or button that turns the boiler on.",
+          "heat_source_off_entity": "Script or button that turns the boiler off.",
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+        }
+      },
+      "heat_source_select": {
+        "title": "Boiler select",
+        "data": {
+          "heat_source_select_entity": "Select entity",
+          "heat_source_select_on": "Option for on",
+          "heat_source_select_off": "Option for off",
+          "feedback_entity": "Feedback (optional)"
+        },
+        "data_description": {
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+        }
+      },
+      "outdoor": {
+        "title": "Outdoor temperature",
+        "data": {
+          "outdoor_sensors": "Outdoor temperature sensors",
+          "weather_entity": "Weather entity (fallback)"
+        },
+        "data_description": {
+          "outdoor_sensors": "In priority order, the first valid one is used.",
+          "weather_entity": "Used when no outdoor sensor has a valid value. Without any outdoor source the equithermal functions are disabled."
+        }
+      },
+      "protection": {
+        "title": "Boiler protection",
+        "description": "All other parameters can be changed later in the integration settings.",
+        "data": {
+          "boiler_min_on": "Minimum run time",
+          "boiler_min_off": "Minimum pause",
+          "boiler_max_starts_per_hour": "Maximum starts per hour",
+          "boiler_overrun": "Valve overrun after boiler stop",
+          "has_bypass": "System has a bypass",
+          "min_open_valves": "Minimum open valves"
+        },
+        "data_description": {
+          "boiler_overrun": "Valves stay open this long after the boiler stops. It should be at least as long as the pump overrun of the boiler.",
+          "has_bypass": "Bypass, differential pressure valve or a radiator without a valve head that always flows.",
+          "min_open_valves": "Required before the boiler starts when the system has no bypass."
+        }
+      }
+    },
+    "error": {
+      "select_options_equal": "Options for on and off must differ.",
+      "invalid_select_option": "The selected entity does not offer this option.",
+      "not_temperature_sensor": "Select sensors that report a temperature."
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured. Only one heating system is supported."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "menu_options": {
+          "general": "General",
+          "heat_source": "Heat source",
+          "outdoor": "Outdoor temperature",
+          "boiler": "Boiler and demand",
+          "safety": "Safety and notifications",
+          "valves": "Valve idle state and exercise",
+          "windows": "Windows",
+          "manual": "Manual mode",
+          "equithermal": "Equithermal",
+          "frost": "Frost protection"
+        }
+      },
+      "general": {
+        "title": "General",
+        "data": {
+          "shadow_mode": "Shadow mode"
+        },
+        "data_description": {
+          "shadow_mode": "Everything is calculated, but no outputs are switched. Recommended for the first weeks next to Loxone."
+        }
+      },
+      "heat_source": {
+        "title": "Heat source",
+        "description": "How Home Assistant enables the boiler.",
+        "data": {
+          "heat_source_type": "Control type"
+        }
+      },
+      "heat_source_switch": {
+        "title": "Boiler switch",
+        "data": {
+          "heat_source_entity": "Boiler switch",
+          "feedback_entity": "Feedback (optional)"
+        },
+        "data_description": {
+          "heat_source_entity": "Switch or input_boolean that enables the boiler (a stateful Loxone Switch block, not a Pushbutton).",
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+        }
+      },
+      "heat_source_actions": {
+        "title": "Boiler actions",
+        "data": {
+          "heat_source_on_entity": "Turn-on action",
+          "heat_source_off_entity": "Turn-off action",
+          "feedback_entity": "Feedback (optional)"
+        },
+        "data_description": {
+          "heat_source_on_entity": "Script or button that turns the boiler on.",
+          "heat_source_off_entity": "Script or button that turns the boiler off.",
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+        }
+      },
+      "heat_source_select": {
+        "title": "Boiler select",
+        "data": {
+          "heat_source_select_entity": "Select entity",
+          "heat_source_select_on": "Option for on",
+          "heat_source_select_off": "Option for off",
+          "feedback_entity": "Feedback (optional)"
+        },
+        "data_description": {
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+        }
+      },
+      "outdoor": {
+        "title": "Outdoor temperature",
+        "data": {
+          "outdoor_sensors": "Outdoor temperature sensors",
+          "weather_entity": "Weather entity (fallback)"
+        },
+        "data_description": {
+          "outdoor_sensors": "In priority order, the first valid one is used.",
+          "weather_entity": "Used when no outdoor sensor has a valid value. Without any outdoor source the equithermal functions are disabled."
+        }
+      },
+      "boiler": {
+        "title": "Boiler and demand",
+        "data": {
+          "boiler_min_on": "Minimum run time",
+          "boiler_min_off": "Minimum pause",
+          "boiler_max_starts_per_hour": "Maximum starts per hour",
+          "boiler_overrun": "Valve overrun after boiler stop",
+          "boiler_demand_threshold": "Demand threshold",
+          "boiler_demand_hysteresis": "Demand hysteresis",
+          "room_call_threshold": "Room call threshold",
+          "min_rooms_calling": "Minimum calling rooms",
+          "combine": "Combine conditions",
+          "area_weighting": "Weight by room area",
+          "has_bypass": "System has a bypass",
+          "min_open_valves": "Minimum open valves"
+        },
+        "data_description": {
+          "boiler_overrun": "Valves stay open this long after the boiler stops. It should be at least as long as the pump overrun of the boiler.",
+          "boiler_demand_threshold": "Weighted demand of all rooms that starts the boiler.",
+          "boiler_demand_hysteresis": "The boiler stops below the threshold minus the hysteresis.",
+          "room_call_threshold": "A room with at least this demand counts as calling.",
+          "combine": "How the demand threshold and the number of calling rooms are combined.",
+          "area_weighting": "Requires the area to be filled in for all rooms.",
+          "has_bypass": "Bypass, differential pressure valve or a radiator without a valve head that always flows.",
+          "min_open_valves": "Required before the boiler starts when the system has no bypass."
+        }
+      },
+      "safety": {
+        "title": "Safety and notifications",
+        "data": {
+          "keep_alive": "Repeat command (keep-alive)",
+          "command_verify_timeout": "Command verification timeout",
+          "command_retries": "Command retries",
+          "startup_grace": "Startup grace period",
+          "fault_recovery_time": "Fault recovery time",
+          "heartbeat_entity": "Heartbeat output (optional)",
+          "heartbeat_interval": "Heartbeat interval",
+          "notify_service": "Notification service (optional)"
+        },
+        "data_description": {
+          "keep_alive": "Repeats the current command periodically, 0 = off.",
+          "startup_grace": "Outputs are not switched until all required entities are available, at most this long.",
+          "fault_recovery_time": "How long the boiler must be available and match the command before leaving the fault state.",
+          "heartbeat_entity": "Toggled periodically for a hardware watchdog, for example in Loxone.",
+          "notify_service": "For example notify.mobile_app_phone."
+        }
+      },
+      "valves": {
+        "title": "Valve idle state and exercise",
+        "data": {
+          "idle_valve_policy": "Valves outside the heating season",
+          "exercise_interval_days": "Exercise interval",
+          "exercise_duration": "Exercise duration",
+          "exercise_time": "Exercise time",
+          "exercise_parallel": "Valves exercised at once"
+        },
+        "data_description": {
+          "idle_valve_policy": "De-energized means that NO valve heads are open and draw no power.",
+          "exercise_interval_days": "0 = off.",
+          "exercise_duration": "At least the valve travel time + 60 s."
+        }
+      },
+      "windows": {
+        "title": "Windows",
+        "description": "Window contacts are assigned to rooms in the room settings.",
+        "data": {
+          "window_open_delay": "Delay after opening",
+          "window_close_delay": "Delay after closing",
+          "window_outdoor_condition": "Only when colder outside",
+          "window_max_block": "Maximum window block",
+          "global_window_mode": "Global threshold mode",
+          "global_window_count": "Rooms with an open window",
+          "global_window_ratio": "Share of rooms with an open window",
+          "global_window_delay": "Global threshold delay"
+        },
+        "data_description": {
+          "window_outdoor_condition": "Block heating only when it is colder outside than in the room."
+        }
+      },
+      "manual": {
+        "title": "Manual mode",
+        "data": {
+          "manual_durations": "Manual durations (min)",
+          "manual_restart_policy": "Repeated start",
+          "manual_scope": "Manual opens valves in",
+          "stop_policy": "After stop",
+          "stop_respects_min_on": "Stop respects the minimum run time",
+          "mirror_timer_entity": "Mirror to a timer (optional)"
+        },
+        "data_description": {
+          "manual_durations": "One button per duration, 1 to 6 values between 1 and 720 minutes.",
+          "mirror_timer_entity": "Timer helper for a running countdown on the dashboard."
+        }
+      },
+      "equithermal": {
+        "title": "Equithermal",
+        "data": {
+          "design_outdoor_temp": "Design outdoor temperature",
+          "design_flow_temp": "Design flow temperature",
+          "reference_room_temp": "Reference room temperature",
+          "radiator_exponent": "Radiator exponent",
+          "curve_offset": "Curve offset",
+          "flow_temp_min": "Minimum flow temperature",
+          "flow_temp_max": "Maximum flow temperature",
+          "heating_limit": "Heating limit",
+          "heating_limit_hysteresis": "Heating limit hysteresis",
+          "outdoor_damping_hours": "Outdoor temperature damping",
+          "summer_switch_delay": "Summer switch delay",
+          "equithermal_duty_enabled": "Limit boiler duty by the curve",
+          "boiler_fixed_flow_temp": "Water temperature set on the boiler",
+          "boiler_cycle_period": "Duty cycle period",
+          "duty_min": "Minimum duty"
+        },
+        "data_description": {
+          "design_flow_temp": "Water temperature the house needs at the design outdoor temperature.",
+          "heating_limit": "Above this damped outdoor temperature the system switches to summer.",
+          "equithermal_duty_enabled": "For non-condensing boilers enable it only after verifying the minimum water temperature."
+        }
+      },
+      "equithermal_confirm": {
+        "title": "Check the heating curve",
+        "description": "The design flow temperature {design_flow_temp} °C is above the water temperature set on the boiler {boiler_fixed_flow_temp} °C. The duty limit will then have little effect for most of the winter. Save anyway?"
+      },
+      "frost": {
+        "title": "Frost protection",
+        "data": {
+          "frost_outdoor_protection": "Circulation run in frost",
+          "frost_outdoor_temp": "Outdoor frost temperature",
+          "frost_idle_max": "Maximum boiler idle time in frost"
+        },
+        "data_description": {
+          "frost_outdoor_protection": "For pipes in unheated spaces."
+        }
+      }
+    },
+    "error": {
+      "select_options_equal": "Options for on and off must differ.",
+      "invalid_select_option": "The selected entity does not offer this option.",
+      "not_temperature_sensor": "Select sensors that report a temperature.",
+      "hysteresis_too_large": "Hysteresis must be lower than the demand threshold.",
+      "area_missing": "Fill in the area of these rooms first: {rooms}",
+      "notify_service_not_found": "Notification service not found. Use the form notify.name.",
+      "exercise_too_short": "Must be at least {minimum} s (longest valve travel time + 60 s).",
+      "invalid_durations": "Enter 1 to 6 whole numbers between 1 and 720.",
+      "flow_range": "The minimum must be lower than the maximum."
+    }
+  },
+  "config_subentries": {
+    "room": {
+      "entry_type": "Room",
+      "initiate_flow": {
+        "user": "Add room",
+        "reconfigure": "Edit room"
+      },
+      "step": {
+        "basics": {
+          "title": "Room",
+          "data": {
+            "name": "Room name",
+            "comfort_temp": "Comfort temperature",
+            "eco_temp": "Eco temperature",
+            "away_temp": "Away temperature",
+            "frost_temp": "Frost protection temperature",
+            "area_m2": "Area",
+            "weight": "Weight"
+          },
+          "data_description": {
+            "area_m2": "0 = not specified.",
+            "weight": "Weight of the room in the boiler decision."
+          }
+        },
+        "sensors": {
+          "title": "Temperature sensors",
+          "data": {
+            "sensors": "Temperature sensors",
+            "aggregation": "Combine sensors",
+            "sensor_min": "Lowest valid value",
+            "sensor_max": "Highest valid value",
+            "sensor_stale_timeout": "Value is stale after",
+            "sensor_fallback": "When all sensors fail",
+            "fallback_hold": "Keep the last value for",
+            "fallback_demand": "Fixed demand"
+          },
+          "data_description": {
+            "sensor_stale_timeout": "Loxone sends values only when they change, so keep this long. 0 = do not check."
+          }
+        },
+        "valves": {
+          "title": "Valves",
+          "data": {
+            "valves": "Valves"
+          },
+          "data_description": {
+            "valves": "Switches or valve entities of the radiator heads."
+          }
+        },
+        "valve": {
+          "title": "Valve settings",
+          "description": "Valve {valve}.",
+          "data": {
+            "normally_open": "Normally open (NO)",
+            "valve_open_time": "Opening time",
+            "valve_close_time": "Closing time"
+          },
+          "data_description": {
+            "normally_open": "On = head energized = valve closed."
+          }
+        },
+        "windows": {
+          "title": "Windows",
+          "description": "Leave empty when the room has no contacts. You can add them later.",
+          "data": {
+            "windows": "Window contacts (optional)",
+            "window_invert": "Invert contacts"
+          },
+          "data_description": {
+            "window_invert": "Use when a contact reports on for a closed window."
+          }
+        },
+        "schedule": {
+          "title": "Schedule",
+          "data": {
+            "schedule_entity": "Schedule (optional)",
+            "presence_entity": "Presence (optional)"
+          },
+          "data_description": {
+            "schedule_entity": "On = comfort, off = eco.",
+            "presence_entity": "Absence switches the room to away."
+          }
+        },
+        "control": {
+          "title": "Control",
+          "data": {
+            "control_algorithm": "Control algorithm",
+            "cold_tolerance": "Tolerance below target",
+            "hot_tolerance": "Tolerance above target",
+            "tpi_coef_int": "TPI coefficient (room)",
+            "tpi_coef_ext": "TPI coefficient (outdoor)",
+            "valve_pwm_period": "Valve PWM period",
+            "valve_min_state_time": "Minimum valve state time"
+          },
+          "data_description": {
+            "cold_tolerance": "Hysteresis only.",
+            "hot_tolerance": "Hysteresis only.",
+            "valve_min_state_time": "Not shorter than the valve travel time."
+          }
+        }
+      },
+      "error": {
+        "name_invalid": "Enter a name.",
+        "name_exists": "A room with this name already exists.",
+        "eco_above_comfort": "The eco temperature must not be above comfort.",
+        "frost_too_high": "The frost temperature must be below the eco and away temperatures.",
+        "sensors_required": "Select at least one sensor.",
+        "not_temperature_sensor": "Select sensors that report a temperature.",
+        "sensor_range": "The lowest value must be below the highest.",
+        "valves_required": "Select at least one valve.",
+        "min_state_too_short": "Must be at least the valve travel time ({valve_time} s)."
+      }
+    }
+  },
+  "selector": {
+    "heat_source_type": {
+      "options": {
+        "switch": "Switch or input_boolean",
+        "actions": "Two actions (script or button)",
+        "select": "Select entity"
+      }
+    },
+    "combine": {
+      "options": {
+        "any": "Either condition",
+        "all": "Both conditions"
+      }
+    },
+    "idle_valve_policy": {
+      "options": {
+        "deenergize": "De-energized",
+        "open": "Open",
+        "closed": "Closed"
+      }
+    },
+    "global_window_mode": {
+      "options": {
+        "count": "Number of rooms",
+        "ratio": "Share of rooms",
+        "any": "Any room"
+      }
+    },
+    "manual_restart_policy": {
+      "options": {
+        "replace": "Replace the remaining time",
+        "extend": "Extend"
+      }
+    },
+    "manual_scope": {
+      "options": {
+        "all_rooms": "All rooms",
+        "calling_rooms": "Calling rooms only"
+      }
+    },
+    "stop_policy": {
+      "options": {
+        "resume": "Return to the previous mode",
+        "off": "Switch off"
+      }
+    },
+    "aggregation": {
+      "options": {
+        "mean": "Mean",
+        "min": "Minimum",
+        "max": "Maximum",
+        "median": "Median",
+        "priority": "First valid"
+      }
+    },
+    "sensor_fallback": {
+      "options": {
+        "last_known": "Last known value",
+        "fixed_demand": "Fixed demand",
+        "valve_open": "Open the valve"
+      }
+    },
+    "control_algorithm": {
+      "options": {
+        "hysteresis": "Hysteresis",
+        "tpi": "TPI"
+      }
+    }
+  }
+}
