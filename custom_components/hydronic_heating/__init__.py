@@ -89,9 +89,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: HydronicConfigEntry) -> 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HydronicConfigEntry) -> bool:
     """Unload a config entry and save the control state."""
+    runtime = entry.runtime_data
+    # Stop first: the platforms remove our own entities, which must not trigger steps.
+    runtime.deactivate()
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        await entry.runtime_data.async_stop()
+        await runtime.async_save()
+    else:
+        runtime.reactivate()
     return unloaded
 
 

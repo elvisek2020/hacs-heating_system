@@ -52,6 +52,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SAVE_DELAY_S = 10
 FORECAST_INTERVAL = timedelta(minutes=30)
+ROOM_PROBLEM_KINDS = ("sensor_failure", "window_long", "not_reached")
 FORECAST_HOURS = 24
 
 type HydronicConfigEntry = ConfigEntry[HydronicHeatingRuntime]
@@ -183,10 +184,20 @@ class HydronicHeatingRuntime:
         if self.demo is not None:
             data = data or {}
             self.demo.restore(data.get("sim", {}))
-            self.demo.start()
             data = data.get("controller")
         self.controller.restore(data, dt_util.utcnow())
         self._mirror_ends_at = self.controller.modes.manual_ends_at
+        self._activate()
+        self.async_step()
+        self._cleanup_stale_problems()
+        self._schedule_forecast()
+
+    @callback
+    def _activate(self) -> None:
+        """Follow entity changes and timers."""
+        self._stopped = False
+        if self.demo is not None:
+            self.demo.start()
         self._subscribe()
         self._unsubs.append(
             async_track_time_interval(
@@ -196,11 +207,14 @@ class HydronicHeatingRuntime:
         self._unsubs.append(
             async_track_time_interval(self.hass, self._async_forecast_tick, FORECAST_INTERVAL)
         )
-        self.async_step()
-        self._schedule_forecast()
 
-    async def async_stop(self) -> None:
-        """Unsubscribe and save the state. Outputs are left as they are."""
+    @callback
+    def deactivate(self) -> None:
+        """Stop reacting to entities and timers. Outputs are left as they are.
+
+        Called before the platforms unload: removing our own entities (the demo
+        boiler above all) must not be seen as a failing boiler.
+        """
         self._stopped = True
         for unsub in self._unsubs:
             unsub()
@@ -210,7 +224,21 @@ class HydronicHeatingRuntime:
             self._state_unsub = None
         if self.demo is not None:
             self.demo.stop()
+
+    @callback
+    def reactivate(self) -> None:
+        """Resume after an unload that did not complete."""
+        self._activate()
+        self.async_step()
+
+    async def async_save(self) -> None:
+        """Save the control state now."""
         await self.store.async_save(self._stored())
+
+    async def async_stop(self) -> None:
+        """Deactivate and save the state."""
+        self.deactivate()
+        await self.async_save()
 
     @callback
     def apply_config(self) -> None:
@@ -363,8 +391,33 @@ class HydronicHeatingRuntime:
             placeholders["reason"] = reason_text(self.hass, placeholders["reason"])
         return placeholders
 
+    def _problem_keys(self) -> set[str]:
+        """All problem keys the current configuration can produce."""
+        keys = {"fault_safe"}
+        for room in [*self.rooms, *(r.cfg for r in self.controller.rooms.values())]:
+            keys.update(f"{kind}_{room.slug}" for kind in ROOM_PROBLEM_KINDS)
+            keys.update(f"valve_command_{valve.entity_id}" for valve in room.valves)
+        return keys
+
+    @callback
+    def _cleanup_stale_problems(self) -> None:
+        """Remove issues and notifications left by a previous instance.
+
+        A problem that is still real is reported again as soon as the controller
+        detects it.
+        """
+        current = set(self.controller.problems)
+        registry = ir.async_get(self.hass)
+        for domain, issue_id in list(registry.issues):
+            if domain == DOMAIN and issue_id not in current:
+                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+        for key in self._problem_keys() - current:
+            persistent_notification.async_dismiss(self.hass, f"{DOMAIN}_{key}")
+
     @callback
     def _handle_problems(self) -> None:
+        if self._stopped:
+            return
         current = self.controller.problems
         for key in current.keys() - self._known_problems.keys():
             self._report(current[key])
@@ -374,6 +427,8 @@ class HydronicHeatingRuntime:
 
     @callback
     def _report(self, problem: Problem) -> None:
+        if self._stopped:
+            return
         placeholders = self._placeholders(problem)
         title, message = notification_text(self.hass, problem.kind, placeholders)
         if self.demo is not None:

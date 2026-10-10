@@ -8,6 +8,7 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import EVENT_CALL_SERVICE
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.hydronic_heating.const import (
@@ -224,3 +225,35 @@ async def test_options_offer_demo_mode(hass: HomeAssistant, config_entry: MockCo
         result["flow_id"], {"next_step_id": "general"}
     )
     assert CONF_DEMO_MODE in {str(key) for key in result["data_schema"].schema}
+
+
+# --- Reload (to-do: false fault_safe on reload) -----------------------------------
+
+
+async def test_reload_in_demo_raises_no_false_fault(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Removing the demo entities during unload must not look like a boiler fault."""
+    entry = await _setup(hass, **{CONF_DEMO_MODE: DEMO_VIRTUAL_OUTPUTS})
+    await _run(hass, freezer, 6 * 60)
+    assert entry.runtime_data.controller.ready
+    assert hass.states.get("switch.hh_demo_boiler").state == "on"  # boiler running
+    boiler_before = entry.runtime_data.controller.sequencer.to_dict()
+    modes_before = entry.runtime_data.controller.modes.to_dict()
+    caplog.clear()
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    # The stored state is unchanged: no forced stop touched the anti-cycling times.
+    assert entry.runtime_data.controller.sequencer.to_dict() == boiler_before
+    assert entry.runtime_data.controller.modes.to_dict() == modes_before
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "fault_safe") is None
+    assert "v poruše" not in caplog.text
+    assert "fault" not in caplog.text.lower()
+    notifications = hass.data.get("persistent_notification", {})
+    assert not any("fault_safe" in key for key in notifications)
+    # The saved state is not a fault either.
+    await _run(hass, freezer, 30)
+    assert hass.states.get("sensor.hh_state").state != "fault_safe"

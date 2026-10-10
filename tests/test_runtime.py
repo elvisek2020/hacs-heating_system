@@ -6,6 +6,7 @@ from datetime import timedelta
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState, ConfigSubentry, ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
@@ -340,3 +341,25 @@ async def test_service_without_entry_raises(hass: HomeAssistant) -> None:
     await hass.config_entries.async_unload(entry.entry_id)
     with pytest.raises(Exception, match=r"not_loaded|není načtená|not loaded"):
         await hass.services.async_call(DOMAIN, "stop", {}, blocking=True)
+
+
+async def test_stale_issue_and_notification_are_removed_at_start(hass: HomeAssistant) -> None:
+    """Leftovers of a previous instance disappear when no fault is active."""
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "fault_safe",
+        is_fixable=False,
+        severity=ir.IssueSeverity.ERROR,
+        translation_key="fault_safe",
+        translation_placeholders={"reason": "x"},
+    )
+    persistent_notification.async_create(hass, "old", "old", f"{DOMAIN}_fault_safe")
+    persistent_notification.async_create(hass, "old", "old", f"{DOMAIN}_window_long_obyvak")
+    persistent_notification.async_create(hass, "keep", "keep", "something_else")
+    await _setup(hass)
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "fault_safe") is None
+    notifications = hass.data.get("persistent_notification", {})
+    assert f"{DOMAIN}_fault_safe" not in notifications
+    assert f"{DOMAIN}_window_long_obyvak" not in notifications
+    assert "something_else" in notifications
