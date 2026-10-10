@@ -7,7 +7,7 @@ anti-cycling, windows, frost protection, summer mode and manual heating.
 from __future__ import annotations
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
@@ -18,9 +18,11 @@ from .const import (
     DOMAIN,
     MANUAL_DURATION_MAX,
     MANUAL_DURATION_MIN,
+    SERVICE_GENERATE_DASHBOARD,
     SERVICE_START_MANUAL,
     SERVICE_STOP,
 )
+from .dashboard import build_dashboard
 from .runtime import HydronicConfigEntry, HydronicHeatingRuntime, structure_of
 
 PLATFORMS = [
@@ -61,7 +63,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         _runtime(hass).stop_manual()
 
     hass.services.async_register(DOMAIN, SERVICE_START_MANUAL, start_manual, START_MANUAL_SCHEMA)
+
+    async def generate_dashboard(call: ServiceCall) -> ServiceResponse:
+        return build_dashboard(_runtime(hass))
+
     hass.services.async_register(DOMAIN, SERVICE_STOP, stop)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_GENERATE_DASHBOARD,
+        generate_dashboard,
+        supports_response=SupportsResponse.ONLY,
+    )
     return True
 
 

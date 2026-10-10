@@ -14,15 +14,19 @@ from typing import Any
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Context, Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util, slugify
 
 from .const import (
+    CONF_BOILER_FIXED_FLOW_TEMP,
+    CONF_DEMO_MODE,
     CONF_MANUAL_DURATIONS,
     CONF_SHADOW_MODE,
+    CONF_VALVES,
     DEFAULT_OPTIONS,
+    DEMO_OFF,
     DOMAIN,
     STORAGE_VERSION,
     SUBENTRY_ROOM,
@@ -41,6 +45,7 @@ from .core.model import (
     SystemConfig,
     SystemMode,
 )
+from .demo import DemoLayout, DemoSimulator, build_layout, remap
 from .notifications import notification_text, reason_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,7 +65,14 @@ def structure_of(entry: ConfigEntry) -> tuple[Any, ...]:
     durations = tuple(
         entry.options.get(CONF_MANUAL_DURATIONS, DEFAULT_OPTIONS[CONF_MANUAL_DURATIONS])
     )
-    return (entry.title, rooms, durations)
+    demo = entry.options.get(CONF_DEMO_MODE, DEMO_OFF)
+    # Demo entities exist per valve, so the valve count is part of the structure.
+    valves = tuple(
+        len(sub.data.get(CONF_VALVES, []))
+        for sub in entry.subentries.values()
+        if sub.subentry_type == SUBENTRY_ROOM
+    )
+    return (entry.title, rooms, durations, demo, valves if demo != DEMO_OFF else ())
 
 
 def room_configs(entry: ConfigEntry) -> list[RoomConfig]:
@@ -91,9 +103,22 @@ class HydronicHeatingRuntime:
         self.entry = entry
         self.structure = structure_of(entry)
         self.rooms = room_configs(entry)
-        self.controller = HydronicController(self._system_config(), self.rooms)
+        self.demo_mode = str(entry.options.get(CONF_DEMO_MODE, DEMO_OFF))
+        self.layout: DemoLayout | None = None
+        self.demo: DemoSimulator | None = None
+        if self.demo_mode != DEMO_OFF:
+            self.layout = build_layout(hass, entry.entry_id, self.demo_mode, self.rooms)
+            water_temp = float(
+                entry.options.get(
+                    CONF_BOILER_FIXED_FLOW_TEMP, DEFAULT_OPTIONS[CONF_BOILER_FIXED_FLOW_TEMP]
+                )
+            )
+            self.demo = DemoSimulator(hass, self.layout, water_temp)
+        self.controller = HydronicController(*self._controller_configs())
+        # The demo keeps its own state, so it never mixes with the real boiler history.
+        suffix = ".demo" if self.demo else ""
         self.store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}{suffix}"
         )
         self.context = Context()
         self.last_plan = Plan()
@@ -109,11 +134,34 @@ class HydronicHeatingRuntime:
         options = {**DEFAULT_OPTIONS, **self.entry.options}
         return SystemConfig.from_options(options, dt_util.get_default_time_zone())
 
+    def real_system_config(self) -> SystemConfig:
+        """System configuration with the real entities, also during the demo."""
+        return self._system_config()
+
+    def _controller_configs(self) -> tuple[SystemConfig, list[RoomConfig]]:
+        """Return the core configuration; in the demo it points at the demo entities."""
+        system = self._system_config()
+        if self.demo is None:
+            return system, self.rooms
+        self.layout = build_layout(self.hass, self.entry.entry_id, self.demo_mode, self.rooms)
+        self.demo.layout = self.layout
+        return remap(system, self.rooms, self.layout)
+
+    def _stored(self) -> dict[str, Any]:
+        if self.demo is None:
+            return self.controller.to_dict()
+        return {"controller": self.controller.to_dict(), "sim": self.demo.to_dict()}
+
     # --- Lifecycle ----------------------------------------------------------
 
     async def async_start(self) -> None:
         """Restore state, subscribe to entities and run the first step."""
         data = await self.store.async_load()
+        if self.demo is not None:
+            data = data or {}
+            self.demo.restore(data.get("sim", {}))
+            self.demo.start()
+            data = data.get("controller")
         self.controller.restore(data, dt_util.utcnow())
         self._mirror_ends_at = self.controller.modes.manual_ends_at
         self._subscribe()
@@ -133,13 +181,15 @@ class HydronicHeatingRuntime:
         if self._state_unsub:
             self._state_unsub()
             self._state_unsub = None
-        await self.store.async_save(self.controller.to_dict())
+        if self.demo is not None:
+            self.demo.stop()
+        await self.store.async_save(self._stored())
 
     @callback
     def apply_config(self) -> None:
         """Apply changed options or room data without reloading (NFR-13)."""
         self.rooms = room_configs(self.entry)
-        self.controller.reconfigure(self._system_config(), self.rooms)
+        self.controller.reconfigure(*self._controller_configs())
         self._subscribe()
         self.async_step()
 
@@ -199,11 +249,27 @@ class HydronicHeatingRuntime:
             )
         self._handle_problems()
         self._sync_mirror_timer()
-        self.store.async_delay_save(self.controller.to_dict, SAVE_DELAY_S)
+        self.store.async_delay_save(self._stored, SAVE_DELAY_S)
         for listener in list(self._listeners):
             listener()
 
+    def _owned(self, entity_id: str) -> bool:
+        """Return True when the entity belongs to this config entry (demo safety net)."""
+        entry = er.async_get(self.hass).async_get(entity_id)
+        return (
+            entry is not None
+            and entry.platform == DOMAIN
+            and entry.config_entry_id == self.entry.entry_id
+        )
+
     async def _async_execute(self, command: Command) -> None:
+        if self.demo is not None and not self._owned(command.entity_id):
+            _LOGGER.error(
+                "Demo mode: refused %s for %s, the entity is not a demo entity",
+                command.action,
+                command.entity_id,
+            )
+            return
         domain = command.entity_id.split(".", 1)[0]
         data: dict[str, Any] = {"entity_id": command.entity_id}
         if command.action in ("open", "close"):
@@ -243,6 +309,8 @@ class HydronicHeatingRuntime:
     def _report(self, problem: Problem) -> None:
         placeholders = self._placeholders(problem)
         title, message = notification_text(self.hass, problem.kind, placeholders)
+        if self.demo is not None:
+            title = f"[Demo] {title}"
         _LOGGER.warning("%s: %s", title, message)
         persistent_notification.async_create(self.hass, message, title, f"{DOMAIN}_{problem.key}")
         if service := self.controller.cfg.notify_service:
@@ -297,7 +365,7 @@ class HydronicHeatingRuntime:
     @callback
     def _after_action(self) -> None:
         self.async_step()
-        self.hass.async_create_task(self.store.async_save(self.controller.to_dict()))
+        self.hass.async_create_task(self.store.async_save(self._stored()))
 
     @callback
     def set_mode(self, mode: str) -> None:

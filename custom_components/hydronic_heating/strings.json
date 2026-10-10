@@ -114,10 +114,12 @@
       "general": {
         "title": "General",
         "data": {
-          "shadow_mode": "Shadow mode"
+          "shadow_mode": "Shadow mode",
+          "demo_mode": "Demo mode"
         },
         "data_description": {
-          "shadow_mode": "Everything is calculated, but no outputs are switched. Recommended for the first weeks next to Loxone."
+          "shadow_mode": "Everything is calculated, but no outputs are switched. Recommended for the first weeks next to Loxone.",
+          "demo_mode": "Virtual outputs: real sensors, commands only to virtual boiler and valves. Virtual house: also simulated temperatures, windows and outdoor temperature. Real boiler and valves are never switched in the demo."
         }
       },
       "heat_source": {
@@ -502,6 +504,13 @@
         "hysteresis": "Hysteresis",
         "tpi": "TPI"
       }
+    },
+    "demo_mode": {
+      "options": {
+        "off": "Off",
+        "virtual_outputs": "Virtual outputs",
+        "virtual_house": "Virtual house"
+      }
     }
   },
   "entity": {
@@ -539,6 +548,9 @@
       },
       "eco": {
         "name": "Eco temperature"
+      },
+      "demo_outdoor_temperature": {
+        "name": "Demo outdoor temperature"
       }
     },
     "select": {
@@ -550,6 +562,14 @@
           "off": "Off",
           "summer": "Summer",
           "manual": "Manual"
+        }
+      },
+      "demo_boiler_behavior": {
+        "name": "Demo boiler behavior",
+        "state": {
+          "normal": "Normal",
+          "unavailable": "Unavailable",
+          "ignore_commands": "Ignores commands"
         }
       }
     },
@@ -600,11 +620,26 @@
           "unknown": "Unknown",
           "mixed": "Mixed"
         }
+      },
+      "demo_temperature": {
+        "name": "Demo temperature"
       }
     },
     "switch": {
       "shadow_mode": {
         "name": "Shadow mode"
+      },
+      "demo_boiler": {
+        "name": "Demo boiler"
+      },
+      "demo_valve": {
+        "name": "Demo valve {index}"
+      },
+      "demo_window": {
+        "name": "Demo window open"
+      },
+      "demo_sensor_fault": {
+        "name": "Demo sensor fault"
       }
     }
   },
@@ -632,6 +667,10 @@
     "stop": {
       "name": "Stop manual heating",
       "description": "Ends manual heating."
+    },
+    "generate_dashboard": {
+      "name": "Generate dashboard",
+      "description": "Returns a dashboard for this installation. Copy the response into a new dashboard (raw configuration editor)."
     }
   },
   "exceptions": {

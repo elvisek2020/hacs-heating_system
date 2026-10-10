@@ -1,37 +1,102 @@
 {
   "entity": {
     "binary_sensor": {
-      "heat_demand": { "default": "mdi:fire-alert" },
-      "window_block": { "default": "mdi:window-open-variant" },
-      "summer": { "default": "mdi:weather-sunny", "state": { "off": "mdi:snowflake" } }
+      "heat_demand": {
+        "default": "mdi:fire-alert"
+      },
+      "window_block": {
+        "default": "mdi:window-open-variant"
+      },
+      "summer": {
+        "default": "mdi:weather-sunny",
+        "state": {
+          "off": "mdi:snowflake"
+        }
+      }
     },
     "button": {
-      "manual": { "default": "mdi:fire" },
-      "stop": { "default": "mdi:stop-circle-outline" }
+      "manual": {
+        "default": "mdi:fire"
+      },
+      "stop": {
+        "default": "mdi:stop-circle-outline"
+      }
     },
     "number": {
-      "comfort": { "default": "mdi:sofa-outline" },
-      "eco": { "default": "mdi:leaf" }
+      "comfort": {
+        "default": "mdi:sofa-outline"
+      },
+      "eco": {
+        "default": "mdi:leaf"
+      },
+      "demo_outdoor_temperature": {
+        "default": "mdi:thermometer"
+      }
     },
     "select": {
-      "system_mode": { "default": "mdi:radiator" }
+      "system_mode": {
+        "default": "mdi:radiator"
+      },
+      "demo_boiler_behavior": {
+        "default": "mdi:water-boiler-alert"
+      }
     },
     "sensor": {
-      "manual_ends_at": { "default": "mdi:timer-outline" },
-      "state": { "default": "mdi:state-machine" },
-      "demand_total": { "default": "mdi:gauge" },
-      "boiler_duty": { "default": "mdi:percent-outline" },
-      "boiler_starts_today": { "default": "mdi:counter" },
-      "open_windows": { "default": "mdi:window-open-variant" },
-      "demand": { "default": "mdi:gauge" },
-      "valve_state": { "default": "mdi:pipe-valve" }
+      "manual_ends_at": {
+        "default": "mdi:timer-outline"
+      },
+      "state": {
+        "default": "mdi:state-machine"
+      },
+      "demand_total": {
+        "default": "mdi:gauge"
+      },
+      "boiler_duty": {
+        "default": "mdi:percent-outline"
+      },
+      "boiler_starts_today": {
+        "default": "mdi:counter"
+      },
+      "open_windows": {
+        "default": "mdi:window-open-variant"
+      },
+      "demand": {
+        "default": "mdi:gauge"
+      },
+      "valve_state": {
+        "default": "mdi:pipe-valve"
+      },
+      "demo_temperature": {
+        "default": "mdi:home-thermometer-outline"
+      }
     },
     "switch": {
-      "shadow_mode": { "default": "mdi:ghost-outline" }
+      "shadow_mode": {
+        "default": "mdi:ghost-outline"
+      },
+      "demo_boiler": {
+        "default": "mdi:water-boiler"
+      },
+      "demo_valve": {
+        "default": "mdi:pipe-valve"
+      },
+      "demo_window": {
+        "default": "mdi:window-open-variant"
+      },
+      "demo_sensor_fault": {
+        "default": "mdi:thermometer-off"
+      }
     }
   },
   "services": {
-    "start_manual": { "service": "mdi:fire" },
-    "stop": { "service": "mdi:stop-circle-outline" }
+    "start_manual": {
+      "service": "mdi:fire"
+    },
+    "stop": {
+      "service": "mdi:stop-circle-outline"
+    },
+    "generate_dashboard": {
+      "service": "mdi:view-dashboard-edit-outline"
+    }
   }
 }

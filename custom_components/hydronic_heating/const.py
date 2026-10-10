@@ -19,10 +19,16 @@ ENTITY_PREFIX: Final = "hh"
 
 SERVICE_START_MANUAL: Final = "start_manual"
 SERVICE_STOP: Final = "stop"
+SERVICE_GENERATE_DASHBOARD: Final = "generate_dashboard"
 ATTR_DURATION: Final = "duration"
 
 # --- General -------------------------------------------------------------
 CONF_SHADOW_MODE: Final = "shadow_mode"
+CONF_DEMO_MODE: Final = "demo_mode"
+DEMO_OFF: Final = "off"
+DEMO_VIRTUAL_OUTPUTS: Final = "virtual_outputs"
+DEMO_VIRTUAL_HOUSE: Final = "virtual_house"
+DEMO_MODES: Final = [DEMO_OFF, DEMO_VIRTUAL_OUTPUTS, DEMO_VIRTUAL_HOUSE]
 
 # --- Heat source (FR-BOI-01) ---------------------------------------------
 CONF_HEAT_SOURCE_TYPE: Final = "heat_source_type"
@@ -178,6 +184,7 @@ CONTROL_ALGORITHMS: Final = ["hysteresis", "tpi"]
 # --- Defaults ------------------------------------------------------------
 DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_SHADOW_MODE: True,
+    CONF_DEMO_MODE: DEMO_OFF,
     CONF_HEAT_SOURCE_TYPE: HEAT_SOURCE_SWITCH,
     CONF_OUTDOOR_SENSORS: [],
     # Boiler and arbitration

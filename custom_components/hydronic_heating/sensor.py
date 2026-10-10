@@ -20,7 +20,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .core.controller import HydronicController
 from .core.model import SystemState, ValvePhysical
 from .core.room import RoomController
-from .entity import HydronicEntity
+from .demo import DemoRoom
+from .entity import DemoEntity, HydronicEntity
 from .runtime import HydronicConfigEntry, HydronicHeatingRuntime
 
 PARALLEL_UPDATES = 0
@@ -142,6 +143,12 @@ async def async_setup_entry(
             (RoomSensor(runtime, d, room) for d in ROOM_SENSORS),
             config_subentry_id=room.room_id,
         )
+    if runtime.layout is not None and runtime.layout.house:
+        for demo_room in runtime.layout.rooms:
+            async_add_entities(
+                [DemoTemperatureSensor(runtime, demo_room)],
+                config_subentry_id=demo_room.room.room_id,
+            )
 
 
 class SystemSensor(HydronicEntity, SensorEntity):
@@ -190,3 +197,35 @@ class RoomSensor(HydronicEntity, SensorEntity):
         if self.entity_description.attrs_fn is None:
             return None
         return self.entity_description.attrs_fn(self.room)
+
+
+class DemoTemperatureSensor(DemoEntity, SensorEntity):
+    """Simulated room temperature of the virtual house."""
+
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(self, runtime: HydronicHeatingRuntime, demo_room: DemoRoom) -> None:
+        """Initialize."""
+        super().__init__(runtime, "sensor", "demo_temperature", demo_room.room)
+
+    @property
+    def available(self) -> bool:
+        """Unavailable while a sensor fault is simulated."""
+        return self.simulator.room_temperature(self.room_id) is not None
+
+    @property
+    def native_value(self) -> float | None:
+        """Simulated temperature."""
+        return self.simulator.room_temperature(self.room_id)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Internal state of the thermal model."""
+        thermal = self.simulator.thermal[self.room_id]
+        return {
+            "radiator": round(thermal.radiator, 1),
+            "valve_opening": round(thermal.opening, 2),
+        }

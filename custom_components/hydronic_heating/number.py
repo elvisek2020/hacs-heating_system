@@ -9,7 +9,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import CONF_COMFORT_TEMP, CONF_ECO_TEMP
 from .core.model import RoomConfig
-from .entity import HydronicEntity
+from .entity import DemoEntity, HydronicEntity
 from .runtime import HydronicConfigEntry, HydronicHeatingRuntime
 
 PARALLEL_UPDATES = 0
@@ -24,6 +24,8 @@ async def async_setup_entry(
 ) -> None:
     """Add the temperature settings of each room."""
     runtime = entry.runtime_data
+    if runtime.layout is not None and runtime.layout.house:
+        async_add_entities([DemoOutdoorTemperature(runtime)])
     for room in runtime.rooms:
         async_add_entities(
             (RoomTemperature(runtime, room, key, conf) for key, conf in ROOM_NUMBERS.items()),
@@ -58,3 +60,27 @@ class RoomTemperature(HydronicEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Store the temperature in the room settings."""
         self.runtime.set_room_value(self.room_id, self.conf_key, value)
+
+
+class DemoOutdoorTemperature(DemoEntity, NumberEntity):
+    """Outdoor temperature of the virtual house."""
+
+    _attr_device_class = NumberDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_native_min_value = -25
+    _attr_native_max_value = 35
+    _attr_native_step = 0.5
+    _attr_mode = NumberMode.BOX
+
+    def __init__(self, runtime: HydronicHeatingRuntime) -> None:
+        """Initialize."""
+        super().__init__(runtime, "number", "demo_outdoor_temperature")
+
+    @property
+    def native_value(self) -> float:
+        """Simulated outdoor temperature."""
+        return self.simulator.outdoor
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Change the simulated outdoor temperature."""
+        self.simulator.set_value("outdoor", None, value)

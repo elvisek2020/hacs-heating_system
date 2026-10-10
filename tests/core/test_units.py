@@ -535,3 +535,21 @@ def test_short_sensor_outage_is_not_reported() -> None:
     assert "sensor_failure_obyvak" not in ctrl.problems
     house.run(90)  # 5 minutes after the first step at T0 + 30 s
     assert "sensor_failure_obyvak" in ctrl.problems
+
+
+def test_startup_decisions_do_not_hold_valves() -> None:
+    """Sensors that load after the valves must not keep a valve closed for 5 minutes."""
+    ctrl = controller(room("obyvak"), **{c.CONF_HAS_BYPASS: True})
+    house = House(ctrl, temperatures={"obyvak": None})
+    house.set(BOILER, "unavailable")
+    # Fallback demand 30 % lands in the closed part of the PWM period.
+    house.now = T0.replace(minute=20)
+    house.step()
+    assert not ctrl.ready
+    assert ctrl.valve_desired["switch.hlavice_obyvak"] is False
+    house.set(BOILER, "off")
+    house.temp("obyvak", 19.0)
+    house.step()
+    assert ctrl.ready
+    assert ctrl.rooms["id_obyvak"].demand == 100
+    assert house.state("switch.hlavice_obyvak") == "off"  # open at once

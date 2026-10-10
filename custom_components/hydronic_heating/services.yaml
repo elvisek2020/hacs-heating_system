@@ -10,3 +10,4 @@ start_manual:
           unit_of_measurement: min
           mode: box
 stop:
+generate_dashboard:

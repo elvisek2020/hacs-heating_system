@@ -10,6 +10,7 @@ from .const import DOMAIN, ENTITY_PREFIX
 from .core.controller import HydronicController
 from .core.model import RoomConfig
 from .core.room import RoomController
+from .demo import DemoSimulator
 from .runtime import HydronicHeatingRuntime
 
 MANUFACTURER = "Hydronic Heating Controller"
@@ -52,7 +53,6 @@ class HydronicEntity(Entity):
                 name=room.name,
                 manufacturer=MANUFACTURER,
                 model="Room",
-                via_device=system_device,
             )
             object_id = "_".join(p for p in (ENTITY_PREFIX, room.slug, key) if p)
         self.entity_id = f"{domain}.{object_id}"
@@ -80,3 +80,18 @@ class HydronicEntity(Entity):
     @callback
     def _handle_update(self) -> None:
         self.async_write_ha_state()
+
+
+class DemoEntity(HydronicEntity):
+    """Entity of the demo mode; follows the simulator as well as the controller."""
+
+    @property
+    def simulator(self) -> DemoSimulator:
+        """The demo simulator (only exists while the demo is active)."""
+        assert self.runtime.demo is not None
+        return self.runtime.demo
+
+    async def async_added_to_hass(self) -> None:
+        """Follow simulator updates too."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self.simulator.async_add_listener(self._handle_update))

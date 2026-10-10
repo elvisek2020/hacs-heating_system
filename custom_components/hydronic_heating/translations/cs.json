@@ -114,10 +114,12 @@
       "general": {
         "title": "Obecné",
         "data": {
-          "shadow_mode": "Režim shadow"
+          "shadow_mode": "Režim shadow",
+          "demo_mode": "Demo režim"
         },
         "data_description": {
-          "shadow_mode": "Vše se počítá, ale nic se nespíná. Doporučeno na první týdny souběhu s Loxone."
+          "shadow_mode": "Vše se počítá, ale nic se nespíná. Doporučeno na první týdny souběhu s Loxone.",
+          "demo_mode": "Virtuální výstupy: skutečná čidla, povely jen do virtuálního kotle a ventilů. Virtuální dům: navíc simulované teploty, okna a venkovní teplota. Skutečný kotel a ventily demo nikdy nespíná."
         }
       },
       "heat_source": {
@@ -502,6 +504,13 @@
         "hysteresis": "Hystereze",
         "tpi": "TPI"
       }
+    },
+    "demo_mode": {
+      "options": {
+        "off": "Vypnuto",
+        "virtual_outputs": "Virtuální výstupy",
+        "virtual_house": "Virtuální dům"
+      }
     }
   },
   "entity": {
@@ -539,6 +548,9 @@
       },
       "eco": {
         "name": "Útlumová teplota"
+      },
+      "demo_outdoor_temperature": {
+        "name": "Demo venkovní teplota"
       }
     },
     "select": {
@@ -550,6 +562,14 @@
           "off": "Vypnuto",
           "summer": "Léto",
           "manual": "Manuál"
+        }
+      },
+      "demo_boiler_behavior": {
+        "name": "Demo chování kotle",
+        "state": {
+          "normal": "Normální",
+          "unavailable": "Nedostupný",
+          "ignore_commands": "Ignoruje povely"
         }
       }
     },
@@ -600,11 +620,26 @@
           "unknown": "Neznámý",
           "mixed": "Smíšený"
         }
+      },
+      "demo_temperature": {
+        "name": "Demo teplota"
       }
     },
     "switch": {
       "shadow_mode": {
         "name": "Režim shadow"
+      },
+      "demo_boiler": {
+        "name": "Demo kotel"
+      },
+      "demo_valve": {
+        "name": "Demo ventil {index}"
+      },
+      "demo_window": {
+        "name": "Demo otevřené okno"
+      },
+      "demo_sensor_fault": {
+        "name": "Demo výpadek čidla"
       }
     }
   },
@@ -632,6 +667,10 @@
     "stop": {
       "name": "Zastavit manuál",
       "description": "Ukončí manuální topení."
+    },
+    "generate_dashboard": {
+      "name": "Vytvořit dashboard",
+      "description": "Vrátí dashboard pro tuto instalaci. Odpověď zkopírujte do nového dashboardu (editor kódu YAML)."
     }
   },
   "exceptions": {

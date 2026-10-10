@@ -50,6 +50,7 @@ from .const import (
     CONF_COMMAND_VERIFY_TIMEOUT,
     CONF_CONTROL_ALGORITHM,
     CONF_CURVE_OFFSET,
+    CONF_DEMO_MODE,
     CONF_DESIGN_FLOW_TEMP,
     CONF_DESIGN_OUTDOOR_TEMP,
     CONF_DUTY_MIN,
@@ -135,6 +136,7 @@ from .const import (
     DEFAULT_OPTIONS,
     DEFAULT_ROOM,
     DEFAULT_VALVE,
+    DEMO_MODES,
     DOMAIN,
     GLOBAL_WINDOW_MODES,
     HEAT_SOURCE_ACTIONS,
@@ -249,7 +251,12 @@ def _user_schema(values: Mapping[str, Any]) -> vol.Schema:
 
 
 def _general_schema(values: Mapping[str, Any]) -> vol.Schema:
-    return vol.Schema({_required(CONF_SHADOW_MODE, values): _BOOL})
+    return vol.Schema(
+        {
+            _required(CONF_SHADOW_MODE, values): _BOOL,
+            _required(CONF_DEMO_MODE, values): _choice(DEMO_MODES, CONF_DEMO_MODE, as_list=True),
+        }
+    )
 
 
 def _heat_source_type_schema(values: Mapping[str, Any]) -> vol.Schema:

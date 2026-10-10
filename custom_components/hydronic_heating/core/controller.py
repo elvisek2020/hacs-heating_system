@@ -237,6 +237,12 @@ class HydronicController:
         if all(snap.get(e).available for e in required) or elapsed >= self.cfg.startup_grace_s:
             self.ready = True
             self.tracker.reset()
+            # Decisions made while inputs were still loading must not hold the
+            # valves for the minimum state time; start the valve logic afresh.
+            for room in self.rooms.values():
+                room.valve_open_cmd = None
+                room.valve_switched_at = None
+                room.valve_forced = False
 
     def _update_global_window(self, now: datetime) -> None:
         """FR-WIN-04: global window threshold with delay."""
