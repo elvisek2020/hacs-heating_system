@@ -1,4 +1,4 @@
-"""Shared fixtures for Hydronic Heating Controller tests."""
+"""Shared fixtures for Heating Controller tests."""
 
 from __future__ import annotations
 

@@ -580,6 +580,69 @@
       "manual_ends_at": {
         "name": "Manual ends at"
       },
+      "boiler_reason": {
+        "name": "Boiler state reason",
+        "state": {
+          "startup": "Starting up",
+          "idle": "No demand",
+          "off": "Off",
+          "summer": "Summer",
+          "window_block": "Window block",
+          "pre_open": "Waiting for valves",
+          "no_flow_hold": "No flow",
+          "min_off_hold": "Minimum pause",
+          "max_starts_hold": "Start limit",
+          "duty_hold": "Duty limit",
+          "firing_demand": "Heating on demand",
+          "firing_manual": "Manual heating",
+          "firing_frost": "Frost protection",
+          "min_on_hold": "Minimum run time",
+          "overrun": "Overrun",
+          "fault_safe": "Fault",
+          "fault_recovery": "Recovering from fault"
+        },
+        "state_attributes": {
+          "until": {
+            "name": "Until"
+          },
+          "remaining_s": {
+            "name": "Remaining (s)"
+          },
+          "rule": {
+            "name": "Rule"
+          },
+          "detail": {
+            "name": "Explanation"
+          }
+        }
+      },
+      "boiler_hold_ends_at": {
+        "name": "Next boiler change",
+        "state_attributes": {
+          "reason": {
+            "name": "Reason",
+            "state": {
+              "startup": "Starting up",
+              "idle": "No demand",
+              "off": "Off",
+              "summer": "Summer",
+              "window_block": "Window block",
+              "pre_open": "Waiting for valves",
+              "no_flow_hold": "No flow",
+              "min_off_hold": "Minimum pause",
+              "max_starts_hold": "Start limit",
+              "duty_hold": "Duty limit",
+              "firing_demand": "Heating on demand",
+              "firing_manual": "Manual heating",
+              "firing_frost": "Frost protection",
+              "min_on_hold": "Minimum run time",
+              "overrun": "Overrun",
+              "fault_safe": "Fault",
+              "fault_recovery": "Recovering from fault"
+            }
+          }
+        }
+      },
       "state": {
         "name": "State",
         "state": {
@@ -628,6 +691,32 @@
           "closed": "Closed",
           "unknown": "Unknown",
           "mixed": "Mixed"
+        },
+        "state_attributes": {
+          "reason": {
+            "name": "Reason",
+            "state": {
+              "startup": "Integration start",
+              "fault_safe": "Fault",
+              "frost": "Frost protection",
+              "window": "Open window",
+              "manual": "Manual heating",
+              "manual_excluded": "Not covered by manual",
+              "idle_policy": "Idle position",
+              "room_off": "Room off",
+              "pwm": "Room control (PWM)",
+              "min_state_hold": "Minimum state time",
+              "exercise": "Valve exercise",
+              "overrun": "Boiler overrun",
+              "min_flow": "Minimum flow"
+            }
+          },
+          "until": {
+            "name": "Until"
+          },
+          "valves": {
+            "name": "Valves"
+          }
         }
       },
       "demo_temperature": {
@@ -684,7 +773,7 @@
   },
   "exceptions": {
     "not_loaded": {
-      "message": "Hydronic Heating Controller is not loaded."
+      "message": "Heating Controller is not loaded."
     }
   }
 }

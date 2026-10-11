@@ -20,6 +20,8 @@ class OutputState:
     last_desired: bool | None = None
     failed: bool = False
     latency_ms: int | None = None
+    # Last position the entity was seen in agreement with the controller.
+    settled: bool | None = None
 
 
 class OutputTracker:
@@ -28,6 +30,8 @@ class OutputTracker:
     def __init__(self) -> None:
         """Start with no history."""
         self.outputs: dict[str, OutputState] = {}
+        # Outputs switched outside the controller and set back: (key, observed, desired).
+        self.reverts: list[tuple[str, bool, bool]] = []
 
     def state(self, key: str) -> OutputState:
         """Return the bookkeeping of an output."""
@@ -62,6 +66,7 @@ class OutputTracker:
             if observed == st.expected:
                 st.latency_ms = int((now - st.sent_at).total_seconds() * 1000)  # type: ignore[operator]
                 st.expected, st.failed, st.attempts = None, False, 0
+                st.settled = observed
             elif desired != st.expected:
                 st.expected = None
             elif now >= st.deadline:  # type: ignore[operator]
@@ -78,7 +83,11 @@ class OutputTracker:
             backoff = max(keep_alive_s, MIN_RETRY_BACKOFF_S)
             if st.failed and (now - st.last_sent).total_seconds() < backoff:
                 return False
+            if not st.failed and observed is not None and desired == st.settled:
+                # The decision did not change, the entity did: someone switched it.
+                self.reverts.append((key, observed, desired))
             return self._send(st, now, desired, verify_timeout_s, retry=False)
+        st.settled = desired
         if keep_alive_s > 0 and (now - st.last_sent).total_seconds() >= keep_alive_s:
             st.last_sent = now
             return True
@@ -110,3 +119,4 @@ class OutputTracker:
         for st in self.outputs.values():
             st.expected = None
             st.attempts = 0
+            st.settled = None

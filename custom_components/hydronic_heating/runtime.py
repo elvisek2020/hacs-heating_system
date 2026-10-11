@@ -15,7 +15,11 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Context, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_point_in_utc_time,
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util, slugify
 
@@ -28,6 +32,7 @@ from .const import (
     DEFAULT_OPTIONS,
     DEMO_OFF,
     DOMAIN,
+    EVENT_DECISION,
     STORAGE_VERSION,
     SUBENTRY_ROOM,
     UPDATE_INTERVAL_S,
@@ -35,6 +40,7 @@ from .const import (
 from .core.controller import HydronicController
 from .core.model import (
     Command,
+    Decision,
     EntityReading,
     Plan,
     Preset,
@@ -46,11 +52,14 @@ from .core.model import (
     SystemMode,
 )
 from .demo import DemoLayout, DemoSimulator, build_layout, remap
+from .explain import decision_text
 from .notifications import notification_text, reason_text
 
 _LOGGER = logging.getLogger(__name__)
 
 SAVE_DELAY_S = 10
+# A step right after a time rule ends, so the boiler follows the countdown.
+HOLD_STEP_DELAY = timedelta(seconds=1)
 FORECAST_INTERVAL = timedelta(minutes=30)
 ROOM_PROBLEM_KINDS = ("sensor_failure", "window_long", "not_reached")
 FORECAST_HOURS = 24
@@ -117,6 +126,22 @@ def _numeric(entity_id: str, state: str, attributes: Mapping[str, Any]) -> float
         return None
 
 
+def _event_data(decision: Decision) -> dict[str, Any]:
+    """Machine readable part of the decision event (for automations)."""
+    status = decision.status
+
+    def plain(value: Any) -> Any:
+        return value.isoformat() if isinstance(value, datetime) else value
+
+    return {
+        "kind": decision.kind,
+        "reason": status.reason.value,
+        "until": plain(status.until),
+        "rule": status.rule,
+        **{key: plain(value) for key, value in decision.params.items() if key != "entity_id"},
+    }
+
+
 class HydronicHeatingRuntime:
     """Owns the controller, its subscriptions and the command execution."""
 
@@ -152,6 +177,9 @@ class HydronicHeatingRuntime:
         self._known_problems: dict[str, Problem] = {}
         self._mirror_ends_at: datetime | None = None
         self._stopped = False
+        self._trigger: tuple[str, str | None] | None = None
+        self._hold_unsub: Callable[[], None] | None = None
+        self._hold_at: datetime | None = None
         self.forecast_24h: float | None = None
 
     def _system_config(self) -> SystemConfig:
@@ -222,6 +250,7 @@ class HydronicHeatingRuntime:
         if self._state_unsub:
             self._state_unsub()
             self._state_unsub = None
+        self._cancel_hold_step()
         if self.demo is not None:
             self.demo.stop()
 
@@ -299,15 +328,87 @@ class HydronicHeatingRuntime:
             _LOGGER.exception("Control step failed")
             return
         self.last_plan = plan
+        # Log before executing: a command can change an entity at once and run a
+        # nested step, which would replace the decisions of this one.
+        self._log_decisions(list(self.controller.decisions))
         for command in plan.commands:
             self.entry.async_create_background_task(
                 self.hass, self._async_execute(command), f"{DOMAIN} {command.entity_id}"
             )
         self._handle_problems()
         self._sync_mirror_timer()
+        self._sync_hold_step()
         self.store.async_delay_save(self._stored, SAVE_DELAY_S)
         for listener in list(self._listeners):
             listener()
+
+    # --- Step at the end of a time rule ---------------------------------------------
+
+    @callback
+    def _sync_hold_step(self) -> None:
+        """Schedule one step when the current time rule ends (min run, pause, overrun…)."""
+        until = self.controller.boiler_status.until
+        if until == self._hold_at:
+            return
+        self._cancel_hold_step()
+        if until is None or until <= dt_util.utcnow():
+            return
+        self._hold_at = until
+        self._hold_unsub = async_track_point_in_utc_time(
+            self.hass, self._async_hold_ended, until + HOLD_STEP_DELAY
+        )
+
+    @callback
+    def _async_hold_ended(self, now: datetime) -> None:
+        self._hold_unsub = None
+        self._hold_at = None
+        self.async_step()
+
+    @callback
+    def _cancel_hold_step(self) -> None:
+        if self._hold_unsub is not None:
+            self._hold_unsub()
+        self._hold_unsub = None
+        self._hold_at = None
+
+    # --- Decision log (logbook and log) ------------------------------------------
+
+    def system_entity_id(self, domain: str, key: str) -> str | None:
+        """Entity ID of a system entity of this entry (renames are kept)."""
+        return er.async_get(self.hass).async_get_entity_id(
+            domain, DOMAIN, f"{self.entry.entry_id}_{key}"
+        )
+
+    @callback
+    def _log_decisions(self, decisions: list[Decision]) -> None:
+        """Write boiler decisions and reverted outputs to the logbook and the log."""
+        trigger, self._trigger = self._trigger, None
+        if not decisions:
+            return
+        reason_entity = self.system_entity_id("sensor", "boiler_reason")
+        for decision in decisions:
+            entity_id = (
+                decision.params.get("entity_id") if decision.kind == "reverted" else reason_entity
+            )
+            state = self.hass.states.get(entity_id) if entity_id else None
+            options = {
+                "trigger": trigger,
+                "shadow": self.controller.cfg.shadow_mode,
+                "demo": self.demo is not None,
+                "name": state.name if state else None,
+            }
+            message = decision_text(self.hass, decision, **options)
+            _LOGGER.info("%s", decision_text(self.hass, decision, subject=True, **options))
+            self.hass.bus.async_fire(
+                EVENT_DECISION,
+                {
+                    "name": self.entry.title,
+                    "message": message,
+                    "entity_id": entity_id,
+                    **_event_data(decision),
+                },
+                context=self.context,
+            )
 
     def _owned(self, entity_id: str) -> bool:
         """Return True when the entity belongs to this config entry (demo safety net)."""
@@ -493,6 +594,7 @@ class HydronicHeatingRuntime:
     def set_mode(self, mode: str) -> None:
         """Select the system mode (FR-MODE-01)."""
         self.controller.set_mode(SystemMode(mode), dt_util.utcnow())
+        self._trigger = ("mode", mode)
         self._after_action()
 
     @callback
@@ -505,6 +607,7 @@ class HydronicHeatingRuntime:
     def stop_manual(self) -> None:
         """Stop manual heating (FR-MAN-03)."""
         self.controller.stop(dt_util.utcnow())
+        self._trigger = ("stop", None)
         self._after_action()
 
     @callback

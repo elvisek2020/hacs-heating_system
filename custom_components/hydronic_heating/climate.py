@@ -97,12 +97,18 @@ class SystemClimate(HydronicEntity, ClimateEntity):
             "boiler_on_since": _iso(seq.on_since) if seq.boiler_on else None,
             "boiler_off_since": _iso(seq.off_since) if not seq.boiler_on else None,
             "next_allowed_start": _iso(seq.next_allowed_start(now, ctrl.cfg)) if now else None,
+            "min_on_until": _iso(seq.min_on_until(ctrl.cfg)),
+            "min_off_until": _iso(seq.min_off_until(ctrl.cfg)),
+            "starts_last_hour": seq.starts_last_hour(now) if now else None,
+            "boiler_reason": ctrl.boiler_status.reason.value,
+            "hold_until": _iso(ctrl.boiler_status.until),
             "rooms_calling": ctrl.arbitration.calling,
             "blocked_by": ctrl.blocked_by,
             "fault_reason": ctrl.fault_reason,
             "burner_running": ctrl.burner_running,
             "last_transition": ctrl.modes.last_transition,
             "last_command_latency_ms": ctrl.tracker.state("boiler").latency_ms,
+            "last_reverted_override": ctrl.last_revert,
         }
         if ctrl.cfg.shadow_mode:
             would = ctrl.would_command()

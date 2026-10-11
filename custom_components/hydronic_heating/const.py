@@ -1,4 +1,4 @@
-"""Constants for the Hydronic Heating Controller integration.
+"""Constants for the Heating Controller integration.
 
 Keys and defaults follow the PRD, chapter 10.2. This module has no Home Assistant
 imports, so the pure core can share the keys (NFR-08).
@@ -21,6 +21,9 @@ SERVICE_START_MANUAL: Final = "start_manual"
 SERVICE_STOP: Final = "stop"
 SERVICE_GENERATE_DASHBOARD: Final = "generate_dashboard"
 ATTR_DURATION: Final = "duration"
+
+# Logbook event with every boiler decision and reverted output.
+EVENT_DECISION: Final = "hydronic_heating_decision"
 
 # --- General -------------------------------------------------------------
 CONF_SHADOW_MODE: Final = "shadow_mode"

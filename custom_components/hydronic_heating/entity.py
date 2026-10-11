@@ -13,7 +13,7 @@ from .core.room import RoomController
 from .demo import DemoSimulator
 from .runtime import HydronicHeatingRuntime
 
-MANUFACTURER = "Hydronic Heating Controller"
+MANUFACTURER = "Heating Controller"
 
 
 class HydronicEntity(Entity):

@@ -1,4 +1,4 @@
-"""Hydronic Heating Controller.
+"""Heating Controller.
 
 Rooms with 1..n sensors and 1..n NO/NC valves, an on/off boiler with
 anti-cycling, windows, frost protection, summer mode and manual heating.

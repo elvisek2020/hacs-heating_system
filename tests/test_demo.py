@@ -293,6 +293,43 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
     assert all(e["entity"].endswith("_demand") for e in demand_chart["entities"])
 
 
+async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
+    """Reason, countdown and explanation of the boiler state (FR-SAFE-07)."""
+    await _setup(hass, **{CONF_DEMO_MODE: DEMO_VIRTUAL_OUTPUTS})
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    overview, history = dashboard["views"]
+    badges = {b["entity"]: b for b in overview["badges"]}
+    assert "sensor.hh_boiler_reason" in badges
+    hold_badge = badges["sensor.hh_boiler_hold_ends_at"]
+    assert hold_badge["visibility"][0]["state_not"] == ["unknown", "unavailable"]
+    boiler = overview["sections"][1]["cards"]
+    assert boiler[1]["entity"] == "sensor.hh_boiler_reason"
+    assert boiler[2]["entity"] == "sensor.hh_boiler_hold_ends_at"
+    assert "visibility" in boiler[2]
+    assert "state_attr('sensor.hh_boiler_reason', 'detail')" in boiler[3]["content"]
+    # In the demo the demo section explains what is switched, not the shadow banner.
+    assert overview["sections"][0]["cards"][1]["type"] == "tile"
+    timeline = history["sections"][1]["cards"][2]["entities"]
+    assert timeline[0]["entity"] == "sensor.hh_boiler_reason"
+    assert timeline[2]["entity"] == "switch.hh_demo_boiler"
+
+
+async def test_dashboard_shadow_banner(hass: HomeAssistant) -> None:
+    """Without the demo a banner shows in shadow mode."""
+    await _setup(hass)
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    banner = dashboard["views"][0]["sections"][0]["cards"][1]
+    assert banner["type"] == "markdown"
+    assert banner["content"].startswith('<ha-alert alert-type="warning">**Shadow mode:**')
+    assert banner["visibility"] == [
+        {"condition": "state", "entity": "switch.hh_shadow_mode", "state": "on"}
+    ]
+
+
 async def test_dashboard_room_without_demo_shows_real_heads(hass: HomeAssistant) -> None:
     await _setup(hass)
     dashboard = await hass.services.async_call(

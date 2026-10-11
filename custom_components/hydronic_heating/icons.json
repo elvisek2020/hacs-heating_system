@@ -45,6 +45,31 @@
       "manual_ends_at": {
         "default": "mdi:timer-outline"
       },
+      "boiler_reason": {
+        "default": "mdi:information-outline",
+        "state": {
+          "startup": "mdi:progress-clock",
+          "idle": "mdi:fire-off",
+          "off": "mdi:power",
+          "summer": "mdi:weather-sunny",
+          "window_block": "mdi:window-open-variant",
+          "pre_open": "mdi:pipe-valve",
+          "no_flow_hold": "mdi:pipe-disconnected",
+          "min_off_hold": "mdi:timer-sand",
+          "max_starts_hold": "mdi:timer-sand",
+          "duty_hold": "mdi:timer-sand",
+          "firing_demand": "mdi:fire",
+          "firing_manual": "mdi:fire",
+          "firing_frost": "mdi:snowflake-alert",
+          "min_on_hold": "mdi:timer-sand",
+          "overrun": "mdi:pump",
+          "fault_safe": "mdi:alert",
+          "fault_recovery": "mdi:alert-outline"
+        }
+      },
+      "boiler_hold_ends_at": {
+        "default": "mdi:timer-sand"
+      },
       "state": {
         "default": "mdi:state-machine"
       },

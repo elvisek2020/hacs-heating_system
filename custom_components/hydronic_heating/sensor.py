@@ -18,10 +18,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .core.controller import HydronicController
-from .core.model import SystemState, ValvePhysical
+from .core.model import BoilerReason, SystemState, ValvePhysical, ValveStatus
 from .core.room import RoomController
 from .demo import DemoRoom
 from .entity import DemoEntity, HydronicEntity
+from .explain import detail
 from .runtime import HydronicConfigEntry, HydronicHeatingRuntime
 
 PARALLEL_UPDATES = 0
@@ -40,7 +41,7 @@ class RoomSensorDescription(SensorEntityDescription):
     """Room sensor with a value function."""
 
     value_fn: Callable[[RoomController, datetime | None], Any]
-    attrs_fn: Callable[[RoomController], dict[str, Any]] | None = None
+    attrs_fn: Callable[[RoomController, HydronicController], dict[str, Any]] | None = None
 
 
 def _now(ctrl: HydronicController) -> datetime | None:
@@ -51,11 +52,40 @@ def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
 
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _valve_attrs(room: RoomController, ctrl: HydronicController) -> dict[str, Any]:
+    """Why the valves of a room are in their position and until when."""
+    found: dict[str, ValveStatus] = {
+        v.entity_id: status
+        for v in room.cfg.valves
+        if (status := ctrl.valve_status.get(v.entity_id)) is not None
+    }
+    if not found:
+        return {}
+    first = next(iter(found.values()))
+    attrs: dict[str, Any] = {"reason": first.reason.value, "until": _iso(first.until)}
+    if len(found) > 1:
+        attrs["valves"] = {
+            entity_id: {"reason": status.reason.value, "until": _iso(status.until)}
+            for entity_id, status in found.items()
+        }
+    return attrs
+
+
 SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
     SystemSensorDescription(
         key="manual_ends_at",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda ctrl: ctrl.modes.manual_ends_at,
+    ),
+    SystemSensorDescription(
+        key="boiler_hold_ends_at",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda ctrl: ctrl.boiler_status.until,
+        attrs_fn=lambda ctrl: {"reason": ctrl.boiler_status.reason.value},
     ),
     SystemSensorDescription(
         key="state",
@@ -143,7 +173,7 @@ ROOM_SENSORS: tuple[RoomSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value_fn=lambda room, now: room.temperature,
-        attrs_fn=lambda room: {
+        attrs_fn=lambda room, ctrl: {
             "sources": list(room.valid_sources),
             "invalid_sources": list(room.invalid_sources),
             "fallback_active": room.fallback_active,
@@ -160,6 +190,7 @@ ROOM_SENSORS: tuple[RoomSensorDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=VALVE_STATES,
         value_fn=lambda room, now: room.valve_summary(now) if now else None,
+        attrs_fn=_valve_attrs,
     ),
 )
 
@@ -172,6 +203,7 @@ async def async_setup_entry(
     """Add system and room sensors."""
     runtime = entry.runtime_data
     async_add_entities(SystemSensor(runtime, d) for d in SYSTEM_SENSORS)
+    async_add_entities([BoilerReasonSensor(runtime)])
     for room in runtime.rooms:
         async_add_entities(
             (RoomSensor(runtime, d, room) for d in ROOM_SENSORS),
@@ -230,7 +262,42 @@ class RoomSensor(HydronicEntity, SensorEntity):
         """Extra attributes."""
         if self.entity_description.attrs_fn is None:
             return None
-        return self.entity_description.attrs_fn(self.room)
+        return self.entity_description.attrs_fn(self.room, self.controller)
+
+
+class BoilerReasonSensor(HydronicEntity, SensorEntity):
+    """Why the boiler is on or off, with the end of the time rule (FR-SAFE-07)."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [r.value for r in BoilerReason]
+    # The countdown changes on every step; keep it out of the history.
+    _unrecorded_attributes = frozenset({"remaining_s"})
+
+    def __init__(self, runtime: HydronicHeatingRuntime) -> None:
+        """Initialize."""
+        super().__init__(runtime, "sensor", "boiler_reason")
+
+    @property
+    def native_value(self) -> str:
+        """Reason code, translated by the frontend."""
+        return self.controller.boiler_status.reason.value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """End of the rule, remaining time, the rule and a readable sentence."""
+        status = self.controller.boiler_status
+        now = self.controller.last_step
+        remaining = (
+            max(0, int((status.until - now).total_seconds()))
+            if status.until is not None and now is not None
+            else None
+        )
+        return {
+            "until": _iso(status.until),
+            "remaining_s": remaining,
+            "rule": status.rule,
+            "detail": detail(self.hass, status),
+        }
 
 
 class DemoTemperatureSensor(DemoEntity, SensorEntity):

@@ -1,4 +1,4 @@
-# Hydronic Heating Controller
+# Heating Controller
 
 Vlastní integrace pro Home Assistant, která řídí teplovodní ústřední topení: kotel spínaný beznapěťovým kontaktem, radiátory a termoelektrické hlavice NO/NC. Staví jen na obecných entitách HA, takže výměna hardwaru (dnes Loxone přes PyLoxone) znamená jen přemapovat entity v nastavení.
 
@@ -16,8 +16,8 @@ Vlastní integrace pro Home Assistant, která řídí teplovodní ústřední to
 
 1. HACS → tři tečky vpravo nahoře → **Vlastní repozitáře**.
 2. Repozitář `https://github.com/elvisek2020/hacs-heating_system`, typ **Integrace**.
-3. Nainstalovat **Hydronic Heating Controller** a restartovat Home Assistant.
-4. Nastavení → Zařízení a služby → **Přidat integraci** → Hydronic Heating Controller.
+3. Nainstalovat **Heating Controller** a restartovat Home Assistant.
+4. Nastavení → Zařízení a služby → **Přidat integraci** → Heating Controller.
 
 Vyžaduje Home Assistant 2026.3 nebo novější.
 
@@ -62,6 +62,17 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 - **Předpověď (volitelně):** s entitou počasí se pro mez vytápění i křivku bere průměr tlumené teploty a průměrné předpovědi na příštích 24 hodin.
 - **Ochrany:** ověření každého povelu s opakováním, keep-alive, obnovení stavu ventilů po výpadku, bezpečný stav při nedostupném kotli, heartbeat pro watchdog v Loxone, upozornění na zastaralá čidla.
 
+## Proč kotel topí nebo stojí
+
+Ochrana kotle někdy drží kotel v chodu nebo ve stání i proti tomu, co zrovna chcete. Například po **Stop** kotel doběhne svou minimální dobu běhu. Proto integrace vždy ukazuje, proč je kotel v aktuálním stavu a kdy se to změní:
+
+- `sensor.hh_boiler_reason` říká důvod, třeba „Minimální doba běhu“, „Minimální pauza“, „Doběh“ nebo „Topí na požadavek“. Atribut `detail` obsahuje celou větu, například „Teplo už nikdo nechce, ale kotel musí běžet minimální dobu 10 min. Vypne se v 00:55:12.“ V atributu `rule` je nastavení, které za tím stojí.
+- `sensor.hh_boiler_hold_ends_at` ukazuje, kdy časové pravidlo skončí. Dashboard z něj dělá odpočet „za 4 minuty“.
+- **Logbook** (Aktivita) zapisuje každé zapnutí a vypnutí kotle s příčinou a každé odložení povelu s časem. Zapíše i výstup, který někdo přepnul ručně a integrace ho vrátila. Stejné věty jsou v logu Home Assistantu. Ve shadow režimu mají předponu `[Shadow]`, v demu `[Demo]`.
+- U ventilů ukazují atributy `reason` a `until` na `sensor.hh_<místnost>_valve_state`, proč je ventil otevřený nebo zavřený (PWM, okno, doběh kotle, protáčení…) a kdy se to změní.
+
+Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastníkem výstupu je ona (ověření povelu). Ručně topit jde přes manuál, ne přepnutím výstupu.
+
 ## Entity
 
 | Entita | Popis |
@@ -71,6 +82,8 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 | `button.hh_manual_30` … `_180`, `button.hh_stop` | manuální topení a jeho zastavení |
 | `sensor.hh_manual_ends_at` | konec manuálu (časové razítko) |
 | `sensor.hh_state` | stav automatu (start, auto, pryč, vypnuto, léto, manuál, porucha) |
+| `sensor.hh_boiler_reason` | proč je kotel v aktuálním stavu (atributy: do kdy, zbývá, pravidlo, vysvětlení) |
+| `sensor.hh_boiler_hold_ends_at` | kdy skončí časové pravidlo, které kotel drží (minimální běh, pauza, doběh…) |
 | `sensor.hh_demand_total` | vážený požadavek místností |
 | `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota (atributy: aktuální, předpověď, efektivní) |
 | `sensor.hh_flow_setpoint` | teplota vody podle topné křivky (virtuální) |

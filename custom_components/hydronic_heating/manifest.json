@@ -1,6 +1,6 @@
 {
   "domain": "hydronic_heating",
-  "name": "Hydronic Heating Controller",
+  "name": "Heating Controller",
   "codeowners": ["@elvisek2020"],
   "config_flow": true,
   "documentation": "https://github.com/elvisek2020/hacs-heating_system",

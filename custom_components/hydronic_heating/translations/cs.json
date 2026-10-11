@@ -580,6 +580,69 @@
       "manual_ends_at": {
         "name": "Konec manuálu"
       },
+      "boiler_reason": {
+        "name": "Důvod stavu kotle",
+        "state": {
+          "startup": "Start integrace",
+          "idle": "Bez požadavku",
+          "off": "Vypnuto",
+          "summer": "Léto",
+          "window_block": "Blokace okny",
+          "pre_open": "Čeká na ventily",
+          "no_flow_hold": "Chybí průtok",
+          "min_off_hold": "Minimální pauza",
+          "max_starts_hold": "Limit startů",
+          "duty_hold": "Omezení střídy",
+          "firing_demand": "Topí na požadavek",
+          "firing_manual": "Topí manuálně",
+          "firing_frost": "Protimrazová ochrana",
+          "min_on_hold": "Minimální doba běhu",
+          "overrun": "Doběh",
+          "fault_safe": "Porucha",
+          "fault_recovery": "Návrat z poruchy"
+        },
+        "state_attributes": {
+          "until": {
+            "name": "Do"
+          },
+          "remaining_s": {
+            "name": "Zbývá (s)"
+          },
+          "rule": {
+            "name": "Pravidlo"
+          },
+          "detail": {
+            "name": "Vysvětlení"
+          }
+        }
+      },
+      "boiler_hold_ends_at": {
+        "name": "Další změna kotle",
+        "state_attributes": {
+          "reason": {
+            "name": "Důvod",
+            "state": {
+              "startup": "Start integrace",
+              "idle": "Bez požadavku",
+              "off": "Vypnuto",
+              "summer": "Léto",
+              "window_block": "Blokace okny",
+              "pre_open": "Čeká na ventily",
+              "no_flow_hold": "Chybí průtok",
+              "min_off_hold": "Minimální pauza",
+              "max_starts_hold": "Limit startů",
+              "duty_hold": "Omezení střídy",
+              "firing_demand": "Topí na požadavek",
+              "firing_manual": "Topí manuálně",
+              "firing_frost": "Protimrazová ochrana",
+              "min_on_hold": "Minimální doba běhu",
+              "overrun": "Doběh",
+              "fault_safe": "Porucha",
+              "fault_recovery": "Návrat z poruchy"
+            }
+          }
+        }
+      },
       "state": {
         "name": "Stav",
         "state": {
@@ -628,6 +691,32 @@
           "closed": "Zavřeno",
           "unknown": "Neznámý",
           "mixed": "Smíšený"
+        },
+        "state_attributes": {
+          "reason": {
+            "name": "Důvod",
+            "state": {
+              "startup": "Start integrace",
+              "fault_safe": "Porucha",
+              "frost": "Protimrazová ochrana",
+              "window": "Otevřené okno",
+              "manual": "Manuální topení",
+              "manual_excluded": "Mimo manuál",
+              "idle_policy": "Klidová poloha",
+              "room_off": "Místnost vypnutá",
+              "pwm": "Regulace místnosti (PWM)",
+              "min_state_hold": "Minimální doba stavu",
+              "exercise": "Protáčení ventilu",
+              "overrun": "Doběh kotle",
+              "min_flow": "Minimální průtok"
+            }
+          },
+          "until": {
+            "name": "Do"
+          },
+          "valves": {
+            "name": "Ventily"
+          }
         }
       },
       "demo_temperature": {
@@ -684,7 +773,7 @@
   },
   "exceptions": {
     "not_loaded": {
-      "message": "Integrace Hydronic Heating Controller není načtená."
+      "message": "Integrace Heating Controller není načtená."
     }
   }
 }

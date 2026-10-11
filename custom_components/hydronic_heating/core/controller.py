@@ -9,10 +9,14 @@ from typing import Any
 from .. import const as c
 from .equithermal import OutdoorEngine, duty_limit, flow_setpoint
 from .exercise import ExerciseScheduler
-from .heat_source import Arbitration, BoilerSequencer, RoomDemand, arbitrate
+from .heat_source import NO_FLOW_MARGIN_S, Arbitration, BoilerSequencer, RoomDemand, arbitrate
 from .model import (
+    HOLD_REASONS,
     BoilerPhase,
+    BoilerReason,
+    BoilerStatus,
     Command,
+    Decision,
     Plan,
     Problem,
     RoomConfig,
@@ -23,12 +27,14 @@ from .model import (
     SystemState,
     ValveConfig,
     ValvePhysical,
+    ValveReason,
+    ValveStatus,
     WindowState,
 )
 from .modes import ModeManager
 from .room import RoomContext, RoomController
 from .safety import OutputTracker
-from .valve import deenergized_open, observed_open
+from .valve import deenergized_open, observed_open, pwm_on_time
 
 BOILER_KEY = "boiler"
 CIRCULATION_S = 10 * 60
@@ -68,6 +74,10 @@ class HydronicController:
         self.problems: dict[str, Problem] = {}
         self.blocked_by: list[str] = []
         self.last_step: datetime | None = None
+        self.boiler_status = BoilerStatus(BoilerReason.STARTUP)
+        self.valve_status: dict[str, ValveStatus] = {}
+        self.decisions: list[Decision] = []
+        self.last_revert: dict[str, Any] | None = None
         self._stop_immediate = False
         self._heartbeat_at: datetime | None = None
         self._circulation_until: datetime | None = None
@@ -115,6 +125,10 @@ class HydronicController:
     def valve_configs(self) -> list[tuple[RoomController, ValveConfig]]:
         """All valves with their room."""
         return [(room, v) for room in self.rooms.values() for v in room.cfg.valves]
+
+    @property
+    def _max_travel_s(self) -> float:
+        return max((v.travel_time_s for _, v in self.valve_configs), default=0)
 
     @property
     def simulating(self) -> bool:
@@ -197,8 +211,10 @@ class HydronicController:
         self._observe_valves(snap)
         fully_open = self._valves_in(now, {ValvePhysical.OPEN})
         flow_ok = cfg.has_bypass or len(fully_open) >= cfg.min_open_valves
+        was_on = self.sequencer.boiler_on and not self.fault_safe
         self._update_fault(now)
 
+        duty_run_s = self._duty_run_s(manual=manual)
         if self.fault_safe:
             self.sequencer.force_off(now)
         else:
@@ -210,8 +226,8 @@ class HydronicController:
                 stop_immediate=self._stop_immediate,
                 flow_ok=flow_ok,
                 open_valves=self._valves_in(now, {ValvePhysical.OPEN, ValvePhysical.OPENING}),
-                max_travel_s=max((v.travel_time_s for _, v in self.valve_configs), default=0),
-                duty_run_s=self._duty_run_s(manual=manual),
+                max_travel_s=self._max_travel_s,
+                duty_run_s=duty_run_s,
             )
         self._stop_immediate = False
 
@@ -221,11 +237,24 @@ class HydronicController:
         self.state = self._system_state(mode)
         self.blocked_by = self._blocked_by(now, blocked, flow_ok)
         self._collect_problems(now)
+        previous = self.boiler_status if self.last_step is not None else None
+        self.boiler_status = self._boiler_status(
+            now,
+            mode=mode,
+            manual=manual,
+            frost=frost_request,
+            blocked=blocked,
+            flow_ok=flow_ok,
+            duty_run_s=duty_run_s,
+        )
+        self.decisions = self._boiler_decisions(previous, was_on=was_on, now_on=boiler_on)
         self.last_step = now
 
         plan = Plan(boiler_on=boiler_on, valves_open=dict(self.valve_desired))
         if not self.simulating:
+            self.tracker.reverts.clear()
             plan.commands.extend(self._output_commands(snap, boiler_on))
+            self._collect_reverts(now)
         if heartbeat := self._heartbeat(now):
             plan.commands.append(heartbeat)
         return plan
@@ -396,38 +425,75 @@ class HydronicController:
         """Desired valve positions (FR-VAL-05, FR-VAL-07, FR-MAN-04, chapter 11.3)."""
         cfg = self.cfg
         plan: dict[str, bool] = {}
+        status: dict[str, ValveStatus] = {}
         for room in self.rooms.values():
             forced = True
             want: bool | None
+            reason = ValveReason.PWM
             if self.fault_safe:
-                want = None
+                want, reason = None, ValveReason.FAULT_SAFE
             elif room.frost_active:
-                want = True
+                want, reason = True, ValveReason.FROST
             elif room.window.effective_open:
-                want = False
+                want, reason = False, ValveReason.WINDOW
             elif manual:
                 want = room.hvac_mode is not RoomHvacMode.OFF and (
                     cfg.manual_scope == "all_rooms" or room.demand > 0
                 )
+                reason = ValveReason.MANUAL if want else ValveReason.MANUAL_EXCLUDED
             elif not heating_allowed:
-                want = None
+                want, reason = None, ValveReason.IDLE_POLICY
             elif room.hvac_mode is RoomHvacMode.OFF:
-                want = False
+                want, reason = False, ValveReason.ROOM_OFF
             else:
                 want = room.pwm_want(now)
                 forced = False
             decided = room.decide_open(want, now, forced=forced)
+            until = None
+            if not forced:
+                if decided != want and room.valve_switched_at is not None:
+                    reason = ValveReason.MIN_STATE_HOLD
+                    until = room.valve_switched_at + timedelta(seconds=room.cfg.min_state_s)
+                else:
+                    until = self._pwm_switch_at(room, now)
             for valve in room.cfg.valves:
                 plan[valve.entity_id] = self._idle_position(valve) if decided is None else decided
+                status[valve.entity_id] = ValveStatus(reason, until)
 
         self._apply_exercise(now, plan, manual=manual)
+        for entity_id in self.exercising:
+            status[entity_id] = ValveStatus(
+                ValveReason.EXERCISE, self.exercise.active.get(entity_id)
+            )
         if self.sequencer.phase is BoilerPhase.OVERRUN:
+            overrun_ends = self.sequencer.overrun_since + timedelta(  # type: ignore[operator]
+                seconds=cfg.boiler_overrun_s
+            )
             for entity_id in self.sequencer.overrun_valves:
-                if entity_id in plan:
+                if entity_id in plan and not plan[entity_id]:
                     plan[entity_id] = True
+                    status[entity_id] = ValveStatus(ValveReason.OVERRUN, overrun_ends)
         if not cfg.has_bypass and self.sequencer.phase is not BoilerPhase.IDLE:
+            before = {entity_id for entity_id, want in plan.items() if want}
             self._keep_min_open(now, plan)
+            for entity_id, want in plan.items():
+                if want and entity_id not in before:
+                    status[entity_id] = ValveStatus(ValveReason.MIN_FLOW)
+        if not self.ready:
+            status = {entity_id: ValveStatus(ValveReason.STARTUP) for entity_id in plan}
+        self.valve_status = status
         return plan
+
+    @staticmethod
+    def _pwm_switch_at(room: RoomController, now: datetime) -> datetime | None:
+        """Next PWM switching time at the current demand (None = no switching)."""
+        period = room.cfg.pwm_period_s
+        on_time = pwm_on_time(room.demand, period, room.cfg.min_state_s)
+        if on_time <= 0 or on_time >= period:
+            return None
+        phase = now.timestamp() % period
+        left = on_time - phase if phase < on_time else period - phase
+        return now + timedelta(seconds=left)
 
     def _apply_exercise(self, now: datetime, plan: dict[str, bool], *, manual: bool) -> None:
         idle_boiler = self.sequencer.phase is BoilerPhase.IDLE and not manual
@@ -503,6 +569,190 @@ class HydronicController:
             elif not self.sequencer.can_start(now, self.cfg):
                 reasons.append("anti_cycling")
         return reasons
+
+    def _boiler_status(
+        self,
+        now: datetime,
+        *,
+        mode: SystemMode,
+        manual: bool,
+        frost: bool,
+        blocked: bool,
+        flow_ok: bool,
+        duty_run_s: float | None,
+    ) -> BoilerStatus:
+        """Why the boiler is on or off and until when a time rule holds it (FR-SAFE-07)."""
+        cfg = self.cfg
+        seq = self.sequencer
+        if not self.ready:
+            until = self.started_at + timedelta(seconds=cfg.startup_grace_s)  # type: ignore[operator]
+            return BoilerStatus(
+                BoilerReason.STARTUP, until, f"startup_grace = {cfg.startup_grace_s:.0f} s"
+            )
+        if self.fault_safe:
+            params = {"fault": self.fault_reason or ""}
+            if self._fault_clear_since is not None:
+                until = self._fault_clear_since + timedelta(seconds=cfg.fault_recovery_s)
+                rule = f"fault_recovery_time = {cfg.fault_recovery_s:.0f} s"
+                return BoilerStatus(BoilerReason.FAULT_RECOVERY, until, rule, params)
+            return BoilerStatus(BoilerReason.FAULT_SAFE, params=params)
+        wants_heat = self.heat_request and not blocked
+        if seq.boiler_on:
+            if not wants_heat:
+                minutes = round(cfg.boiler_min_on_s / 60)
+                return BoilerStatus(
+                    BoilerReason.MIN_ON_HOLD,
+                    seq.min_on_until(cfg),
+                    f"boiler_min_on = {minutes} min",
+                    {"minutes": minutes},
+                )
+            params: dict[str, Any] = {
+                "rooms": self.arbitration.calling,
+                "demand": self.arbitration.weighted,
+            }
+            if manual:
+                reason = BoilerReason.FIRING_MANUAL
+                params["manual_until"] = self.modes.manual_ends_at
+            elif frost:
+                reason = BoilerReason.FIRING_FROST
+            else:
+                reason = BoilerReason.FIRING_DEMAND
+            if duty_run_s is None or seq.on_since is None:
+                return BoilerStatus(reason, params=params)
+            # FR-EQ-05: the duty limit ends this run at a known time.
+            run_s = max(duty_run_s, cfg.boiler_min_on_s)
+            params["duty"] = round((self.duty or 0) * 100)
+            params["cycle_min"] = round(cfg.boiler_cycle_period_s / 60)
+            rule = f"duty_limit = {params['duty']} % / {params['cycle_min']} min"
+            return BoilerStatus(reason, seq.on_since + timedelta(seconds=run_s), rule, params)
+        if seq.phase is BoilerPhase.PRE_OPEN:
+            return self._pre_open_status(now, flow_ok)
+        if seq.phase is BoilerPhase.OVERRUN and seq.overrun_since is not None:
+            until = seq.overrun_since + timedelta(seconds=cfg.boiler_overrun_s)
+            return BoilerStatus(
+                BoilerReason.OVERRUN,
+                until,
+                f"boiler_overrun = {cfg.boiler_overrun_s:.0f} s",
+                {"seconds": round(cfg.boiler_overrun_s), "valves": len(seq.overrun_valves)},
+            )
+        if mode is SystemMode.OFF:
+            return BoilerStatus(BoilerReason.OFF)
+        if self.summer:
+            return BoilerStatus(BoilerReason.SUMMER)
+        if self.window_block:
+            return BoilerStatus(BoilerReason.WINDOW_BLOCK)
+        return BoilerStatus(BoilerReason.IDLE)
+
+    def _pre_open_status(self, now: datetime, flow_ok: bool) -> BoilerStatus:
+        """Heat is wanted but the boiler waits: valves, duty limit or anti-cycling."""
+        cfg = self.cfg
+        seq = self.sequencer
+        if not flow_ok:
+            travel_s = self._max_travel_s
+            travel_end = seq.pre_open_since + timedelta(seconds=travel_s)  # type: ignore[operator]
+            params = {
+                "open": len(self._valves_in(now, {ValvePhysical.OPEN})),
+                "needed": cfg.min_open_valves,
+                "seconds": round(travel_s),
+            }
+            if now < travel_end:
+                return BoilerStatus(
+                    BoilerReason.PRE_OPEN, travel_end, f"valve_open_time = {travel_s:.0f} s", params
+                )
+            return BoilerStatus(
+                BoilerReason.NO_FLOW_HOLD,
+                travel_end + timedelta(seconds=NO_FLOW_MARGIN_S),
+                f"min_open_valves = {cfg.min_open_valves}",
+                params,
+            )
+        if seq.duty_holding(now):
+            cycle = round(cfg.boiler_cycle_period_s / 60)
+            return BoilerStatus(
+                BoilerReason.DUTY_HOLD,
+                seq.duty_hold_until,
+                f"boiler_cycle_period = {cycle} min",
+                {"cycle_min": cycle},
+            )
+        min_off = seq.min_off_until(cfg)
+        starts = seq.max_starts_until(now, cfg)
+        if starts is not None and starts > now and (min_off is None or starts >= min_off):
+            return BoilerStatus(
+                BoilerReason.MAX_STARTS_HOLD,
+                starts,
+                f"boiler_max_starts = {cfg.boiler_max_starts}/h",
+                {"count": cfg.boiler_max_starts},
+            )
+        if min_off is not None and min_off > now:
+            minutes = round(cfg.boiler_min_off_s / 60)
+            return BoilerStatus(
+                BoilerReason.MIN_OFF_HOLD,
+                min_off,
+                f"boiler_min_off = {minutes} min",
+                {"minutes": minutes},
+            )
+        return BoilerStatus(BoilerReason.PRE_OPEN)
+
+    def _boiler_decisions(
+        self, previous: BoilerStatus | None, *, was_on: bool, now_on: bool
+    ) -> list[Decision]:
+        """Decisions worth a logbook entry: command changes and new time rules."""
+        status = self.boiler_status
+        if previous is None or not self.ready:
+            return []
+        decisions: list[Decision] = []
+        if now_on and not was_on:
+            decisions.append(Decision("boiler_on", status))
+        elif was_on and not now_on:
+            decisions.append(Decision("boiler_off", status, {"cause": self._off_cause(previous)}))
+        if status.reason in HOLD_REASONS and (
+            status.reason is not previous.reason or status.until != previous.until
+        ):
+            decisions.append(Decision("hold", status))
+        return decisions
+
+    def _off_cause(self, previous: BoilerStatus) -> str:
+        """Why the boiler was switched off, in more detail than the sequencer knows."""
+        cause = self.sequencer.off_cause or "no_demand"
+        if self.fault_safe:
+            return f"fault:{self.fault_reason or ''}"
+        if cause != "no_demand":
+            return cause
+        if previous.reason is BoilerReason.MIN_ON_HOLD:
+            return "min_on_done"
+        if self.modes.mode is SystemMode.OFF:
+            return "mode_off"
+        if self.summer:
+            return "summer"
+        if self.window_block:
+            return "window_block"
+        return "no_demand"
+
+    def _collect_reverts(self, now: datetime) -> None:
+        """Record outputs switched outside the controller and set back (FR-BOI-04)."""
+        boiler_entity = self.cfg.heat_source.state_entity
+        for key, observed, desired in self.tracker.reverts:
+            entity_id = boiler_entity if key == BOILER_KEY else key
+            if entity_id is None:
+                continue
+            params: dict[str, Any] = {
+                "entity_id": entity_id,
+                "output": "boiler" if key == BOILER_KEY else "valve",
+                "observed": observed,
+                "desired": desired,
+            }
+            if key != BOILER_KEY and (valve := self.valve_status.get(key)) is not None:
+                params["valve_reason"] = valve.reason.value
+                params["valve_until"] = valve.until
+            self.decisions.append(Decision("reverted", self.boiler_status, params))
+            # For valves True means open, for the boiler True means on.
+            self.last_revert = {
+                "entity_id": entity_id,
+                "output": params["output"],
+                "found": observed,
+                "set_to": desired,
+                "at": now.isoformat(),
+            }
+        self.tracker.reverts.clear()
 
     def _collect_problems(self, now: datetime) -> None:
         """Active problems for notifications and repair issues (FR-SAFE-04)."""

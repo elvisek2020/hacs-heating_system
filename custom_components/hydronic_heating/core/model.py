@@ -85,6 +85,60 @@ class BoilerPhase(StrEnum):
     OVERRUN = "overrun"
 
 
+class BoilerReason(StrEnum):
+    """Why the boiler is in its current state (FR-SAFE-07, `sensor.hh_boiler_reason`)."""
+
+    STARTUP = "startup"
+    IDLE = "idle"
+    OFF = "off"
+    SUMMER = "summer"
+    WINDOW_BLOCK = "window_block"
+    PRE_OPEN = "pre_open"
+    NO_FLOW_HOLD = "no_flow_hold"
+    MIN_OFF_HOLD = "min_off_hold"
+    MAX_STARTS_HOLD = "max_starts_hold"
+    DUTY_HOLD = "duty_hold"
+    FIRING_DEMAND = "firing_demand"
+    FIRING_MANUAL = "firing_manual"
+    FIRING_FROST = "firing_frost"
+    MIN_ON_HOLD = "min_on_hold"
+    OVERRUN = "overrun"
+    FAULT_SAFE = "fault_safe"
+    FAULT_RECOVERY = "fault_recovery"
+
+
+# A time rule keeps the boiler in its state against or regardless of the demand.
+HOLD_REASONS = frozenset(
+    {
+        BoilerReason.PRE_OPEN,
+        BoilerReason.NO_FLOW_HOLD,
+        BoilerReason.MIN_OFF_HOLD,
+        BoilerReason.MAX_STARTS_HOLD,
+        BoilerReason.DUTY_HOLD,
+        BoilerReason.MIN_ON_HOLD,
+        BoilerReason.FAULT_RECOVERY,
+    }
+)
+
+
+class ValveReason(StrEnum):
+    """Why a valve is commanded to its position (attributes of the valve state)."""
+
+    STARTUP = "startup"
+    FAULT_SAFE = "fault_safe"
+    FROST = "frost"
+    WINDOW = "window"
+    MANUAL = "manual"
+    MANUAL_EXCLUDED = "manual_excluded"
+    IDLE_POLICY = "idle_policy"
+    ROOM_OFF = "room_off"
+    PWM = "pwm"
+    MIN_STATE_HOLD = "min_state_hold"
+    EXERCISE = "exercise"
+    OVERRUN = "overrun"
+    MIN_FLOW = "min_flow"
+
+
 # --- Configuration --------------------------------------------------------
 
 
@@ -458,6 +512,41 @@ class Plan:
     commands: list[Command] = field(default_factory=list)
     boiler_on: bool = False
     valves_open: dict[str, bool] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class BoilerStatus:
+    """Reason of the boiler state and the end of the time rule behind it.
+
+    `rule` names the setting in the options (technical, not translated) and
+    `params` holds the values the explanation text needs.
+    """
+
+    reason: BoilerReason
+    until: datetime | None = None
+    rule: str | None = None
+    params: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class ValveStatus:
+    """Reason of one valve position and when it is expected to change."""
+
+    reason: ValveReason
+    until: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Decision:
+    """A boiler decision or a reverted output, written to the logbook.
+
+    Kinds: `boiler_on`, `boiler_off`, `hold` (a time rule delays the command)
+    and `reverted` (an output switched outside the controller was set back).
+    """
+
+    kind: str
+    status: BoilerStatus
+    params: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

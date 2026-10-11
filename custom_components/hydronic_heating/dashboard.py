@@ -34,6 +34,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "minutes": "{minutes} min",
         "stop": "Stop",
         "boiler_command": "Povel kotli",
+        "boiler_reason": "Proč",
+        "boiler_hold": "Další změna",
+        "boiler_reason_timeline": "Důvod stavu kotle",
+        "shadow_banner": (
+            "**Shadow režim:** řízení všechno počítá, ale kotel ani hlavice nespíná. "
+            "Co by udělalo, ukazuje logbook a atributy `would_command_*`."
+        ),
+        "open_windows": "Okna",
         "heat_demand": "Požadavek na teplo",
         "demand_total": "Celkový požadavek",
         "flow_setpoint": "Teplota vody",
@@ -99,6 +107,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "minutes": "{minutes} min",
         "stop": "Stop",
         "boiler_command": "Boiler command",
+        "boiler_reason": "Why",
+        "boiler_hold": "Next change",
+        "boiler_reason_timeline": "Boiler state reason",
+        "shadow_banner": (
+            "**Shadow mode:** the controller calculates everything but switches neither the "
+            "boiler nor the valves. The logbook and the `would_command_*` attributes show "
+            "what it would do."
+        ),
+        "open_windows": "Windows",
         "heat_demand": "Heat demand",
         "demand_total": "Total demand",
         "flow_setpoint": "Flow temperature",
@@ -227,6 +244,10 @@ def _when_on(entity_id: str) -> list[dict[str, str]]:
     return [{"condition": "state", "entity": entity_id, "state": "on"}]
 
 
+def _when_known(entity_id: str) -> list[dict[str, Any]]:
+    return [{"condition": "state", "entity": entity_id, "state_not": ["unknown", "unavailable"]}]
+
+
 class _Ids:
     """Entity IDs of this installation, found by unique ID (renames are kept)."""
 
@@ -264,12 +285,22 @@ def _overview(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) 
     sid = ids.system
     problem = sid("binary_sensor", "problem")
     shadow = sid("switch", "shadow_mode")
+    hold = sid("sensor", "boiler_hold_ends_at")
+    windows = sid("sensor", "open_windows")
     badges = [
         _badge(sid("sensor", "state"), text["state"]),
         _badge(sid("binary_sensor", "boiler_command"), text["boiler"], color="deep-orange"),
+        _badge(sid("sensor", "boiler_reason"), text["boiler_reason"]),
+        _badge(hold, text["boiler_hold"], visibility=_when_known(hold)),
         _badge(sid("sensor", "outdoor_temperature_damped"), text["outdoor"]),
         _badge(sid("sensor", "flow_setpoint"), text["flow_setpoint"]),
         _badge(sid("sensor", "demand_total"), text["demand_total"]),
+        _badge(
+            windows,
+            text["open_windows"],
+            color="blue",
+            visibility=[{"condition": "numeric_state", "entity": windows, "above": 0}],
+        ),
         _badge(problem, text["problem"], color="red", visibility=_when_on(problem)),
         _badge(shadow, text["shadow"], visibility=_when_on(shadow)),
     ]
@@ -291,8 +322,19 @@ def _overview(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) 
 def _system_section(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) -> dict:
     sid = ids.system
     durations = runtime.controller.cfg.manual_durations
-    cards: list[dict[str, Any]] = [
-        _heading(text["heating"], "mdi:radiator"),
+    shadow = sid("switch", "shadow_mode")
+    cards: list[dict[str, Any]] = [_heading(text["heating"], "mdi:radiator")]
+    if runtime.layout is None:
+        # In the demo the demo section explains what is switched.
+        cards.append(
+            {
+                "type": "markdown",
+                "content": f'<ha-alert alert-type="warning">{text["shadow_banner"]}</ha-alert>',
+                "text_only": True,
+                "visibility": _when_on(shadow),
+            }
+        )
+    cards += [
         _tile(
             sid("climate", "system"),
             text["system"],
@@ -343,10 +385,20 @@ def _system_section(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, 
 def _boiler_section(ids: _Ids, text: dict[str, str]) -> dict:
     sid = ids.system
     trend = {"type": "trend-graph", "hours_to_show": 24}
+    reason = sid("sensor", "boiler_reason")
+    hold = sid("sensor", "boiler_hold_ends_at")
     return {
         "type": "grid",
         "cards": [
             _heading(text["boiler"], "mdi:water-boiler"),
+            # Why the boiler is on or off, and when that changes (FR-SAFE-07).
+            _full(reason, text["boiler_reason"], state_content=["state", "last_changed"]),
+            _full(hold, text["boiler_hold"], visibility=_when_known(hold)),
+            {
+                "type": "markdown",
+                "content": f"{{{{ state_attr('{reason}', 'detail') }}}}",
+                "text_only": True,
+            },
             _half(
                 sid("binary_sensor", "boiler_command"), text["boiler_command"], color="deep-orange"
             ),
@@ -505,6 +557,7 @@ def _history(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) -
     )
 
     boiler_entities: list[dict[str, str]] = [
+        {"entity": sid("sensor", "boiler_reason"), "name": text["boiler_reason_timeline"]},
         {"entity": sid("binary_sensor", "boiler_command"), "name": text["boiler_command"]},
         {"entity": sid("binary_sensor", "heat_demand"), "name": text["heat_demand"]},
         {"entity": sid("binary_sensor", "window_block"), "name": text["window_block"]},
@@ -512,10 +565,10 @@ def _history(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) -
     ]
     if layout is not None:
         boiler_entities.insert(
-            1, {"entity": layout.boiler.entity_id, "name": text["boiler_virtual"]}
+            2, {"entity": layout.boiler.entity_id, "name": text["boiler_virtual"]}
         )
         if real_boiler:
-            boiler_entities.insert(2, {"entity": real_boiler, "name": text["boiler_real"]})
+            boiler_entities.insert(3, {"entity": real_boiler, "name": text["boiler_real"]})
 
     boiler_cards = [
         _heading(text["boiler"], "mdi:water-boiler"),

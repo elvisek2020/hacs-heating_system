@@ -68,6 +68,8 @@ class BoilerSequencer:
         # FR-EQ-05: after a duty-limited stop the next start waits for the cycle end.
         self.duty_hold_until: datetime | None = None
         self.duty_stopped = False
+        # Why the last run ended: no_demand, no_flow, duty_limit or fault.
+        self.off_cause: str | None = None
 
     # --- Anti-cycling -----------------------------------------------------
 
@@ -75,14 +77,32 @@ class BoilerSequencer:
         """Return the number of starts within the last hour."""
         return sum(1 for s in self.starts if (now - s).total_seconds() < 3600)
 
+    def min_on_until(self, cfg: SystemConfig) -> datetime | None:
+        """End of the minimum run time of the current run."""
+        if not self.boiler_on or self.on_since is None:
+            return None
+        return self.on_since + timedelta(seconds=cfg.boiler_min_on_s)
+
+    def min_off_until(self, cfg: SystemConfig) -> datetime | None:
+        """End of the minimum pause after the last stop."""
+        if self.boiler_on or self.off_since is None:
+            return None
+        return self.off_since + timedelta(seconds=cfg.boiler_min_off_s)
+
+    def max_starts_until(self, now: datetime, cfg: SystemConfig) -> datetime | None:
+        """When a start is free again, if the starts per hour are used up."""
+        recent = sorted(s for s in self.starts if (now - s).total_seconds() < 3600)
+        if len(recent) < cfg.boiler_max_starts:
+            return None
+        return recent[len(recent) - cfg.boiler_max_starts] + timedelta(hours=1)
+
     def next_allowed_start(self, now: datetime, cfg: SystemConfig) -> datetime:
         """Earliest time the boiler may start again."""
         candidates = [now]
         if self.off_since is not None:
             candidates.append(self.off_since + timedelta(seconds=cfg.boiler_min_off_s))
-        recent = sorted(s for s in self.starts if (now - s).total_seconds() < 3600)
-        if len(recent) >= cfg.boiler_max_starts:
-            candidates.append(recent[len(recent) - cfg.boiler_max_starts] + timedelta(hours=1))
+        if (starts_free := self.max_starts_until(now, cfg)) is not None:
+            candidates.append(starts_free)
         if self.duty_hold_until is not None:
             candidates.append(self.duty_hold_until)
         return max(candidates)
@@ -108,7 +128,8 @@ class BoilerSequencer:
         self.on_intervals.append([now, None])
         self.phase = BoilerPhase.FIRING
 
-    def _turn_off(self, now: datetime, open_valves: set[str]) -> None:
+    def _turn_off(self, now: datetime, open_valves: set[str], cause: str) -> None:
+        self.off_cause = cause
         self.boiler_on = False
         self.off_since = now
         if self.on_intervals and self.on_intervals[-1][1] is None:
@@ -120,7 +141,7 @@ class BoilerSequencer:
     def force_off(self, now: datetime) -> None:
         """Switch off immediately (fault, safety), without overrun bookkeeping changes."""
         if self.boiler_on:
-            self._turn_off(now, set())
+            self._turn_off(now, set(), "fault")
         self.phase = BoilerPhase.IDLE
         self.overrun_valves = set()
 
@@ -166,9 +187,9 @@ class BoilerSequencer:
         elif self.phase is BoilerPhase.FIRING:
             if not flow_ok:
                 # Safety overrides the minimum run time.
-                self._turn_off(now, open_valves)
+                self._turn_off(now, open_valves, "no_flow")
             elif not wants_heat and (stop_immediate or self.min_on_done(now, cfg)):
-                self._turn_off(now, open_valves)
+                self._turn_off(now, open_valves, "no_demand")
             elif (
                 duty_run_s is not None
                 and self.on_since is not None
@@ -176,7 +197,7 @@ class BoilerSequencer:
             ):
                 # Duty limit reached: stop until the cycle ends (never before min_on).
                 cycle_end = self.on_since + timedelta(seconds=cfg.boiler_cycle_period_s)
-                self._turn_off(now, open_valves)
+                self._turn_off(now, open_valves, "duty_limit")
                 self.duty_hold_until = cycle_end
                 self.duty_stopped = True
         if (
