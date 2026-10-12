@@ -183,8 +183,7 @@ async def test_generate_dashboard(hass: HomeAssistant) -> None:
         "climate.hh_system",
         "climate.hh_obyvak",
         "switch.hh_demo_boiler",
-        "switch.hh_obyvak_demo_valve_1",
-        "input_boolean.hlavice_obyvak",
+        "switch.hh_obyvak_demo_window",
         "input_boolean.kotel",
         "number.hh_demo_outdoor_temperature",
         "button.hh_manual_60",
@@ -330,11 +329,23 @@ async def test_dashboard_shadow_banner(hass: HomeAssistant) -> None:
     ]
 
 
-async def test_dashboard_room_without_demo_shows_real_heads(hass: HomeAssistant) -> None:
-    await _setup(hass)
-    dashboard = await hass.services.async_call(
-        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
-    )
-    living = dashboard["views"][0]["sections"][-2]["cards"]
-    assert living[-1]["entity"] == "input_boolean.hlavice_obyvak"
-    assert living[-1]["name"] == "Valve head"  # test instance runs in English
+async def test_dashboard_room_shows_the_valve_not_the_heads(hass: HomeAssistant) -> None:
+    """The radiator valve is shown; the head outputs (switches) are not."""
+    for mode in (None, DEMO_VIRTUAL_OUTPUTS):
+        options = {CONF_DEMO_MODE: mode} if mode else {}
+        entry = await _setup(hass, **options)
+        dashboard = await hass.services.async_call(
+            DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+        )
+        text = str(dashboard)
+        assert "input_boolean.hlavice_obyvak" not in text
+        assert "demo_valve" not in text
+        living = dashboard["views"][0]["sections"][-2]["cards"]
+        assert living[-1]["entity"] == "sensor.hh_obyvak_valve_state"
+        assert living[-1]["name"] == "Valve"  # test instance runs in English
+        timeline = dashboard["views"][1]["sections"][2]["cards"][-1]["entities"]
+        assert timeline == [
+            {"entity": "sensor.hh_obyvak_valve_state", "name": "Obývák"},
+            {"entity": "sensor.hh_loznice_valve_state", "name": "Ložnice"},
+        ]
+        assert await hass.config_entries.async_remove(entry.entry_id)

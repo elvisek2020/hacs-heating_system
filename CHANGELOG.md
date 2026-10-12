@@ -5,6 +5,15 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.6.2 — 2026-10-13
+
+### 🎨 Vzhled
+
+- Dashboard u každé místnosti ukazuje jen **Ventil**: jestli je otevřený, otevírá se, zavírá se nebo je zavřený. Dlaždice hlavic (demo a skutečná) zmizely, protože hlavice je jen pohon ventilu a u hlavic NO „Vypnuto“ znamenalo otevřeno.
+- Časová osa v Grafech ukazuje polohu ventilu v každé místnosti místo spínačů hlavic.
+
+Nový vzhled získáš po novém vygenerování dashboardu službou `hydronic_heating.generate_dashboard`.
+
 ## v0.6.1 — 2026-10-12
 
 ### ✨ Novinky

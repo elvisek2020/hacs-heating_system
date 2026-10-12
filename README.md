@@ -53,19 +53,19 @@ Všechno se mění jen v nastavení, bez úprav kódu a bez restartu HA. Změna 
 
 V **Konfigurovat → Obecné → Demo režim** jsou dvě možnosti. Obě běží v reálném čase.
 
-- **Virtuální výstupy:** teploty a okna se berou ze skutečných čidel, ale povely jdou do virtuálního kotle `switch.hh_demo_boiler` a virtuálních hlavic `switch.hh_<místnost>_demo_valve_<n>`. Projde celá cesta povelů včetně ověření stavu, opakování a poruchy. Skutečný kotel a hlavice dál řídí Loxone a na dashboardu je vidíte vedle virtuálních.
+- **Virtuální výstupy:** teploty a okna se berou ze skutečných čidel, ale povely jdou do virtuálního kotle `switch.hh_demo_boiler` a virtuálních hlavic `switch.hh_<místnost>_demo_valve_<n>`. Projde celá cesta povelů včetně ověření stavu, opakování a poruchy. Skutečný kotel a ventily dál řídí Loxone, skutečný kotel vidíte na dashboardu vedle virtuálního.
 - **Virtuální dům:** navíc simulované teploty místností s tepelným modelem (topení otápí, okno ochlazuje), simulovaná okna, výpadky čidel a venkovní teplota `number.hh_demo_outdoor_temperature`. Hodí se na vyzkoušení událostí od stolu.
 
 Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_boiler_behavior` nasimulovat kotel, který je nedostupný nebo ignoruje povely.
 
 **Pojistka:** v demo režimu integrace odmítne poslat povel jakékoli entitě, která jí nepatří. Ani případná chyba v konfiguraci tak nemůže sepnout skutečný kotel nebo hlavici. Heartbeat a zrcadlový časovač se v demu nespínají, notifikace mají v titulku `[Demo]`. Demo si ukládá stav zvlášť, takže se nemíchá s historií skutečného kotle.
 
-**Dashboard:** Nástroje pro vývojáře → Akce → `hydronic_heating.generate_dashboard` → Provést akci. Odpověď je hotový dashboard pro vaši instalaci: systém, manuál, demo, každá místnost se skutečnými i virtuálními hlavicemi a grafy. Vložíte ho takto: Nastavení → Řídicí panely → Přidat řídicí panel → Nový od začátku, otevřít, ⋮ → Upravit → ⋮ → Editor kódu YAML, obsah nahradit odpovědí a uložit.
+**Dashboard:** Nástroje pro vývojáře → Akce → `hydronic_heating.generate_dashboard` → Provést akci. Odpověď je hotový dashboard pro vaši instalaci: systém, manuál, demo, každá místnost s termostatem, požadavkem a ventilem a grafy. Vložíte ho takto: Nastavení → Řídicí panely → Přidat řídicí panel → Nový od začátku, otevřít, ⋮ → Upravit → ⋮ → Editor kódu YAML, obsah nahradit odpovědí a uložit.
 
 ### Doporučený postup přepnutí
 
 1. **Virtuální dům:** vyzkoušejte otevřené okno, výpadek čidla, nedostupný kotel, manuál a změnu venkovní teploty (léto). Ověřte, že reakce odpovídají očekávání.
-2. **Virtuální výstupy, několik dní:** v grafech porovnávejte virtuální kotel a hlavice se skutečnými, které řídí Loxone.
+2. **Virtuální výstupy, několik dní:** v grafech porovnávejte virtuální kotel se skutečným, který řídí Loxone.
 3. **Loxone:** kotel a hlavice jako bloky **Switch**, odpojit IRC a Climate Controller od výstupů a zavést watchdog na heartbeat.
 4. **Přepnutí:** demo režim vypnout, pak vypnout `switch.hh_shadow_mode`. Od té chvíle integrace spíná skutečné výstupy.
 

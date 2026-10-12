@@ -38,7 +38,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "boiler_hold": "Další změna",
         "boiler_reason_timeline": "Důvod stavu kotle",
         "shadow_banner": (
-            "**Shadow režim:** řízení všechno počítá, ale kotel ani hlavice nespíná. "
+            "**Shadow režim:** řízení všechno počítá, ale kotel ani ventily nespíná. "
             "Co by udělalo, ukazuje logbook a atributy `would_command_*`."
         ),
         "open_windows": "Okna",
@@ -57,26 +57,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "shadow": "Shadow",
         "temperature": "Teplota",
         "demand": "Požadavek",
+        "valve": "Ventil",
         "valves": "Ventily",
         "window": "Okno",
-        "valve": "Hlavice {index}",
-        "head": "Hlavice",
-        "head_n": "Hlavice {index}",
-        "heads": "Hlavice",
-        "demo": "Demo",
-        "real": "Skutečná",
         "simulation": "Simulace",
         "demo_outputs": "Demo · virtuální výstupy",
         "demo_house": "Demo · virtuální dům",
         "demo_info_outputs": (
-            "Povely jdou jen do **virtuálního kotle a hlavic**. Skutečné výstupy dál řídí "
-            "stávající systém, vidíte je vedle virtuálních. U hlavic NO znamená *Vypnuto* "
-            "bez proudu, tedy otevřeno."
+            "Povely jdou jen do **virtuálního kotle a ventilů**. Skutečný kotel a ventily "
+            "dál řídí stávající systém, skutečný kotel vidíte vedle virtuálního."
         ),
         "demo_info_house": (
             "Teploty, okna a venkovní teplota jsou **simulované**. Povely jdou jen do "
-            "virtuálních výstupů, skutečný kotel ani hlavice se nesepnou. U hlavic NO "
-            "znamená *Vypnuto* bez proudu, tedy otevřeno."
+            "virtuálních výstupů, skutečný kotel ani ventily se nesepnou."
         ),
         "boiler_virtual": "Kotel · demo",
         "boiler_real": "Kotel · skutečný",
@@ -133,26 +126,20 @@ TEXTS: dict[str, dict[str, str]] = {
         "shadow": "Shadow",
         "temperature": "Temperature",
         "demand": "Demand",
+        "valve": "Valve",
         "valves": "Valves",
         "window": "Window",
-        "valve": "Head {index}",
-        "head": "Valve head",
-        "head_n": "Head {index}",
-        "heads": "Valve heads",
-        "demo": "Demo",
-        "real": "Real",
         "simulation": "Simulation",
         "demo_outputs": "Demo · virtual outputs",
         "demo_house": "Demo · virtual house",
         "demo_info_outputs": (
-            "Commands go only to the **virtual boiler and valve heads**. The real outputs are "
-            "still controlled by the current system and shown next to the virtual ones. For "
-            "NO heads *Off* means de-energized, i.e. open."
+            "Commands go only to the **virtual boiler and valves**. The real boiler and valves "
+            "are still controlled by the current system; the real boiler is shown next to the "
+            "virtual one."
         ),
         "demo_info_house": (
             "Temperatures, windows and the outdoor temperature are **simulated**. Commands "
-            "go only to virtual outputs, the real boiler and valves are never switched. For "
-            "NO heads *Off* means de-energized, i.e. open."
+            "go only to virtual outputs, the real boiler and valves are never switched."
         ),
         "boiler_virtual": "Boiler · demo",
         "boiler_real": "Boiler · real",
@@ -523,28 +510,11 @@ def _room_section(
             features_position="inline",
         ),
     ]
-    single = len(room.valves) == 1
-    if demo is None:
-        cards.append(_half(ids.room("sensor", room, "valve_state"), text["valves"]))
-        cards.extend(
-            _half(
-                valve.entity_id,
-                text["head"] if single else text["head_n"].format(index=index),
-                color="amber",
-            )
-            for index, valve in enumerate(room.valves, start=1)
-        )
-        return {"type": "grid", "cards": cards}
-
-    cards.append(_full(ids.room("sensor", room, "valve_state"), text["valves"]))
-    cards.append(_heading(text["heads"], "mdi:pipe-valve", subtitle=True))
-    for index, valve in enumerate(room.valves, start=1):
-        suffix = "" if single else f" {index}"
-        cards.append(
-            _half(demo.valves[index - 1].ids.entity_id, text["demo"] + suffix, color="amber")
-        )
-        cards.append(_half(valve.entity_id, text["real"] + suffix, color="amber"))
-    if layout is not None and layout.house:
+    # The valve on the radiator: its position modelled from the head command and the
+    # travel time, so "open" means open regardless of NO/NC heads.
+    valve_name = text["valve"] if len(room.valves) == 1 else text["valves"]
+    cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name))
+    if demo is not None and layout is not None and layout.house:
         cards.append(_heading(text["simulation"], "mdi:test-tube", subtitle=True))
         cards.append(_half(demo.window.entity_id, text["window"], color="blue"))
         cards.append(_half(demo.sensor_fault.entity_id, text["demo_sensor_fault"], color="red"))
@@ -639,17 +609,9 @@ def _history(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) -
         },
     ]
 
-    valve_entities: list[dict[str, str]] = []
-    demo_rooms = {d.room.room_id: d for d in layout.rooms} if layout is not None else {}
-    for room in rooms:
-        demo = demo_rooms.get(room.room_id)
-        for index, valve in enumerate(room.valves, start=1):
-            label = f"{room.name} · {text['valve'].format(index=index)}"
-            if demo is not None:
-                valve_entities.append(
-                    {"entity": demo.valves[index - 1].ids.entity_id, "name": f"{label} · demo"}
-                )
-            valve_entities.append({"entity": valve.entity_id, "name": label})
+    valve_entities = [
+        {"entity": ids.room("sensor", room, "valve_state"), "name": room.name} for room in rooms
+    ]
     valve_cards = [
         _heading(text["valves_timeline"], "mdi:pipe-valve"),
         {"type": "history-graph", "hours_to_show": 24, "entities": valve_entities},

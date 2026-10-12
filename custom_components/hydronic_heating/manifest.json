@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/elvisek2020/hacs-heating_system/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.6.1"
+  "version": "0.6.2"
 }
