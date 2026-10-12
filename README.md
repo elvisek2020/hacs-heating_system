@@ -1,27 +1,46 @@
 # Heating Controller
 
-Vlastní integrace pro Home Assistant, která řídí teplovodní ústřední topení: kotel spínaný beznapěťovým kontaktem, radiátory a termoelektrické hlavice NO/NC. Staví jen na obecných entitách HA, takže výměna hardwaru (dnes Loxone přes PyLoxone) znamená jen přemapovat entity v nastavení.
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Release](https://img.shields.io/github/v/release/elvisek2020/hacs-heating_system)](https://github.com/elvisek2020/hacs-heating_system/releases)
+[![Validate](https://github.com/elvisek2020/hacs-heating_system/actions/workflows/validate.yml/badge.svg)](https://github.com/elvisek2020/hacs-heating_system/actions/workflows/validate.yml)
+[![Licence](https://img.shields.io/github/license/elvisek2020/hacs-heating_system)](LICENSE)
 
-## Stav
+[![Otevřít v HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=elvisek2020&repository=hacs-heating_system&category=integration)
 
-| Fáze | Obsah |
-|---|---|
-| **F0** ✅ | kostra, config flow, nastavení systému, místnosti, ikona, CI |
-| **F1** ✅ | místnosti, čidla, ventily NO/NC, kotel, arbitr požadavků, sekvence ventily → kotel → doběh, ochrana kotle proti cyklování, manuál s odpočtem, režimy, rozvrh, shadow, ukládání stavu |
-| **F2** ✅ | okna a globální práh, protimrazová ochrana, venkovní teplota a mez vytápění (léto), protáčení ventilů, notifikace, repair issues, diagnostika |
-| **F3** ✅ | ekviterm: topná křivka (virtuální teplota vody), omezení střídy kotle, předpověď počasí |
-| F5 | modulované řízení (OpenTherm/eBUS) – až s kotlem, který ho umí |
+Integrace pro Home Assistant, která řídí teplovodní ústřední topení: kotel spínaný beznapěťovým kontaktem, radiátory a termoelektrické hlavice NO/NC. Staví jen na obecných entitách HA, takže výměna hardwaru (dnes Loxone přes PyLoxone) znamená jen přemapovat entity v nastavení.
 
-## Instalace přes HACS
+- místnosti s 1..n teplotními čidly a ventily, regulace TPI nebo hystereze, PWM ventilů s ohledem na pomalé hlavice
+- kotel se sekvencí ventily → kotel → doběh a s ochranou proti cyklování (minimální běh, pauza, počet startů)
+- režimy, manuální topení s odpočtem, rozvrhy, okna, protimrazová ochrana, léto podle venkovní teploty
+- ekviterm: virtuální teplota vody podle topné křivky a volitelné omezení střídy kotle
+- přítomnost domácnosti a předtápění, které se učí rychlost ohřevu místností
+- vysvětlení, proč kotel topí nebo stojí, a deník rozhodnutí v logbooku
+- shadow a demo režim pro bezpečné ověření před přepnutím z jiné regulace, generovaný dashboard
 
-1. HACS → tři tečky vpravo nahoře → **Vlastní repozitáře**.
-2. Repozitář `https://github.com/elvisek2020/hacs-heating_system`, typ **Integrace**.
-3. Nainstalovat **Heating Controller** a restartovat Home Assistant.
-4. Nastavení → Zařízení a služby → **Přidat integraci** → Heating Controller.
+## Předpoklady a závislosti
 
-Vyžaduje Home Assistant 2026.3 nebo novější.
+- Home Assistant 2026.3 nebo novější.
+- Kotel jako entita `switch`, `select` nebo dvojice skriptů či tlačítek (zapnout, vypnout). Typicky beznapěťový kontakt.
+- Hlavice jako `switch` (NO nebo NC) nebo `valve`, teplotní čidla místností jako `sensor` nebo `climate`.
+- Volitelně: venkovní čidlo nebo entita počasí, okenní kontakty, helper `schedule` pro rozvrh, entity přítomnosti, entita pro heartbeat watchdog.
+- Výstup kotle a hlavic smí řídit jen jeden vlastník, viz [Příprava v Loxone](#příprava-v-loxone).
 
-## Jak začít
+## Instalace
+
+### HACS (doporučeno)
+
+1. HACS → tři tečky vpravo nahoře → **Custom repositories**
+2. Vlož URL `https://github.com/elvisek2020/hacs-heating_system`, kategorie **Integration**
+3. Nainstaluj **Heating Controller**
+4. Restartuj Home Assistant a přidej ji v Nastavení → Zařízení a služby → Přidat integraci.
+
+HACS nabízí aktualizace z GitHub releases.
+
+### Ručně
+
+Zkopíruj `custom_components/hydronic_heating` z posledního [release](https://github.com/elvisek2020/hacs-heating_system/releases) do `/config/custom_components/` a restartuj Home Assistant.
+
+## Konfigurace
 
 1. Přidejte integraci. **Režim shadow** nechte zapnutý: integrace všechno počítá, ale nic nespíná.
 2. V integraci přidejte místnosti tlačítkem **Přidat místnost** (čidla, ventily, okna, rozvrh).
@@ -141,3 +160,22 @@ Validace stejná jako v CI:
 ```bash
 docker run --rm -v "$PWD:/github/workspace" ghcr.io/home-assistant/hassfest
 ```
+
+## Vydání verze
+
+1. Zvedni verzi v `custom_components/hydronic_heating/manifest.json` a `pyproject.toml` (SemVer).
+2. Doplň sekci `## vX.Y.Z — RRRR-MM-DD` do `CHANGELOG.md`.
+3. Commit `Release vX.Y.Z: …`, `git tag vX.Y.Z`, push commitu i tagu.
+4. GitHub Actions zkontroluje verzi v manifestu a vytvoří release s textem z CHANGELOG. HACS pak nabídne aktualizaci.
+
+## Známá omezení
+
+- Kotel řízený jen kontaktem: Home Assistant ho umí jen zapnout a vypnout. Teplota vody podle topné křivky je proto jen virtuální hodnota, skutečnou teplotu si kotel drží sám. Modulované řízení (OpenTherm, eBUS) zatím není.
+- Předtápění se rychlost ohřevu teprve učí. Prvních pár ohřevů počítá s výchozí hodnotou 0,5 °C za hodinu.
+- Předtápění podle návratu konkrétní osoby (např. dětský pokoj) zatím není, jen podle návratu domácnosti a podle rozvrhu.
+- Dashboard se negeneruje sám: po změně místností nebo po aktualizaci je potřeba znovu spustit službu `hydronic_heating.generate_dashboard` a vložit výsledek.
+- Jedna instance integrace na Home Assistant.
+
+## Autor
+
+**[elvisek2020](https://github.com/elvisek2020)** — integrace vznikla jako náhrada regulace Loxone (Intelligent Room Controller a Climate Controller) pro teplovodní topení v rodinném domě. Licence MIT.

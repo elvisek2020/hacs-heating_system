@@ -1,12 +1,13 @@
+.DS_Store
 __pycache__/
 *.py[cod]
+.venv/
+venv/
 .pytest_cache/
 .ruff_cache/
 .coverage
 htmlcov/
-.venv/
-venv/
-.DS_Store
 
-# Design documents stay local
+# lokální deník práce a návrhy (PRD), synchronizuje se přes iCloud
 _docs/
+.cursor/
