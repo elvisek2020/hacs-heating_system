@@ -86,6 +86,7 @@ async def test_presence_saves_entities_and_clears_them(
     result = await hass.config_entries.options.async_configure(
         result["flow_id"],
         {
+            "house_schedule_entity": "schedule.dum",
             "house_presence_entity": "zone.home",
             "long_away_entity": "input_boolean.dovolena",
             "absence_preset": "away",
@@ -95,6 +96,8 @@ async def test_presence_saves_entities_and_clears_them(
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert config_entry.options["house_presence_entity"] == "zone.home"
+    assert config_entry.options["house_schedule_entity"] == "schedule.dum"
+    assert config_entry.runtime_data.controller.cfg.house_schedule_entity == "schedule.dum"
     assert config_entry.options["absence_preset"] == "away"
     assert config_entry.options["preheat_max"] == 3
     assert config_entry.runtime_data.controller.cfg.preheat_max_s == 3 * 3600

@@ -109,7 +109,7 @@
           "manual": "Manual mode",
           "equithermal": "Equithermal",
           "frost": "Frost protection",
-          "presence": "Presence and preheating"
+          "presence": "Schedule, presence and preheating"
         }
       },
       "general": {
@@ -314,9 +314,10 @@
         }
       },
       "presence": {
-        "title": "Presence and preheating",
-        "description": "Who is home comes from a presence module, a group of persons or zone.home. When nobody is home, rooms in auto use the setback; during a long absence the whole house uses away. Preheating starts early enough to have comfort when the schedule switches to comfort or when someone is expected back.",
+        "title": "Schedule, presence and preheating",
+        "description": "The house schedule applies to every room without its own schedule: on = comfort, off = setback. Who is home comes from a presence module, a group of persons or zone.home. When nobody is home, rooms in auto use the setback; during a long absence the whole house uses away. Preheating starts early enough to have comfort when the schedule switches to comfort or when someone is expected back.",
         "data": {
+          "house_schedule_entity": "House schedule (optional)",
           "house_presence_entity": "Somebody home (optional)",
           "long_away_entity": "Long absence (optional)",
           "expected_return_entity": "Expected return (optional)",
@@ -325,6 +326,7 @@
           "preheat_max": "Longest preheating"
         },
         "data_description": {
+          "house_schedule_entity": "A schedule helper for the whole house: on = comfort, off = setback (night, work, school). A room can override it with its own schedule.",
           "house_presence_entity": "On or home = somebody is home. A number (zone.home) above 0 also means home. Unavailable keeps the last state.",
           "long_away_entity": "On = weekend or holiday: the whole house uses the away temperatures.",
           "expected_return_entity": "Timestamp of the next return, used for preheating.",
@@ -426,7 +428,7 @@
             "presence_entity": "Presence (optional)"
           },
           "data_description": {
-            "schedule_entity": "On = comfort, off = eco.",
+            "schedule_entity": "On = comfort, off = setback. Empty = the house schedule (Schedule, presence and preheating).",
             "presence_entity": "Absence switches the room to setback or away, see Presence and preheating."
           }
         },

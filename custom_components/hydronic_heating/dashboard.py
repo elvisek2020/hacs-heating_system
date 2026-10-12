@@ -43,6 +43,7 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "open_windows": "Okna",
         "presence": "Doma",
+        "house_schedule": "Rozvrh domu",
         "long_away": "Dlouhodobě pryč",
         "heat_demand": "Požadavek na teplo",
         "demand_total": "Celkový požadavek",
@@ -112,6 +113,7 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
         "open_windows": "Windows",
         "presence": "Home",
+        "house_schedule": "House schedule",
         "long_away": "Long absence",
         "heat_demand": "Heat demand",
         "demand_total": "Total demand",
@@ -352,6 +354,11 @@ def _system_section(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, 
             ],
         ),
         _tile(sid("select", "system_mode"), text["mode"], features=[{"type": "select-options"}]),
+    ]
+    if schedule := runtime.controller.cfg.house_schedule_entity:
+        # On = comfort, off = setback; the next change shows in the tile.
+        cards.append(_full(schedule, text["house_schedule"], state_content=["state", "next_event"]))
+    cards += [
         _heading(text["manual"], "mdi:fire", subtitle=True),
     ]
     # One row of start buttons (3 of 12 columns each, 4 per row).

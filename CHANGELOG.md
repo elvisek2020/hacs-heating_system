@@ -5,6 +5,19 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.7.0 — 2026-10-13
+
+### ✨ Novinky
+
+- **Rozvrh domu:** jeden pomocník Plán pro celý dům místo rozvrhu u každé místnosti. Zapnuto = komfort, vypnuto = útlum (noc, práce, škola).
+  - Nastavuje se v **Konfigurovat → Rozvrh, přítomnost a předtápění → Rozvrh domu**.
+  - Platí pro všechny místnosti bez vlastního rozvrhu. Vlastní rozvrh místnosti má přednost.
+  - Předtápění začne včas před začátkem komfortu v rozvrhu domu.
+- Dashboard ukazuje v sekci Topení dlaždici rozvrhu domu se stavem a časem příští změny. Termostat místnosti má atribut `schedule_entity`, podle kterého rozvrhu jede.
+- Výchozí útlum nově přidaných místností je 19 °C (dřív 18 °C). Stávající místnosti si nastavení ponechají.
+
+Po aktualizaci restartuj Home Assistant. Dlaždice rozvrhu se na dashboardu objeví po novém vygenerování službou `hydronic_heating.generate_dashboard`.
+
 ## v0.6.2 — 2026-10-13
 
 ### 🎨 Vzhled

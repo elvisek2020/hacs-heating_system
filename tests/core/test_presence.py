@@ -52,7 +52,7 @@ def test_nobody_home_lowers_to_eco_and_logs_it() -> None:
     house.set(FAMILY, "not_home")
     house.now += timedelta(seconds=30)
     house.step()
-    assert _targets(ctrl) == {18.0}
+    assert _targets(ctrl) == {19.0}
     assert {r.effective_preset for r in ctrl.rooms.values()} == {Preset.ECO}
     assert ctrl.state is SystemState.AUTO
     presence = [d for d in ctrl.decisions if d.kind == "presence"]
@@ -108,7 +108,7 @@ def test_permanent_room_change_wins_over_absence() -> None:
     house.step()
     assert ctrl.rooms["id_obyvak"].hvac_mode is RoomHvacMode.HEAT
     assert ctrl.rooms["id_obyvak"].target == 22.0
-    assert ctrl.rooms["id_loznice"].target == 18.0
+    assert ctrl.rooms["id_loznice"].target == 19.0
 
 
 def test_preheat_before_expected_return() -> None:
@@ -163,7 +163,7 @@ def test_preheat_before_schedule_change() -> None:
     comfort_from = T0 + timedelta(hours=2)
     house.set("schedule.obyvak", "off", next_event=comfort_from)
     house.step()
-    assert obyvak.target == 18.0
+    assert obyvak.target == 19.0
     # Default 0.5 K/h would need 4 h, limited to preheat_max = 1 h.
     assert obyvak.preheat_planned == comfort_from - timedelta(hours=1)
     house.run(3600)
@@ -181,7 +181,7 @@ def test_no_preheat_when_disabled_or_somebody_is_home_anyway() -> None:
     house.set("schedule.obyvak", "off", next_event=T0 + timedelta(minutes=30))
     house.step()
     assert not ctrl.rooms["id_obyvak"].preheating
-    assert ctrl.rooms["id_obyvak"].target == 18.0
+    assert ctrl.rooms["id_obyvak"].target == 19.0
 
 
 def test_heat_rate_is_learned_from_a_heat_up() -> None:
@@ -208,3 +208,45 @@ def test_heat_rate_bands_and_storage() -> None:
     restored = HeatRate()
     restored.restore(rate.to_dict())
     assert restored.samples == rate.samples
+
+
+def test_house_schedule_applies_to_rooms_without_their_own() -> None:
+    """FR-SCH-01: one schedule for the house; a room schedule overrides it."""
+    ctrl = controller(
+        room("obyvak"),
+        room("loznice", **{c.CONF_SCHEDULE_ENTITY: "schedule.loznice"}),
+        **{c.CONF_HAS_BYPASS: True, c.CONF_HOUSE_SCHEDULE_ENTITY: "schedule.dum"},
+    )
+    house = House(ctrl, temperatures={"obyvak": 20.0, "loznice": 20.0})
+    house.set("schedule.dum", "off")
+    house.set("schedule.loznice", "on")
+    house.step()
+    obyvak, loznice = ctrl.rooms["id_obyvak"], ctrl.rooms["id_loznice"]
+    assert obyvak.schedule_entity == "schedule.dum"
+    assert obyvak.target == 19.0
+    assert loznice.schedule_entity == "schedule.loznice"
+    assert loznice.target == 21.0
+
+    house.set("schedule.dum", "on")
+    house.run(30)
+    assert obyvak.target == 21.0
+
+
+def test_preheat_before_the_house_schedule() -> None:
+    ctrl = controller(
+        room("obyvak"),
+        **{
+            c.CONF_HAS_BYPASS: True,
+            c.CONF_HOUSE_SCHEDULE_ENTITY: "schedule.dum",
+            c.CONF_PREHEAT_MAX: 1,
+        },
+    )
+    house = House(ctrl, temperatures={"obyvak": 19.0})
+    comfort_from = T0 + timedelta(hours=2)
+    house.set("schedule.dum", "off", next_event=comfort_from)
+    house.step()
+    obyvak = ctrl.rooms["id_obyvak"]
+    assert obyvak.preheat_planned == comfort_from - timedelta(hours=1)
+    house.run(3600)
+    assert obyvak.preheating
+    assert obyvak.preheat_source == "schedule"

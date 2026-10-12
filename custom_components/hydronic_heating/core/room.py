@@ -44,6 +44,8 @@ class RoomContext:
     window_close_delay_s: float
     window_outdoor_condition: bool
     window_max_block_s: float
+    # FR-SCH-01: schedule of the whole house, used by rooms without their own.
+    house_schedule_entity: str | None = None
     house_present: bool | None = None
     long_away: bool = False
     expected_return: datetime | None = None
@@ -139,6 +141,7 @@ class RoomController:
         self.calling = False
         self.demand = 0.0
         self.target: float | None = None
+        self.schedule_entity: str | None = None
         self.schedule_on: bool | None = None
         self.schedule_next: datetime | None = None
         self.present: bool | None = None
@@ -294,7 +297,7 @@ class RoomController:
 
     def _comfort_at(self, when: datetime, ctx: RoomContext) -> bool:
         """Whether the room will want comfort at `when` (schedule and presence)."""
-        if self.cfg.schedule_entity and self.schedule_on is not None:
+        if self.schedule_entity and self.schedule_on is not None:
             following = self.schedule_next
             if self.schedule_on and following is not None and following <= when:
                 return False
@@ -348,10 +351,14 @@ class RoomController:
     def update(self, snap: Snapshot, ctx: RoomContext) -> None:
         """Read inputs and compute target and demand."""
         self._read_temperature(snap)
-        if self.cfg.schedule_entity:
-            reading = snap.get(self.cfg.schedule_entity)
+        # The room's own schedule wins over the schedule of the house.
+        self.schedule_entity = self.cfg.schedule_entity or ctx.house_schedule_entity
+        if self.schedule_entity:
+            reading = snap.get(self.schedule_entity)
             self.schedule_on = self._bool_state(reading, {"on"})
             self.schedule_next = read_next_event(reading, ctx.timezone)
+        else:
+            self.schedule_on = self.schedule_next = None
         self.present = self._read_presence(snap) if self.cfg.presence_entity else None
         condition_ok = (
             not ctx.window_outdoor_condition

@@ -109,7 +109,7 @@
           "manual": "Manuální režim",
           "equithermal": "Ekviterm",
           "frost": "Ochrana proti mrazu",
-          "presence": "Přítomnost a předtápění"
+          "presence": "Rozvrh, přítomnost a předtápění"
         }
       },
       "general": {
@@ -314,9 +314,10 @@
         }
       },
       "presence": {
-        "title": "Přítomnost a předtápění",
-        "description": "Kdo je doma, říká modul přítomnosti, skupina osob nebo zone.home. Když nikdo není doma, místnosti v režimu automaticky jedou na útlum. Při dlouhodobé nepřítomnosti jede celý dům na teploty Pryč. Předtápění začne včas, aby byl komfort v době, kdy rozvrh přepne na komfort nebo kdy se někdo vrací.",
+        "title": "Rozvrh, přítomnost a předtápění",
+        "description": "Rozvrh domu platí pro všechny místnosti bez vlastního rozvrhu: zapnuto = komfort, vypnuto = útlum. Kdo je doma, říká modul přítomnosti, skupina osob nebo zone.home. Když nikdo není doma, místnosti v režimu automaticky jedou na útlum. Při dlouhodobé nepřítomnosti jede celý dům na teploty Pryč. Předtápění začne včas, aby byl komfort v době, kdy rozvrh přepne na komfort nebo kdy se někdo vrací.",
         "data": {
+          "house_schedule_entity": "Rozvrh domu (volitelné)",
           "house_presence_entity": "Někdo doma (volitelné)",
           "long_away_entity": "Dlouhodobě pryč (volitelné)",
           "expected_return_entity": "Očekávaný návrat (volitelné)",
@@ -325,6 +326,7 @@
           "preheat_max": "Nejdelší předtápění"
         },
         "data_description": {
+          "house_schedule_entity": "Pomocník Plán pro celý dům: zapnuto = komfort, vypnuto = útlum (noc, práce, škola). Místnost ho může přebít vlastním rozvrhem.",
           "house_presence_entity": "Zapnuto nebo doma = někdo je doma. Číslo (zone.home) větší než 0 také znamená doma. Nedostupná entita drží poslední stav.",
           "long_away_entity": "Zapnuto = víkend nebo dovolená: celý dům jede na teploty Pryč.",
           "expected_return_entity": "Časové razítko nejbližšího návratu, pro předtápění.",
@@ -426,7 +428,7 @@
             "presence_entity": "Přítomnost (volitelné)"
           },
           "data_description": {
-            "schedule_entity": "Zapnuto = komfort, vypnuto = eco.",
+            "schedule_entity": "Zapnuto = komfort, vypnuto = útlum. Prázdné = rozvrh domu (Rozvrh, přítomnost a předtápění).",
             "presence_entity": "Při nepřítomnosti jde místnost na útlum nebo Pryč podle nastavení Přítomnost a předtápění."
           }
         },

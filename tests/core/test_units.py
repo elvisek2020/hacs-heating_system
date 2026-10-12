@@ -306,7 +306,7 @@ def test_room_presence_absent_uses_absence_preset() -> None:
     house.run(30)
     obyvak = ctrl.rooms["id_obyvak"]
     assert obyvak.effective_preset is Preset.ECO
-    assert obyvak.target == 18.0
+    assert obyvak.target == 19.0
     house.set("person.zdenek", "home")
     house.run(30)
     assert obyvak.target == 21.0
@@ -328,9 +328,9 @@ def test_preset_change_is_override() -> None:
     assert obyvak.hvac_mode is RoomHvacMode.HEAT
     house = House(ctrl, temperatures={"obyvak": 20.0})
     house.run(30)
-    assert obyvak.target == 18.0
+    assert obyvak.target == 19.0
     obyvak.set_preset(Preset.NONE, house.now)
-    assert obyvak.manual_target == 18.0
+    assert obyvak.manual_target == 19.0
 
 
 def test_room_off_closes_valve_but_keeps_frost() -> None:

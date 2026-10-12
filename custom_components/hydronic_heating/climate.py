@@ -217,6 +217,7 @@ class RoomClimate(HydronicEntity, ClimateEntity):
             "window_state": room.window.state.value,
             "window_since": _iso(room.window.since),
             "frost_active": room.frost_active,
+            "schedule_entity": room.schedule_entity,
             "schedule_state": room.schedule_on,
             "schedule_next": _iso(room.schedule_next),
             "presence": room.present,

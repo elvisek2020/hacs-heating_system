@@ -364,6 +364,7 @@ class SystemConfig:
     boiler_cycle_period_s: float = 1200.0
     duty_min: float = 0.2
     use_forecast: bool = False
+    house_schedule_entity: str | None = None
     house_presence_entity: str | None = None
     long_away_entity: str | None = None
     expected_return_entity: str | None = None
@@ -456,6 +457,7 @@ class SystemConfig:
             boiler_cycle_period_s=num(c.CONF_BOILER_CYCLE_PERIOD) * 60,
             duty_min=num(c.CONF_DUTY_MIN),
             use_forecast=bool(opt(c.CONF_USE_FORECAST)),
+            house_schedule_entity=options.get(c.CONF_HOUSE_SCHEDULE_ENTITY),
             house_presence_entity=options.get(c.CONF_HOUSE_PRESENCE_ENTITY),
             long_away_entity=options.get(c.CONF_LONG_AWAY_ENTITY),
             expected_return_entity=options.get(c.CONF_EXPECTED_RETURN_ENTITY),

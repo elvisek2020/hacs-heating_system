@@ -118,6 +118,7 @@ class HydronicController:
         for entity in (
             cfg.weather_entity,
             cfg.heat_source.feedback_entity,
+            cfg.house_schedule_entity,
             cfg.house_presence_entity,
             cfg.long_away_entity,
             cfg.expected_return_entity,
@@ -200,6 +201,7 @@ class HydronicController:
             window_close_delay_s=cfg.window_close_delay_s,
             window_outdoor_condition=cfg.window_outdoor_condition,
             window_max_block_s=cfg.window_max_block_s,
+            house_schedule_entity=cfg.house_schedule_entity,
             house_present=self.house_present,
             long_away=self.long_away and mode is SystemMode.AUTO,
             expected_return=self.expected_return,

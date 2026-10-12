@@ -145,6 +145,7 @@ CONF_FROST_OUTDOOR_TEMP: Final = "frost_outdoor_temp"
 CONF_FROST_IDLE_MAX: Final = "frost_idle_max"
 
 # --- Presence and preheating (FR-SCH-02, FR-SCH-03) ------------------------
+CONF_HOUSE_SCHEDULE_ENTITY: Final = "house_schedule_entity"
 CONF_HOUSE_PRESENCE_ENTITY: Final = "house_presence_entity"
 CONF_LONG_AWAY_ENTITY: Final = "long_away_entity"
 CONF_EXPECTED_RETURN_ENTITY: Final = "expected_return_entity"
@@ -270,7 +271,7 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
 
 DEFAULT_ROOM: Final[dict[str, Any]] = {
     CONF_COMFORT_TEMP: 21.0,
-    CONF_ECO_TEMP: 18.0,
+    CONF_ECO_TEMP: 19.0,
     CONF_AWAY_TEMP: 15.0,
     CONF_FROST_TEMP: 5.0,
     CONF_AREA_M2: 0,

@@ -338,7 +338,7 @@ def test_14_setpoint_change_is_permanent_override() -> None:
     assert obyvak.target == 21.0
     house.set("schedule.obyvak", "off")
     house.run(30)
-    assert obyvak.target == 18.0
+    assert obyvak.target == 19.0
 
     obyvak.set_target(23.0, house.now)
     house.run(30)

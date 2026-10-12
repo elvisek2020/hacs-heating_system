@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import async_capture_events
 from custom_components.hydronic_heating.const import (
     CONF_EXPECTED_RETURN_ENTITY,
     CONF_HOUSE_PRESENCE_ENTITY,
+    CONF_HOUSE_SCHEDULE_ENTITY,
     CONF_LONG_AWAY_ENTITY,
     EVENT_DECISION,
 )
@@ -40,7 +41,7 @@ async def test_presence_lowers_rooms_and_preheats(
     hass.states.async_set("group.rodina", "not_home")
     await _settle(hass)
     living = hass.states.get("climate.hh_obyvak")
-    assert living.attributes["temperature"] == 18.0
+    assert living.attributes["temperature"] == 19.0
     assert living.attributes["preset_mode"] == "eco"
     assert hass.states.get("climate.hh_system").attributes["presence"] == "absent"
     presence = [e.data for e in events if e.data["kind"] == "presence"]
@@ -100,3 +101,21 @@ async def test_czech_preheat_text_and_dashboard_badges(hass: HomeAssistant) -> N
     badges = {b["entity"]: b for b in dashboard["views"][0]["badges"]}
     assert badges["group.rodina"]["name"] == "Doma"
     assert badges["binary_sensor.dlouho_pryc"]["visibility"][0]["state"] == "on"
+
+
+async def test_house_schedule_in_rooms_and_dashboard(hass: HomeAssistant) -> None:
+    hass.states.async_set("schedule.dum", "off")
+    await _setup(hass, **{CONF_HOUSE_SCHEDULE_ENTITY: "schedule.dum"})
+    living = hass.states.get("climate.hh_obyvak")
+    assert living.attributes["schedule_entity"] == "schedule.dum"
+    assert living.attributes["temperature"] == 19.0
+    hass.states.async_set("schedule.dum", "on")
+    await _settle(hass)
+    assert hass.states.get("climate.hh_obyvak").attributes["temperature"] == 21.0
+    dashboard = await hass.services.async_call(
+        "hydronic_heating", "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    system = dashboard["views"][0]["sections"][0]["cards"]
+    tile = next(c for c in system if c.get("entity") == "schedule.dum")
+    assert tile["name"] == "House schedule"
+    assert tile["state_content"] == ["state", "next_event"]

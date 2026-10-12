@@ -91,6 +91,7 @@ from .const import (
     CONF_HEATING_LIMIT_HYSTERESIS,
     CONF_HOT_TOLERANCE,
     CONF_HOUSE_PRESENCE_ENTITY,
+    CONF_HOUSE_SCHEDULE_ENTITY,
     CONF_IDLE_VALVE_POLICY,
     CONF_KEEP_ALIVE,
     CONF_LONG_AWAY_ENTITY,
@@ -468,9 +469,13 @@ def _frost_schema(values: Mapping[str, Any]) -> vol.Schema:
 PRESENCE_DOMAINS = ["binary_sensor", "input_boolean", "person", "group", "zone", "sensor"]
 
 
+SCHEDULE_DOMAINS = ["schedule", "input_boolean", "switch", "binary_sensor"]
+
+
 def _presence_schema(values: Mapping[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
+            _optional(CONF_HOUSE_SCHEDULE_ENTITY, values): _entity(SCHEDULE_DOMAINS),
             _optional(CONF_HOUSE_PRESENCE_ENTITY, values): _entity(PRESENCE_DOMAINS),
             _optional(CONF_LONG_AWAY_ENTITY, values): _entity(["binary_sensor", "input_boolean"]),
             _optional(CONF_EXPECTED_RETURN_ENTITY, values): _entity(["sensor", "input_datetime"]),
@@ -545,9 +550,7 @@ def _room_windows_schema(values: Mapping[str, Any]) -> vol.Schema:
 def _room_schedule_schema(values: Mapping[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
-            _optional(CONF_SCHEDULE_ENTITY, values): _entity(
-                ["schedule", "input_boolean", "switch", "binary_sensor"]
-            ),
+            _optional(CONF_SCHEDULE_ENTITY, values): _entity(SCHEDULE_DOMAINS),
             _optional(CONF_PRESENCE_ENTITY, values): _entity(PRESENCE_DOMAINS),
         }
     )

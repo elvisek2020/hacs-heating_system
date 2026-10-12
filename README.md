@@ -81,9 +81,13 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 - **Předpověď (volitelně):** s entitou počasí se pro mez vytápění i křivku bere průměr tlumené teploty a průměrné předpovědi na příštích 24 hodin.
 - **Ochrany:** ověření každého povelu s opakováním, keep-alive, obnovení stavu ventilů po výpadku, bezpečný stav při nedostupném kotli, heartbeat pro watchdog v Loxone, upozornění na zastaralá čidla.
 
-## Přítomnost a předtápění
+## Rozvrh, přítomnost a předtápění
 
-V **Konfigurovat → Přítomnost a předtápění** se nastaví, odkud topení ví, kdo je doma. Stačí běžné entity, například vlastní modul přítomnosti, skupina osob nebo `zone.home` (počet lidí doma).
+Všechno se nastavuje v **Konfigurovat → Rozvrh, přítomnost a předtápění**.
+
+**Rozvrh domu** je jeden pomocník **Plán** (`schedule`) pro celý dům: zapnuto = komfort, vypnuto = útlum (noc, práce, škola). Platí pro všechny místnosti, které nemají vlastní rozvrh. Vlastní rozvrh místnosti (Překonfigurovat → Rozvrh) ho přebije, třeba když ložnice chce jiné časy. Plán se zakládá v Nastavení → Zařízení a služby → Pomocníci → Vytvořit pomocníka → Plán.
+
+Přítomnost se nastavuje běžnými entitami, například vlastním modulem přítomnosti, skupinou osob nebo `zone.home` (počet lidí doma).
 
 - **Někdo doma:** zapnuto nebo `home` znamená doma, číslo větší než 0 taky. Když nikdo není doma, místnosti v režimu automaticky jedou na útlum. V nastavení jde místo útlumu zvolit teplotu Pryč. Nedostupná entita drží poslední stav, takže výpadek telefonu dům nevychladí.
 - **Dlouhodobě pryč:** zapnuto znamená víkend nebo dovolenou. Celý dům jede na teploty Pryč a stav systému je `away`. Zvolený režim se nemění, po návratu jede topení samo zase normálně.
@@ -92,7 +96,7 @@ V **Konfigurovat → Přítomnost a předtápění** se nastaví, odkud topení 
 
 **Předtápění** se zapíná v nastavení a je zapnuté ve výchozím stavu.
 - **Co se učí:** jak rychle se která místnost ohřívá, ve °C za hodinu a podle venkovní teploty. Bere medián posledních 8 ohřevů. Dokud nemá data, počítá s 0,5 °C za hodinu.
-- **Kdy začne:** včas před začátkem komfortu v rozvrhu (helper `schedule`) nebo před očekávaným návratem. Počítá s dobou přestavení hlavic a náběhem kotle, ale nikdy nezačne dřív než nastavené maximum (výchozí 4 h).
+- **Kdy začne:** včas před začátkem komfortu v rozvrhu (domu nebo místnosti) nebo před očekávaným návratem. Počítá s dobou přestavení hlavic a náběhem kotle, ale nikdy nezačne dřív než nastavené maximum (výchozí 4 h).
 - **Kde je to vidět:** na termostatu místnosti v atributech `preheating`, `preheat_until`, `preheat_planned` a `heat_rate_k_h`. Do logbooku se zapíše věta, například „Předtápění: Obývák na 21 °C do 15:00 (očekávaný návrat), rychlost ohřevu 0,8 K/h.“
 
 Bez nastavené přítomnosti a bez rozvrhu se nic nemění.
