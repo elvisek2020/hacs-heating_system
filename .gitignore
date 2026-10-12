@@ -11,3 +11,4 @@ htmlcov/
 # lokální deník práce a návrhy (PRD), synchronizuje se přes iCloud
 _docs/
 .cursor/
+CLAUDE.md
