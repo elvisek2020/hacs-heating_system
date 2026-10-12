@@ -134,6 +134,7 @@ class ValveReason(StrEnum):
     ROOM_OFF = "room_off"
     PWM = "pwm"
     MIN_STATE_HOLD = "min_state_hold"
+    PREHEAT = "preheat"
     EXERCISE = "exercise"
     OVERRUN = "overrun"
     MIN_FLOW = "min_flow"
@@ -363,6 +364,12 @@ class SystemConfig:
     boiler_cycle_period_s: float = 1200.0
     duty_min: float = 0.2
     use_forecast: bool = False
+    house_presence_entity: str | None = None
+    long_away_entity: str | None = None
+    expected_return_entity: str | None = None
+    absence_preset: str = "eco"
+    preheat_enabled: bool = True
+    preheat_max_s: float = 4 * 3600
     timezone: ZoneInfo = field(default_factory=lambda: ZoneInfo("UTC"))
 
     @classmethod
@@ -449,6 +456,12 @@ class SystemConfig:
             boiler_cycle_period_s=num(c.CONF_BOILER_CYCLE_PERIOD) * 60,
             duty_min=num(c.CONF_DUTY_MIN),
             use_forecast=bool(opt(c.CONF_USE_FORECAST)),
+            house_presence_entity=options.get(c.CONF_HOUSE_PRESENCE_ENTITY),
+            long_away_entity=options.get(c.CONF_LONG_AWAY_ENTITY),
+            expected_return_entity=options.get(c.CONF_EXPECTED_RETURN_ENTITY),
+            absence_preset=str(opt(c.CONF_ABSENCE_PRESET)),
+            preheat_enabled=bool(opt(c.CONF_PREHEAT_ENABLED)),
+            preheat_max_s=num(c.CONF_PREHEAT_MAX) * 3600,
             timezone=timezone,
         )
 

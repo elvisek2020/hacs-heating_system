@@ -298,17 +298,27 @@ def test_away_mode_targets_away_temperature() -> None:
 # --- Rooms ----------------------------------------------------------------------
 
 
-def test_presence_absent_uses_away_preset() -> None:
+def test_room_presence_absent_uses_absence_preset() -> None:
+    """FR-SCH-02: absence means eco by default, away when configured."""
     ctrl = controller(room("obyvak", presence_entity="person.zdenek"))
     house = House(ctrl, temperatures={"obyvak": 20.0})
     house.set("person.zdenek", "not_home")
     house.run(30)
     obyvak = ctrl.rooms["id_obyvak"]
-    assert obyvak.effective_preset is Preset.AWAY
-    assert obyvak.target == 15.0
+    assert obyvak.effective_preset is Preset.ECO
+    assert obyvak.target == 18.0
     house.set("person.zdenek", "home")
     house.run(30)
     assert obyvak.target == 21.0
+
+    ctrl = controller(
+        room("obyvak", presence_entity="person.zdenek"), **{c.CONF_ABSENCE_PRESET: "away"}
+    )
+    house = House(ctrl, temperatures={"obyvak": 20.0})
+    house.set("person.zdenek", "not_home")
+    house.run(30)
+    assert ctrl.rooms["id_obyvak"].effective_preset is Preset.AWAY
+    assert ctrl.rooms["id_obyvak"].target == 15.0
 
 
 def test_preset_change_is_override() -> None:

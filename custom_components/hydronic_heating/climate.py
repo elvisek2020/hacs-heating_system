@@ -109,6 +109,8 @@ class SystemClimate(HydronicEntity, ClimateEntity):
             "last_transition": ctrl.modes.last_transition,
             "last_command_latency_ms": ctrl.tracker.state("boiler").latency_ms,
             "last_reverted_override": ctrl.last_revert,
+            "presence": ctrl.presence_state,
+            "expected_return": _iso(ctrl.expected_return),
         }
         if ctrl.cfg.shadow_mode:
             would = ctrl.would_command()
@@ -216,6 +218,13 @@ class RoomClimate(HydronicEntity, ClimateEntity):
             "window_since": _iso(room.window.since),
             "frost_active": room.frost_active,
             "schedule_state": room.schedule_on,
+            "schedule_next": _iso(room.schedule_next),
+            "presence": room.present,
+            "preheating": room.preheating,
+            "preheat_until": _iso(room.preheat_until),
+            "preheat_planned": _iso(room.preheat_planned),
+            "heat_rate_k_h": room.heat_rate.rate(ctrl.outdoor.damped),
+            "heat_rate_samples": room.heat_rate.count,
             "override_active": room.override_active,
             "override_since": _iso(room.override_since),
             "last_exercise": _iso(max(last_exercise)) if last_exercise else None,

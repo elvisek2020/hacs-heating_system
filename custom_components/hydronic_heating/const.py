@@ -144,6 +144,15 @@ CONF_FROST_OUTDOOR_PROTECTION: Final = "frost_outdoor_protection"
 CONF_FROST_OUTDOOR_TEMP: Final = "frost_outdoor_temp"
 CONF_FROST_IDLE_MAX: Final = "frost_idle_max"
 
+# --- Presence and preheating (FR-SCH-02, FR-SCH-03) ------------------------
+CONF_HOUSE_PRESENCE_ENTITY: Final = "house_presence_entity"
+CONF_LONG_AWAY_ENTITY: Final = "long_away_entity"
+CONF_EXPECTED_RETURN_ENTITY: Final = "expected_return_entity"
+CONF_ABSENCE_PRESET: Final = "absence_preset"
+CONF_PREHEAT_ENABLED: Final = "preheat_enabled"
+CONF_PREHEAT_MAX: Final = "preheat_max"
+ABSENCE_PRESETS: Final = ["eco", "away"]
+
 # --- Room subentry (FR-ROOM, FR-SCH, FR-WIN, chapter 10.2) ---------------
 CONF_ROOM_NAME: Final = "name"
 CONF_COMFORT_TEMP: Final = "comfort_temp"
@@ -253,6 +262,10 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_FROST_OUTDOOR_PROTECTION: False,
     CONF_FROST_OUTDOOR_TEMP: -10,
     CONF_FROST_IDLE_MAX: 6,
+    # Presence and preheating
+    CONF_ABSENCE_PRESET: "eco",
+    CONF_PREHEAT_ENABLED: True,
+    CONF_PREHEAT_MAX: 4,
 }
 
 DEFAULT_ROOM: Final[dict[str, Any]] = {

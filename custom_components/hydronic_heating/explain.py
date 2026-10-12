@@ -143,6 +143,16 @@ DECISION: dict[str, dict[str, str]] = {
         "boiler_off_state": "vypnuto",
         "valve_open_state": "otevřeno",
         "valve_closed_state": "zavřeno",
+        "presence_absent": "Nikdo doma: místnosti v režimu automaticky jedou na {preset_word}.",
+        "presence_long_away": "Dlouhodobě pryč: celý dům jede na teploty Pryč.",
+        "presence_home": "Někdo je doma: místnosti jedou zase podle rozvrhu.",
+        "return_suffix": " Očekávaný návrat {expected_return}.",
+        "preset_eco": "útlum",
+        "preset_away": "teploty Pryč",
+        "preheat": "Předtápění: {room} na {comfort} °C do {preheat_until} ({source_word}), "
+        "rychlost ohřevu {rate} K/h.",
+        "source_schedule": "začátek komfortu podle rozvrhu",
+        "source_return": "očekávaný návrat",
         "trigger_stop": "Stop",
         "trigger_mode": "Režim {mode}",
         "shadow": "[Shadow] ",
@@ -184,6 +194,16 @@ DECISION: dict[str, dict[str, str]] = {
         "boiler_off_state": "off",
         "valve_open_state": "open",
         "valve_closed_state": "closed",
+        "presence_absent": "Nobody home: rooms in auto use {preset_word}.",
+        "presence_long_away": "Long absence: the whole house uses the away temperatures.",
+        "presence_home": "Somebody is home: rooms follow their schedule again.",
+        "return_suffix": " Expected return {expected_return}.",
+        "preset_eco": "the setback",
+        "preset_away": "the away temperatures",
+        "preheat": "Preheating: {room} to {comfort} °C by {preheat_until} ({source_word}), "
+        "heat-up rate {rate} K/h.",
+        "source_schedule": "comfort starts by schedule",
+        "source_return": "expected return",
         "trigger_stop": "Stop",
         "trigger_mode": "Mode {mode}",
         "shadow": "[Shadow] ",
@@ -206,6 +226,7 @@ VALVE_REASONS: dict[str, dict[str, str]] = {
         "exercise": "protáčení ventilu",
         "overrun": "doběh kotle",
         "min_flow": "minimální průtok kotlem",
+        "preheat": "předtápění",
     },
     "en": {
         "startup": "integration start",
@@ -221,6 +242,7 @@ VALVE_REASONS: dict[str, dict[str, str]] = {
         "exercise": "valve exercise",
         "overrun": "boiler overrun",
         "min_flow": "minimum flow through the boiler",
+        "preheat": "preheating",
     },
 }
 
@@ -248,14 +270,34 @@ def clock(value: Any) -> str:
     return dt_util.as_local(value).strftime("%H:%M:%S")
 
 
+def moment(value: Any) -> str:
+    """Time of day today ("v 15:00"), with the date on another day ("12. 10. v 15:00")."""
+    if not isinstance(value, datetime):
+        return "?"
+    local = dt_util.as_local(value)
+    if local.date() == dt_util.now().date():
+        return local.strftime("%H:%M")
+    return f"{local.day}. {local.month}. {local:%H:%M}"
+
+
+def number(hass: HomeAssistant, value: Any) -> str:
+    """Short number, with a decimal comma in Czech (0,5)."""
+    text = f"{value:g}" if isinstance(value, int | float) else str(value)
+    return text.replace(".", ",") if language(hass) == "cs" else text
+
+
 def _values(hass: HomeAssistant, status: BoilerStatus, extra: Mapping[str, Any]) -> dict[str, Any]:
     values: dict[str, Any] = {**status.params, **extra}
     values["until"] = clock(status.until)
     for key in ("manual_until", "next_start", "valve_until"):
         if key in values:
             values[key] = clock(values[key])
-    if "demand" in values:
-        values["demand"] = f"{values['demand']:g}"
+    for key in ("expected_return", "preheat_until"):
+        if key in values:
+            values[key] = moment(values[key])
+    for key in ("demand", "comfort", "rate"):
+        if key in values:
+            values[key] = number(hass, values[key])
     if "fault" in values:
         values["fault"] = reason_text(hass, str(values["fault"]))
     return values
@@ -313,6 +355,15 @@ def decision_text(
             message += texts["overrun_suffix"].format_map(fill)
     elif decision.kind == "hold":
         message = texts.get(f"hold_{status.reason.value}", "{until}").format_map(fill)
+    elif decision.kind == "presence":
+        state = str(decision.params.get("state"))
+        fill["preset_word"] = texts.get(f"preset_{decision.params.get('preset')}", "")
+        message = texts[f"presence_{state}"].format_map(fill)
+        if state != "home" and decision.params.get("expected_return") is not None:
+            message += texts["return_suffix"].format_map(fill)
+    elif decision.kind == "preheat":
+        fill["source_word"] = texts.get(f"source_{decision.params.get('source')}", "")
+        message = texts["preheat"].format_map(fill)
     else:
         message = _reverted_text(hass, texts, decision, values, name, subject=subject)
     if trigger is not None and decision.kind == "hold":

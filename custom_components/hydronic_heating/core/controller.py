@@ -32,6 +32,7 @@ from .model import (
     WindowState,
 )
 from .modes import ModeManager
+from .presence import read_expected_return, read_presence
 from .room import RoomContext, RoomController
 from .safety import OutputTracker
 from .valve import deenergized_open, observed_open, pwm_on_time
@@ -63,6 +64,10 @@ class HydronicController:
         self.heat_request = False
         self.window_block = False
         self._window_pending_since: datetime | None = None
+        # FR-SCH-02: presence of the household (None = not configured or unknown).
+        self.house_present: bool | None = None
+        self.long_away = False
+        self.expected_return: datetime | None = None
         self.fault_safe = False
         self.fault_reason: str | None = None
         self._fault_clear_since: datetime | None = None
@@ -100,6 +105,8 @@ class HydronicController:
                 room.valve_switched_at = previous.valve_switched_at
                 room.valve_forced = previous.valve_forced
                 room.heating_since = previous.heating_since
+                room.preheat_until = previous.preheat_until
+                room.preheat_source = previous.preheat_source
             self.rooms[room_cfg.room_id] = room
         if system.shadow_mode:
             self.tracker.reset()
@@ -108,7 +115,13 @@ class HydronicController:
         """Every entity whose state change should trigger a step."""
         cfg = self.cfg
         found: set[str] = {*cfg.heat_source.entities, *cfg.outdoor_sensors}
-        for entity in (cfg.weather_entity, cfg.heat_source.feedback_entity):
+        for entity in (
+            cfg.weather_entity,
+            cfg.heat_source.feedback_entity,
+            cfg.house_presence_entity,
+            cfg.long_away_entity,
+            cfg.expected_return_entity,
+        ):
             if entity:
                 found.add(entity)
         for room in self.rooms.values():
@@ -165,6 +178,8 @@ class HydronicController:
             self.started_at = now
         self.modes.tick(now)
         self.outdoor.update(snap, cfg)
+        presence_before = self.presence_state
+        self._update_presence(snap)
         self._update_equithermal()
         self._update_ready(snap)
 
@@ -185,7 +200,15 @@ class HydronicController:
             window_close_delay_s=cfg.window_close_delay_s,
             window_outdoor_condition=cfg.window_outdoor_condition,
             window_max_block_s=cfg.window_max_block_s,
+            house_present=self.house_present,
+            long_away=self.long_away and mode is SystemMode.AUTO,
+            expected_return=self.expected_return,
+            absence_preset=cfg.absence_preset,
+            preheat_enabled=cfg.preheat_enabled,
+            preheat_max_s=cfg.preheat_max_s,
+            timezone=cfg.timezone,
         )
+        preheating_before = {room_id: r.preheating for room_id, r in self.rooms.items()}
         for room in self.rooms.values():
             room.update(snap, ctx)
 
@@ -248,6 +271,9 @@ class HydronicController:
             duty_run_s=duty_run_s,
         )
         self.decisions = self._boiler_decisions(previous, was_on=was_on, now_on=boiler_on)
+        if previous is not None and self.ready:
+            self.decisions += self._presence_decisions(presence_before, preheating_before)
+        self._learn_heat_rates(now)
         self.last_step = now
 
         plan = Plan(boiler_on=boiler_on, valves_open=dict(self.valve_desired))
@@ -280,6 +306,46 @@ class HydronicController:
         if manual or not self.duty_active:
             return None
         return self.duty * self.cfg.boiler_cycle_period_s  # type: ignore[operator]
+
+    @property
+    def presence_state(self) -> str | None:
+        """`home`, `absent`, `long_away`, or None without a presence entity (FR-SCH-02)."""
+        if self.long_away:
+            return "long_away"
+        if self.house_present is None:
+            return None
+        return "home" if self.house_present else "absent"
+
+    def _update_presence(self, snap: Snapshot) -> None:
+        """Read the household presence; an unavailable entity keeps the last state."""
+        cfg = self.cfg
+        if not cfg.house_presence_entity:
+            self.house_present = None
+        elif (present := read_presence(snap.get(cfg.house_presence_entity))) is not None:
+            self.house_present = present
+        if not cfg.long_away_entity:
+            self.long_away = False
+        elif (away := read_presence(snap.get(cfg.long_away_entity))) is not None:
+            self.long_away = away
+        self.expected_return = (
+            read_expected_return(snap.get(cfg.expected_return_entity), snap.now, cfg.timezone)
+            if cfg.expected_return_entity
+            else None
+        )
+
+    def _learn_heat_rates(self, now: datetime) -> None:
+        """Measure heat-ups of rooms that heat normally (FR-SCH-03)."""
+        for room in self.rooms.values():
+            room.heat_rate.update(
+                now,
+                temperature=room.temperature,
+                target=room.target,
+                heating=room.demand > 0
+                and not room.window.effective_open
+                and not self.window_block
+                and not self.fault_safe,
+                outdoor=self.outdoor.damped,
+            )
 
     def _update_ready(self, snap: Snapshot) -> None:
         """FR-SAFE-01: wait for required entities, at most startup_grace."""
@@ -448,6 +514,8 @@ class HydronicController:
             else:
                 want = room.pwm_want(now)
                 forced = False
+                if room.preheating:
+                    reason = ValveReason.PREHEAT
             decided = room.decide_open(want, now, forced=forced)
             until = None
             if not forced:
@@ -548,7 +616,7 @@ class HydronicController:
             return SystemState.SUMMER
         if mode is SystemMode.OFF:
             return SystemState.OFF
-        if mode is SystemMode.AWAY:
+        if mode is SystemMode.AWAY or (mode is SystemMode.AUTO and self.long_away):
             return SystemState.AWAY
         return SystemState.AUTO
 
@@ -708,6 +776,42 @@ class HydronicController:
             status.reason is not previous.reason or status.until != previous.until
         ):
             decisions.append(Decision("hold", status))
+        return decisions
+
+    def _presence_decisions(
+        self, presence_before: str | None, preheating_before: dict[str, bool]
+    ) -> list[Decision]:
+        """Logbook entries for a presence change and for each preheat that starts."""
+        decisions: list[Decision] = []
+        state = self.presence_state
+        if state is not None and presence_before is not None and state != presence_before:
+            decisions.append(
+                Decision(
+                    "presence",
+                    self.boiler_status,
+                    {
+                        "state": state,
+                        "preset": self.cfg.absence_preset,
+                        "expected_return": self.expected_return,
+                    },
+                )
+            )
+        for room_id, room in self.rooms.items():
+            if room.preheating and not preheating_before.get(room_id, False):
+                decisions.append(
+                    Decision(
+                        "preheat",
+                        self.boiler_status,
+                        {
+                            "room": room.cfg.name,
+                            "room_id": room_id,
+                            "preheat_until": room.preheat_until,
+                            "source": room.preheat_source,
+                            "comfort": room.cfg.comfort_temp,
+                            "rate": room.heat_rate.rate(self.outdoor.damped),
+                        },
+                    )
+                )
         return decisions
 
     def _off_cause(self, previous: BoilerStatus) -> str:

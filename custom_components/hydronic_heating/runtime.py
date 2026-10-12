@@ -386,10 +386,20 @@ class HydronicHeatingRuntime:
         if not decisions:
             return
         reason_entity = self.system_entity_id("sensor", "boiler_reason")
+        registry = er.async_get(self.hass)
         for decision in decisions:
-            entity_id = (
-                decision.params.get("entity_id") if decision.kind == "reverted" else reason_entity
-            )
+            if decision.kind == "reverted":
+                entity_id = decision.params.get("entity_id")
+            elif decision.kind == "presence":
+                entity_id = self.system_entity_id("climate", "system")
+            elif decision.kind == "preheat":
+                entity_id = registry.async_get_entity_id(
+                    "climate",
+                    DOMAIN,
+                    f"{self.entry.entry_id}_{decision.params.get('room_id')}_climate",
+                )
+            else:
+                entity_id = reason_entity
             state = self.hass.states.get(entity_id) if entity_id else None
             options = {
                 "trigger": trigger,

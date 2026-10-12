@@ -74,7 +74,38 @@ async def test_menu_offers_all_sections(hass: HomeAssistant, config_entry: MockC
         "manual",
         "equithermal",
         "frost",
+        "presence",
     ]
+
+
+async def test_presence_saves_entities_and_clears_them(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """FR-SCH-02: presence entities are optional and can be cleared again."""
+    result = await _open(hass, config_entry, "presence")
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "house_presence_entity": "zone.home",
+            "long_away_entity": "input_boolean.dovolena",
+            "absence_preset": "away",
+            "preheat_enabled": True,
+            "preheat_max": 3,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert config_entry.options["house_presence_entity"] == "zone.home"
+    assert config_entry.options["absence_preset"] == "away"
+    assert config_entry.options["preheat_max"] == 3
+    assert config_entry.runtime_data.controller.cfg.preheat_max_s == 3 * 3600
+
+    result = await _open(hass, config_entry, "presence")
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"absence_preset": "eco", "preheat_enabled": False, "preheat_max": 4},
+    )
+    assert "house_presence_entity" not in config_entry.options
+    assert config_entry.runtime_data.controller.cfg.house_presence_entity is None
 
 
 async def test_boiler_saves_and_keeps_other_options(

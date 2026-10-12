@@ -29,8 +29,10 @@ from homeassistant.util import slugify
 import voluptuous as vol
 
 from .const import (
+    ABSENCE_PRESETS,
     AGGREGATIONS,
     COMBINE_OPTIONS,
+    CONF_ABSENCE_PRESET,
     CONF_AGGREGATION,
     CONF_AREA_M2,
     CONF_AREA_WEIGHTING,
@@ -60,6 +62,7 @@ from .const import (
     CONF_EXERCISE_INTERVAL_DAYS,
     CONF_EXERCISE_PARALLEL,
     CONF_EXERCISE_TIME,
+    CONF_EXPECTED_RETURN_ENTITY,
     CONF_FALLBACK_DEMAND,
     CONF_FALLBACK_HOLD,
     CONF_FAULT_RECOVERY_TIME,
@@ -87,8 +90,10 @@ from .const import (
     CONF_HEATING_LIMIT,
     CONF_HEATING_LIMIT_HYSTERESIS,
     CONF_HOT_TOLERANCE,
+    CONF_HOUSE_PRESENCE_ENTITY,
     CONF_IDLE_VALVE_POLICY,
     CONF_KEEP_ALIVE,
+    CONF_LONG_AWAY_ENTITY,
     CONF_MANUAL_DURATIONS,
     CONF_MANUAL_RESTART_POLICY,
     CONF_MANUAL_SCOPE,
@@ -99,6 +104,8 @@ from .const import (
     CONF_NOTIFY_SERVICE,
     CONF_OUTDOOR_DAMPING_HOURS,
     CONF_OUTDOOR_SENSORS,
+    CONF_PREHEAT_ENABLED,
+    CONF_PREHEAT_MAX,
     CONF_PRESENCE_ENTITY,
     CONF_RADIATOR_EXPONENT,
     CONF_REFERENCE_ROOM_TEMP,
@@ -172,6 +179,7 @@ OPTIONS_MENU = [
     "manual",
     "equithermal",
     "frost",
+    "presence",
 ]
 
 # --- Selector helpers ----------------------------------------------------
@@ -456,6 +464,23 @@ def _frost_schema(values: Mapping[str, Any]) -> vol.Schema:
     )
 
 
+# Entities that say "present": on/off, home/not_home, or a count such as zone.home.
+PRESENCE_DOMAINS = ["binary_sensor", "input_boolean", "person", "group", "zone", "sensor"]
+
+
+def _presence_schema(values: Mapping[str, Any]) -> vol.Schema:
+    return vol.Schema(
+        {
+            _optional(CONF_HOUSE_PRESENCE_ENTITY, values): _entity(PRESENCE_DOMAINS),
+            _optional(CONF_LONG_AWAY_ENTITY, values): _entity(["binary_sensor", "input_boolean"]),
+            _optional(CONF_EXPECTED_RETURN_ENTITY, values): _entity(["sensor", "input_datetime"]),
+            _required(CONF_ABSENCE_PRESET, values): _choice(ABSENCE_PRESETS, CONF_ABSENCE_PRESET),
+            _required(CONF_PREHEAT_ENABLED, values): _BOOL,
+            _required(CONF_PREHEAT_MAX, values): _number(0.5, 12, 0.5, "h"),
+        }
+    )
+
+
 # --- Schemas: room -------------------------------------------------------
 
 
@@ -523,9 +548,7 @@ def _room_schedule_schema(values: Mapping[str, Any]) -> vol.Schema:
             _optional(CONF_SCHEDULE_ENTITY, values): _entity(
                 ["schedule", "input_boolean", "switch", "binary_sensor"]
             ),
-            _optional(CONF_PRESENCE_ENTITY, values): _entity(
-                ["binary_sensor", "input_boolean", "person", "group"]
-            ),
+            _optional(CONF_PRESENCE_ENTITY, values): _entity(PRESENCE_DOMAINS),
         }
     )
 
@@ -908,6 +931,12 @@ class HydronicHeatingOptionsFlow(_SystemSteps, OptionsFlow):
     async def async_step_frost(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """System frost protection (FR-FROST-02)."""
         return await self._async_form("frost", _frost_schema, user_input)
+
+    async def async_step_presence(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Presence of the household and preheating (FR-SCH-02, FR-SCH-03)."""
+        return await self._async_form("presence", _presence_schema, user_input)
 
 
 # --- Room subentry flow --------------------------------------------------

@@ -1,13 +1,15 @@
 """Room controller: temperature, target, demand, windows and valve PWM.
 
-Chapter 11.1 (demand), 11.4 (windows), FR-MODE-02 (presets and override).
+Chapter 11.1 (demand), 11.4 (windows), FR-MODE-02 (presets and override),
+FR-SCH-02 (presence) and FR-SCH-03 (preheating).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .aggregation import aggregate
 from .model import (
@@ -19,15 +21,14 @@ from .model import (
     ValvePhysical,
     WindowState,
 )
+from .presence import BOILER_START_S, PREHEAT_TOLERANCE, HeatRate, read_next_event, read_presence
 from .valve import ValveState, pwm_open
 
 FROST_HYSTERESIS_K = 2.0
 NOT_REACHED_DEFICIT_K = 1.5
 NOT_REACHED_AFTER_S = 3 * 3600
 SENSOR_FAILURE_REPORT_S = 5 * 60
-
-PRESENT_STATES = {"on", "home"}
-ABSENT_STATES = {"off", "not_home", "away"}
+UTC_ZONE = ZoneInfo("UTC")
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +44,18 @@ class RoomContext:
     window_close_delay_s: float
     window_outdoor_condition: bool
     window_max_block_s: float
+    house_present: bool | None = None
+    long_away: bool = False
+    expected_return: datetime | None = None
+    absence_preset: str = "eco"
+    preheat_enabled: bool = False
+    preheat_max_s: float = 4 * 3600
+    timezone: ZoneInfo = UTC_ZONE
+
+    @property
+    def house_absent(self) -> bool:
+        """Nobody is home (short or long absence)."""
+        return self.house_present is False or self.long_away
 
 
 @dataclass(slots=True)
@@ -127,7 +140,15 @@ class RoomController:
         self.demand = 0.0
         self.target: float | None = None
         self.schedule_on: bool | None = None
+        self.schedule_next: datetime | None = None
         self.present: bool | None = None
+        # Preset whose temperature the room uses in auto (shown on the climate).
+        self.auto_preset = Preset.COMFORT
+        # Preheating (FR-SCH-03): learned rate, latched target time, next start.
+        self.heat_rate = HeatRate()
+        self.preheat_until: datetime | None = None
+        self.preheat_source: str | None = None
+        self.preheat_planned: datetime | None = None
         self.window = WindowMachine()
         self.valves: dict[str, ValveState] = {v.entity_id: ValveState() for v in cfg.valves}
         self.valve_open_cmd: bool | None = None
@@ -181,11 +202,12 @@ class RoomController:
         """Preset shown on the climate entity."""
         if self.hvac_mode is RoomHvacMode.HEAT:
             return self.preset
-        if self.present is False:
-            return Preset.AWAY
-        if self.schedule_on is False:
-            return Preset.ECO
-        return Preset.COMFORT
+        return self.auto_preset
+
+    @property
+    def preheating(self) -> bool:
+        """The room heats to comfort ahead of a schedule change or a return."""
+        return self.preheat_until is not None
 
     # --- Inputs -----------------------------------------------------------
 
@@ -230,39 +252,106 @@ class RoomController:
         return any(snap.get(e).state == open_state for e in self.cfg.windows)
 
     def _read_presence(self, snap: Snapshot) -> bool | None:
-        reading = snap.get(self.cfg.presence_entity)
-        if not reading.available:
-            return None
-        if reading.state in PRESENT_STATES:
-            return True
-        if reading.state in ABSENT_STATES:
-            return False
-        return None
+        return read_presence(snap.get(self.cfg.presence_entity))
 
     # --- Step -------------------------------------------------------------
 
     def target_temp(self, ctx: RoomContext) -> float | None:
-        """Return the target temperature, None when the room should not heat."""
+        """Return the target temperature without preheating, None when not heating.
+
+        Priority: system away > permanent manual change > long absence >
+        absence > schedule (FR-SCH-02).
+        """
         cfg = self.cfg
+        self.auto_preset = Preset.COMFORT
         if self.hvac_mode is RoomHvacMode.OFF or not ctx.heating_allowed:
             return None
         if ctx.away:
+            self.auto_preset = Preset.AWAY
             return cfg.away_temp
         if self.hvac_mode is RoomHvacMode.HEAT:
             if self.preset is Preset.NONE:
                 return self.manual_target if self.manual_target is not None else cfg.comfort_temp
             return cfg.temp_for(self.preset)
-        if self.present is False:
+        if ctx.long_away:
+            self.auto_preset = Preset.AWAY
             return cfg.away_temp
+        if self.present is False or ctx.house_present is False:
+            self.auto_preset = Preset(ctx.absence_preset)
+            return cfg.temp_for(self.auto_preset)
         if self.schedule_on is False:
+            self.auto_preset = Preset.ECO
             return cfg.eco_temp
         return cfg.comfort_temp
+
+    # --- Preheating (FR-SCH-03) ----------------------------------------------
+
+    def preheat_lead_s(self, outdoor: float | None, temperature: float, max_s: float) -> float:
+        """Time needed to reach comfort: valve travel, boiler start and the heat-up."""
+        dead_s = max((v.open_time_s for v in self.cfg.valves), default=0) + BOILER_START_S
+        deficit = max(0.0, self.cfg.comfort_temp - temperature)
+        return min(max_s, dead_s + deficit / self.heat_rate.rate(outdoor) * 3600)
+
+    def _comfort_at(self, when: datetime, ctx: RoomContext) -> bool:
+        """Whether the room will want comfort at `when` (schedule and presence)."""
+        if self.cfg.schedule_entity and self.schedule_on is not None:
+            following = self.schedule_next
+            if self.schedule_on and following is not None and following <= when:
+                return False
+            if not self.schedule_on and (following is None or following > when):
+                return False
+        if self.present is False:
+            return False
+        if ctx.house_absent:
+            return ctx.expected_return is not None and ctx.expected_return <= when
+        return True
+
+    def _update_preheat(self, ctx: RoomContext, base: float | None) -> None:
+        """Start heating to comfort early enough for the next comfort period."""
+        now = ctx.now
+        self.preheat_planned = None
+        if (
+            not ctx.preheat_enabled
+            or ctx.away
+            or base is None
+            or self.hvac_mode is not RoomHvacMode.AUTO
+            or base >= self.cfg.comfort_temp
+            or self.temperature is None
+            or self.window.effective_open
+        ):
+            self.preheat_until = self.preheat_source = None
+            return
+        candidates: list[tuple[datetime, str]] = []
+        if self.schedule_on is False and self.schedule_next is not None:
+            candidates.append((self.schedule_next, "schedule"))
+        if ctx.house_absent and ctx.expected_return is not None:
+            candidates.append((ctx.expected_return, "return"))
+        valid = [(t, src) for t, src in candidates if t > now and self._comfort_at(t, ctx)]
+        if not valid:
+            self.preheat_until = self.preheat_source = None
+            return
+        when, source = min(valid)
+        if (
+            self.preheat_until is not None
+            and now < self.preheat_until
+            and abs(when - self.preheat_until) <= PREHEAT_TOLERANCE
+        ):
+            return  # keep a running preheat; the shrinking lead must not stop it
+        lead = self.preheat_lead_s(ctx.outdoor_damped, self.temperature, ctx.preheat_max_s)
+        start = when - timedelta(seconds=lead)
+        if now >= start:
+            self.preheat_until, self.preheat_source = when, source
+        else:
+            self.preheat_until = self.preheat_source = None
+            self.preheat_planned = start
 
     def update(self, snap: Snapshot, ctx: RoomContext) -> None:
         """Read inputs and compute target and demand."""
         self._read_temperature(snap)
         if self.cfg.schedule_entity:
-            self.schedule_on = self._bool_state(snap.get(self.cfg.schedule_entity), {"on"})
+            reading = snap.get(self.cfg.schedule_entity)
+            self.schedule_on = self._bool_state(reading, {"on"})
+            self.schedule_next = read_next_event(reading, ctx.timezone)
         self.present = self._read_presence(snap) if self.cfg.presence_entity else None
         condition_ok = (
             not ctx.window_outdoor_condition
@@ -271,7 +360,11 @@ class RoomController:
             or ctx.outdoor_now < self.temperature
         )
         self.window.update(self._read_windows(snap), condition_ok, ctx)
-        self.target = self.target_temp(ctx)
+        base = self.target_temp(ctx)
+        self._update_preheat(ctx, base)
+        if self.preheating:
+            self.auto_preset = Preset.COMFORT
+        self.target = self.cfg.comfort_temp if self.preheating else base
         self.demand = self._compute_demand(ctx)
         self._track_not_reached(ctx.now)
 
@@ -372,6 +465,7 @@ class RoomController:
             "last_valid_temp": self.last_valid_temp,
             "last_valid_at": self.last_valid_at.isoformat() if self.last_valid_at else None,
             "valves": {key: state.to_dict() for key, state in self.valves.items()},
+            "heat_rate": self.heat_rate.to_dict(),
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -387,3 +481,4 @@ class RoomController:
         for key, valve in data.get("valves", {}).items():
             if key in self.valves:
                 self.valves[key] = ValveState.from_dict(valve)
+        self.heat_rate.restore(data.get("heat_rate"))

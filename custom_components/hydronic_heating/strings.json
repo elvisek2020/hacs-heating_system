@@ -108,7 +108,8 @@
           "windows": "Windows",
           "manual": "Manual mode",
           "equithermal": "Equithermal",
-          "frost": "Frost protection"
+          "frost": "Frost protection",
+          "presence": "Presence and preheating"
         }
       },
       "general": {
@@ -311,6 +312,26 @@
         "data_description": {
           "frost_outdoor_protection": "For pipes in unheated spaces."
         }
+      },
+      "presence": {
+        "title": "Presence and preheating",
+        "description": "Who is home comes from a presence module, a group of persons or zone.home. When nobody is home, rooms in auto use the setback; during a long absence the whole house uses away. Preheating starts early enough to have comfort when the schedule switches to comfort or when someone is expected back.",
+        "data": {
+          "house_presence_entity": "Somebody home (optional)",
+          "long_away_entity": "Long absence (optional)",
+          "expected_return_entity": "Expected return (optional)",
+          "absence_preset": "When nobody is home",
+          "preheat_enabled": "Preheating",
+          "preheat_max": "Longest preheating"
+        },
+        "data_description": {
+          "house_presence_entity": "On or home = somebody is home. A number (zone.home) above 0 also means home. Unavailable keeps the last state.",
+          "long_away_entity": "On = weekend or holiday: the whole house uses the away temperatures.",
+          "expected_return_entity": "Timestamp of the next return, used for preheating.",
+          "absence_preset": "Setback suits short absences: the house does not cool down too much.",
+          "preheat_enabled": "Learns how fast each room heats up and starts heating ahead of time.",
+          "preheat_max": "Preheating never starts earlier than this before the target time."
+        }
       }
     },
     "error": {
@@ -406,7 +427,7 @@
           },
           "data_description": {
             "schedule_entity": "On = comfort, off = eco.",
-            "presence_entity": "Absence switches the room to away."
+            "presence_entity": "Absence switches the room to setback or away, see Presence and preheating."
           }
         },
         "control": {
@@ -513,6 +534,12 @@
         "off": "Off",
         "virtual_outputs": "Virtual outputs",
         "virtual_house": "Virtual house"
+      }
+    },
+    "absence_preset": {
+      "options": {
+        "eco": "Setback (eco)",
+        "away": "Away"
       }
     }
   },
@@ -708,7 +735,8 @@
               "min_state_hold": "Minimum state time",
               "exercise": "Valve exercise",
               "overrun": "Boiler overrun",
-              "min_flow": "Minimum flow"
+              "min_flow": "Minimum flow",
+              "preheat": "Preheating"
             }
           },
           "until": {

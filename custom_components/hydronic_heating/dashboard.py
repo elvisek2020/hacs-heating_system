@@ -42,6 +42,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "Co by udělalo, ukazuje logbook a atributy `would_command_*`."
         ),
         "open_windows": "Okna",
+        "presence": "Doma",
+        "long_away": "Dlouhodobě pryč",
         "heat_demand": "Požadavek na teplo",
         "demand_total": "Celkový požadavek",
         "flow_setpoint": "Teplota vody",
@@ -116,6 +118,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "what it would do."
         ),
         "open_windows": "Windows",
+        "presence": "Home",
+        "long_away": "Long absence",
         "heat_demand": "Heat demand",
         "demand_total": "Total demand",
         "flow_setpoint": "Flow temperature",
@@ -304,6 +308,19 @@ def _overview(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) 
         _badge(problem, text["problem"], color="red", visibility=_when_on(problem)),
         _badge(shadow, text["shadow"], visibility=_when_on(shadow)),
     ]
+    # Presence of the household, when configured (FR-SCH-02).
+    cfg = runtime.controller.cfg
+    if cfg.house_presence_entity:
+        badges.insert(2, _badge(cfg.house_presence_entity, text["presence"]))
+    if cfg.long_away_entity:
+        badges.append(
+            _badge(
+                cfg.long_away_entity,
+                text["long_away"],
+                color="blue",
+                visibility=_when_on(cfg.long_away_entity),
+            )
+        )
     sections = [_system_section(runtime, ids, text), _boiler_section(ids, text)]
     if runtime.layout is not None:
         sections.append(_demo_section(runtime, text))
