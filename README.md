@@ -119,9 +119,10 @@ Bez nastavené přítomnosti a bez rozvrhu se nic nemění.
   - `target_until`: do kdy cíl platí,
   - `target_detail`: celá věta, například „Útlum 19 °C: nikdo doma (Rodiče doma).“,
   - `presence_entity` a `presence_source`: podle čí přítomnosti místnost jede (`room` = vlastní, `house` = celý dům).
-- Dashboard ukazuje u místnosti tuhle větu, **kdo je doma jménem** a rozvrh domu. Vlastní rozvrh je dole v kartě jako upravitelná dlaždice.
-  - Jména se berou z atributu `people` (modul přítomnosti), u skupin z členů v atributu `entity_id`.
-  - Pod blokem Provoz kotle je přehled „Kdo je doma“: každá osoba se stavem a časem poslední změny, takže je vidět, kdo právě odešel.
+- Vlastní rozvrh místnosti je na dashboardu dole v kartě jako upravitelná dlaždice.
+- Pod blokem Provoz kotle je přehled **Kdo je doma**: každá osoba se stavem a časem poslední změny, takže je vidět, kdo právě odešel.
+  - Jen osoby, žádné skupiny ani počty. Skupina HA se rozbalí na členy (atribut `entity_id`). Skupina nebo počet z modulu přítomnosti (atributy `people`, `count`) se rozbalí na osoby téže integrace.
+  - Jméno je název zařízení osoby („ElvisEK“, ne „ElvisEK Doma“), jinak název entity.
 - Když místnost změní cíl kvůli přítomnosti nebo rozvrhu, zapíše se to do logbooku, například „Kuchyně: útlum 19 °C, nikdo doma (Rodiče doma).“
 
 ## Dashboard
@@ -130,14 +131,27 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 
 - **Nahoře jedna řada:**
   - Topení: systém, režim, topná sezóna, rozvrh domu, manuál.
-  - Kotel: proč, další změna, celkový požadavek, teplota vody a venku.
-  - Provoz kotle: povel, statistiky, sezóna, blokace a porucha, pod tím Kdo je doma.
+  - Kotel: proč, další změna, celkový požadavek, měřená teplota vody, venku a 4h průměr s hranicí topné sezóny.
+  - Provoz kotle podle priority: povel kotli, požadavek na teplo, venku (průměr 4 h), porucha, topná sezóna, starty dnes, střída 24 h, omezení střídy. Pod tím Kdo je doma.
 - **Pod řadou** upozornění na shadow režim přes celou šířku, v demu blok Demo.
 - **Místnosti – individuální nastavení:**
   - nahoře ovládání (režim místnosti automaticky / ručně / vypnuto, cílová teplota, předvolba),
-  - uprostřed zobrazení (proč, kdo je doma, ventil, požadavek),
+  - pod ním požadavek (příčina) a ventil (následek),
   - dole vlastní rozvrh.
-- **Vysvětlivky** úplně dole: každá dlaždice se stejnou ikonou a jednou až dvěma větami, co znamená.
+- **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice se stejnou ikonou a jednou až dvěma větami, co znamená.
+- **Jen nastavené funkce.** Okna, blokace okny, omezení střídy, žádaná teplota z křivky, teplota vody ani rozvrh domu se negenerují, když je nepoužíváte. Po změně nastavení dashboard přegenerujte.
+- **Barvy podle významu:** kotel oranžově, požadavky a sezóna jantarově, voda a porucha červeně, venek modře, ventily a okna tyrkysově, osoby zeleně. Dvoustavové dlaždice svítí jen v aktivním stavu, termostaty mají barvy HA.
+
+## Teplota vody a kontrola topení
+
+Volitelné čidlo **Teplota vody** (Konfigurovat → Zdroj tepla), například na stoupačce od kotle:
+
+- Dashboard ukazuje měřenou teplotu vody místo žádané teploty z topné křivky. Ta se u kotle spínaného kontaktem neuplatní, proto je vidět jen se zapnutým omezením střídy podle křivky.
+- **Kontrola topení** (Konfigurovat → Bezpečnost): když kotel běží 15 min a teplota vody nestoupne aspoň o 5 °C nad nejnižší hodnotu běhu, ohlásí se porucha „Kotel běží, ale netopí“ (oznámení, Opravy, `binary_sensor.hh_problem`). Příčinou může být porucha kotle, nízký tlak vody, zavřený okruh nebo vzduch v systému.
+  - Doba a nárůst se dají nastavit, doba 0 kontrolu vypne.
+  - Se zpětnou vazbou hořáku se počítá jen doba, kdy hořák opravdu běží. Ve shadow režimu a v demu se nekontroluje.
+  - Kotel se kvůli tomu nevypíná. Porucha zmizí sama, až teplota vody při běhu kotle zase stoupne.
+  - Stav kontroly ukazuje atribut `flow_check` u `binary_sensor.hh_boiler_command`.
 
 ## Proč kotel topí nebo stojí
 
@@ -163,7 +177,8 @@ Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastn�
 | `sensor.hh_boiler_reason` | proč je kotel v aktuálním stavu (atributy: do kdy, zbývá, pravidlo, vysvětlení) |
 | `sensor.hh_boiler_hold_ends_at` | kdy skončí časové pravidlo, které kotel drží (minimální běh, pauza, doběh…) |
 | `sensor.hh_demand_total` | vážený požadavek místností |
-| `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota (atributy: aktuální, předpověď, efektivní) |
+| `sensor.hh_outdoor_temperature` | aktuální venkovní teplota (první platné čidlo, jinak počasí) |
+| `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota pro topnou křivku (atributy: aktuální, předpověď, efektivní) |
 | `sensor.hh_outdoor_mean_4h` | průměr venkovní teploty za 4 h, podle něj se řídí topná sezóna |
 | `sensor.hh_flow_setpoint` | teplota vody podle topné křivky (virtuální) |
 | `sensor.hh_duty_limit` | povolená střída kotle a doba běhu v cyklu |

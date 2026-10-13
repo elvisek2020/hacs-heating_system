@@ -102,6 +102,15 @@ SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
         attrs_fn=lambda ctrl: {"rooms_calling": ctrl.arbitration.calling},
     ),
     SystemSensorDescription(
+        key="outdoor_temperature",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda ctrl: ctrl.outdoor.current,
+        attrs_fn=lambda ctrl: {"source": ctrl.outdoor.source},
+    ),
+    SystemSensorDescription(
         key="outdoor_temperature_damped",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,

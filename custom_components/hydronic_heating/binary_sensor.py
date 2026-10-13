@@ -40,6 +40,14 @@ class RoomBinaryDescription(BinarySensorEntityDescription):
     attrs_fn: Callable[[HydronicController, RoomController], dict[str, Any]] | None = None
 
 
+def _flow_check(ctrl: HydronicController) -> str:
+    """State of the check that the boiler heats (FR-SAFE-08)."""
+    cfg = ctrl.cfg
+    if cfg.heat_source.flow_temp_entity is None or cfg.flow_check_s <= 0:
+        return "off"
+    return ctrl.flow_check.state
+
+
 def _room_valve_failures(ctrl: HydronicController, room: RoomController) -> list[str]:
     return [v.entity_id for v in room.cfg.valves if ctrl.tracker.failed(v.entity_id)]
 
@@ -52,7 +60,10 @@ SYSTEM_BINARY: tuple[SystemBinaryDescription, ...] = (
         is_on_fn=lambda ctrl: (
             ctrl.last_step is not None and ctrl.sequencer.boiler_on and not ctrl.fault_safe
         ),
-        attrs_fn=lambda ctrl: {"phase": ctrl.sequencer.phase.value},
+        attrs_fn=lambda ctrl: {
+            "phase": ctrl.sequencer.phase.value,
+            "flow_check": _flow_check(ctrl),
+        },
     ),
     SystemBinaryDescription(key="window_block", is_on_fn=lambda ctrl: ctrl.window_block),
     SystemBinaryDescription(

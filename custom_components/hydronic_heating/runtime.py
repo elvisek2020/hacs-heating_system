@@ -506,7 +506,7 @@ class HydronicHeatingRuntime:
 
     def _problem_keys(self) -> set[str]:
         """All problem keys the current configuration can produce."""
-        keys = {"fault_safe"}
+        keys = {"fault_safe", "no_heat"}
         for room in [*self.rooms, *(r.cfg for r in self.controller.rooms.values())]:
             keys.update(f"{kind}_{room.slug}" for kind in ROOM_PROBLEM_KINDS)
             keys.update(f"valve_command_{valve.entity_id}" for valve in room.valves)

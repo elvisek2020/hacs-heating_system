@@ -5,6 +5,28 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.10.0 — 2026-10-13
+
+### ✨ Novinky
+
+- **Měřená teplota vody.** Nové volitelné čidlo v Konfigurovat → Zdroj tepla, například na stoupačce od kotle. Dashboard ukazuje skutečnou teplotu vody místo teploty podle topné křivky.
+- **Kontrola, že kotel opravdu topí** (Konfigurovat → Bezpečnost):
+  - když kotel běží 15 min a teplota vody nestoupne aspoň o 5 °C, ohlásí se porucha „Kotel běží, ale netopí“ (oznámení, Opravy, Porucha),
+  - doba i nárůst jdou nastavit, doba 0 kontrolu vypne; se zpětnou vazbou hořáku se počítá jen doba, kdy hořák běží,
+  - kotel se nevypíná, porucha zmizí sama, až voda při běhu kotle zase ohřeje.
+- **Skutečná venkovní teplota:** nová entita `sensor.hh_outdoor_temperature`. Na dashboardu je vedle ní 4h průměr s hranicí topné sezóny.
+
+### 🎨 Vzhled
+
+- **Jen to, co používáš.** Okna, blokace okny, omezení střídy, teplota podle křivky ani tlumená teplota se na dashboardu neukazují, když je nemáš nastavené.
+- **Barvy podle významu:** kotel oranžově, požadavky a sezóna jantarově, voda a porucha červeně, venek modře, ventily tyrkysově, osoby zeleně.
+- **Provoz kotle podle priority:** povel kotli, požadavek na teplo, venku (průměr 4 h), porucha, topná sezóna, starty dnes, střída 24 h.
+- **Karta místnosti:** termostat, požadavek, ventil, vlastní rozvrh. Text pod termostatem je pryč, důvod cíle je v atributech termostatu a v logbooku.
+- **Kdo je doma** ukazuje jen osoby, bez skupin a počtů, a jménem bez přípony „Doma“.
+- **Vysvětlivky** otevře odznak v horní liště, jsou na samostatném skrytém pohledu.
+
+Po aktualizaci nastav čidlo teploty vody (Konfigurovat → Zdroj tepla) a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.9.0 — 2026-10-13
 
 ### ✨ Novinky

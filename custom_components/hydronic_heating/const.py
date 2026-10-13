@@ -47,6 +47,8 @@ CONF_HEAT_SOURCE_SELECT_ENTITY: Final = "heat_source_select_entity"
 CONF_HEAT_SOURCE_SELECT_ON: Final = "heat_source_select_on"
 CONF_HEAT_SOURCE_SELECT_OFF: Final = "heat_source_select_off"
 CONF_FEEDBACK_ENTITY: Final = "feedback_entity"
+# Measured flow temperature, e.g. on the riser from the boiler (FR-SAFE-08).
+CONF_FLOW_TEMP_ENTITY: Final = "flow_temp_entity"
 
 # Keys owned by each heat source type, used to drop stale keys on type change.
 HEAT_SOURCE_KEYS: Final = {
@@ -87,6 +89,8 @@ CONF_FAULT_RECOVERY_TIME: Final = "fault_recovery_time"
 CONF_HEARTBEAT_ENTITY: Final = "heartbeat_entity"
 CONF_HEARTBEAT_INTERVAL: Final = "heartbeat_interval"
 CONF_NOTIFY_SERVICE: Final = "notify_service"
+CONF_FLOW_CHECK_TIME: Final = "flow_check_time"
+CONF_FLOW_CHECK_RISE: Final = "flow_check_rise"
 
 # --- Valves, system level (FR-VAL-06, FR-VAL-07) -------------------------
 CONF_IDLE_VALVE_POLICY: Final = "idle_valve_policy"
@@ -222,6 +226,8 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_STARTUP_GRACE: 120,
     CONF_FAULT_RECOVERY_TIME: 300,
     CONF_HEARTBEAT_INTERVAL: 60,
+    CONF_FLOW_CHECK_TIME: 15,
+    CONF_FLOW_CHECK_RISE: 5,
     # Valves (system)
     CONF_IDLE_VALVE_POLICY: "deenergize",
     CONF_EXERCISE_INTERVAL_DAYS: 7,

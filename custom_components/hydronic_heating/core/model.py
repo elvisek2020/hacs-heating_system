@@ -313,6 +313,7 @@ class HeatSourceConfig:
     select_on: str | None = None
     select_off: str | None = None
     feedback_entity: str | None = None
+    flow_temp_entity: str | None = None
 
     @property
     def state_entity(self) -> str | None:
@@ -399,6 +400,8 @@ class SystemConfig:
     boiler_cycle_period_s: float = 1200.0
     duty_min: float = 0.2
     use_forecast: bool = False
+    flow_check_s: float = 15 * 60
+    flow_check_rise: float = 5.0
     house_schedule_entity: str | None = None
     house_presence_entity: str | None = None
     long_away_entity: str | None = None
@@ -431,6 +434,7 @@ class SystemConfig:
                 select_on=options.get(c.CONF_HEAT_SOURCE_SELECT_ON),
                 select_off=options.get(c.CONF_HEAT_SOURCE_SELECT_OFF),
                 feedback_entity=options.get(c.CONF_FEEDBACK_ENTITY),
+                flow_temp_entity=options.get(c.CONF_FLOW_TEMP_ENTITY),
             ),
             outdoor_sensors=tuple(opt(c.CONF_OUTDOOR_SENSORS) or ()),
             weather_entity=options.get(c.CONF_WEATHER_ENTITY),
@@ -490,6 +494,8 @@ class SystemConfig:
             boiler_cycle_period_s=num(c.CONF_BOILER_CYCLE_PERIOD) * 60,
             duty_min=num(c.CONF_DUTY_MIN),
             use_forecast=bool(opt(c.CONF_USE_FORECAST)),
+            flow_check_s=num(c.CONF_FLOW_CHECK_TIME) * 60,
+            flow_check_rise=num(c.CONF_FLOW_CHECK_RISE),
             house_schedule_entity=options.get(c.CONF_HOUSE_SCHEDULE_ENTITY),
             house_presence_entity=options.get(c.CONF_HOUSE_PRESENCE_ENTITY),
             long_away_entity=options.get(c.CONF_LONG_AWAY_ENTITY),

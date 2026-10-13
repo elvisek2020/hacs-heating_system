@@ -9,6 +9,7 @@ from typing import Any
 from .. import const as c
 from .equithermal import OutdoorEngine, duty_limit, flow_setpoint
 from .exercise import ExerciseScheduler
+from .flow_check import FlowCheck
 from .heat_source import NO_FLOW_MARGIN_S, Arbitration, BoilerSequencer, RoomDemand, arbitrate
 from .model import (
     HOLD_REASONS,
@@ -79,6 +80,9 @@ class HydronicController:
         self.boiler_observed: bool | None = None
         self.boiler_available = False
         self.burner_running: bool | None = None
+        # FR-SAFE-08: measured flow temperature and the check that the boiler heats.
+        self.flow_temperature: float | None = None
+        self.flow_check = FlowCheck()
         self.valve_desired: dict[str, bool] = {}
         self.exercising: set[str] = set()
         self.problems: dict[str, Problem] = {}
@@ -124,6 +128,7 @@ class HydronicController:
         for entity in (
             cfg.weather_entity,
             cfg.heat_source.feedback_entity,
+            cfg.heat_source.flow_temp_entity,
             cfg.house_schedule_entity,
             cfg.house_presence_entity,
             cfg.long_away_entity,
@@ -281,6 +286,7 @@ class HydronicController:
 
         self.state = self._system_state(mode)
         self.blocked_by = self._blocked_by(now, blocked, flow_ok)
+        self._update_flow_check(snap, boiler_on)
         self._collect_problems(now)
         previous = self.boiler_status if self.last_step is not None else None
         self.boiler_status = self._boiler_status(
@@ -311,6 +317,29 @@ class HydronicController:
         return plan
 
     # --- Step helpers -----------------------------------------------------
+
+    def _update_flow_check(self, snap: Snapshot, boiler_on: bool) -> None:
+        """Measured flow temperature and the check that the boiler heats (FR-SAFE-08)."""
+        cfg = self.cfg
+        reading = snap.get(cfg.heat_source.flow_temp_entity)
+        self.flow_temperature = reading.value if reading.available else None
+        if cfg.heat_source.flow_temp_entity is None or cfg.flow_check_s <= 0:
+            self.flow_check.disable()
+            return
+        # With a feedback entity only the time the burner really runs counts.
+        running = (
+            boiler_on
+            and not self.simulating
+            and self.sequencer.phase is BoilerPhase.FIRING
+            and self.burner_running is not False
+        )
+        self.flow_check.update(
+            snap.now,
+            running=running,
+            temperature=self.flow_temperature,
+            check_s=cfg.flow_check_s,
+            rise=cfg.flow_check_rise,
+        )
 
     def _update_equithermal(self) -> None:
         """Heating curve and duty limit (FR-EQ-04, FR-EQ-05)."""
@@ -1000,6 +1029,16 @@ class HydronicController:
         if self.fault_safe:
             problems["fault_safe"] = Problem(
                 "fault_safe", "fault_safe", {"reason": self.fault_reason or ""}, repair=True
+            )
+        if self.flow_check.failed:
+            problems["no_heat"] = Problem(
+                "no_heat",
+                "no_heat",
+                {
+                    "minutes": f"{self.cfg.flow_check_s / 60:g}",
+                    "rise": f"{self.cfg.flow_check_rise:g}",
+                },
+                repair=True,
             )
         if self.ready:
             for room in self.rooms.values():

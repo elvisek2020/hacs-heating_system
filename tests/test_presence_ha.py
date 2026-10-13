@@ -6,9 +6,9 @@ from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.template import Template
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_capture_events
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events
 
 from custom_components.hydronic_heating.const import (
     CONF_EXPECTED_RETURN_ENTITY,
@@ -129,8 +129,8 @@ async def test_room_shows_what_it_follows(hass: HomeAssistant) -> None:
         "on",
         {"entity_id": ["person.elvisek", "person.ronny"], "friendly_name": "Rodiče doma"},
     )
-    hass.states.async_set("person.elvisek", "home")
-    hass.states.async_set("person.ronny", "home")
+    hass.states.async_set("person.elvisek", "home", {"friendly_name": "ElvisEK"})
+    hass.states.async_set("person.ronny", "home", {"friendly_name": "Ronny"})
     hass.states.async_set(
         "binary_sensor.nekdo_doma",
         "on",
@@ -176,29 +176,59 @@ async def test_room_shows_what_it_follows(hass: HomeAssistant) -> None:
     )
     sections = dashboard["views"][0]["sections"]
     rooms = {s["cards"][0].get("heading"): s["cards"] for s in sections}
-    living_cards = rooms["Obývák"]
-    explanation = living_cards[2]["content"]
-    assert "state_attr('climate.hh_obyvak', 'target_detail')" in explanation
-    assert "**Home:**" in explanation
-    assert "state_attr('binary_sensor.rodice_doma', 'entity_id')" in explanation
-    assert "**House schedule:**" in explanation
-    # Who is home: the people behind the presence entities, under the boiler operation.
+    # No text under the thermostat: the reason is in its attributes and the logbook.
+    assert all(c["type"] != "markdown" for c in rooms["Obývák"])
+    # Who is home: only people (the group stands for its members), by their names.
     operation = rooms["Boiler operation"]
-    people = [c["entity"] for c in operation if c.get("state_content") == ["state", "last_changed"]]
-    assert people == ["binary_sensor.nekdo_doma", "person.elvisek", "person.ronny"]
-    bedroom = rooms["Ložnice"][2]["content"]
-    assert "**Home in the house:**" in bedroom
-    assert "state_attr('binary_sensor.nekdo_doma', 'people')" in bedroom
+    people = [
+        (c["entity"], c["name"])
+        for c in operation
+        if c.get("state_content") == ["state", "last_changed"]
+    ]
+    assert people == [("person.elvisek", "ElvisEK"), ("person.ronny", "Ronny")]
 
-    # The names come out of the templates as the frontend renders them.
-    hass.states.async_set(
-        "binary_sensor.rodice_doma",
-        "on",
-        {"entity_id": ["person.elvisek", "person.ronny"], "friendly_name": "Rodiče doma"},
+
+async def test_who_is_home_from_a_presence_integration(hass: HomeAssistant) -> None:
+    """Groups and counts of a presence integration stand for its people."""
+    module = MockConfigEntry(domain="household_presence", title="Domácnost")
+    module.add_to_hass(hass)
+    devices = dr.async_get(hass)
+    registry = er.async_get(hass)
+
+    def sensor(key: str, device: str | None, attributes: dict) -> str:
+        device_id = None
+        if device is not None:
+            device_id = devices.async_get_or_create(
+                config_entry_id=module.entry_id,
+                identifiers={("household_presence", device)},
+                name=device,
+            ).id
+        entity = registry.async_get_or_create(
+            "binary_sensor",
+            "household_presence",
+            key,
+            config_entry=module,
+            device_id=device_id,
+            has_entity_name=True,
+            original_device_class="presence",
+            suggested_object_id=f"hp_{key}",
+        )
+        hass.states.async_set(entity.entity_id, "on", attributes)
+        return entity.entity_id
+
+    house = sensor("multiple_home", None, {"count": 2, "people": ["ElvisEK", "Adam"]})
+    parents = sensor("rodice_home", "Rodiče", {"count": 1, "people": ["ElvisEK"]})
+    elvisek = sensor("elvisek_home", "ElvisEK", {"friendly_name": "ElvisEK Doma"})
+    adam = sensor("adam_home", "Adam", {"friendly_name": "Adam Doma"})
+    entry = await _setup(hass, **{CONF_HOUSE_PRESENCE_ENTITY: house})
+    living = next(s for s in entry.subentries.values() if s.unique_id == "obyvak")
+    hass.config_entries.async_update_subentry(
+        entry, living, data={**living.data, "presence_entity": parents}
     )
-    hass.states.async_set("person.ronny", "not_home", {"friendly_name": "Ronny"})
-    hass.states.async_set("person.elvisek", "home", {"friendly_name": "ElvisEK"})
-    names = Template(explanation.split("**Home:** ", 1)[1].split("  \n")[0], hass)
-    assert names.async_render() == "ElvisEK"
-    names = Template(bedroom.split("**Home in the house:** ", 1)[1].split("  \n")[0], hass)
-    assert names.async_render() == "Zdeněk, Adam"
+    await _settle(hass)
+    dashboard = await hass.services.async_call(
+        "hydronic_heating", "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    operation = dashboard["views"][0]["sections"][2]["cards"]
+    people = [(c["entity"], c.get("name")) for c in operation if c.get("color") == "green"]
+    assert people == [(elvisek, "ElvisEK"), (adam, "Adam")]

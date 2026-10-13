@@ -13,6 +13,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 
 from custom_components.hydronic_heating.const import (
     CONF_DEMO_MODE,
+    CONF_EQUITHERMAL_DUTY_ENABLED,
+    CONF_FLOW_TEMP_ENTITY,
     DEMO_VIRTUAL_HOUSE,
     DEMO_VIRTUAL_OUTPUTS,
     DOMAIN,
@@ -20,7 +22,7 @@ from custom_components.hydronic_heating.const import (
 from custom_components.hydronic_heating.core.model import Command
 from custom_components.hydronic_heating.demo_model import RoomThermal
 
-from .test_runtime import _setup
+from .test_runtime import CELSIUS, _setup
 
 REAL_OUTPUTS = (
     "input_boolean.kotel",
@@ -190,7 +192,7 @@ async def test_generate_dashboard(hass: HomeAssistant) -> None:
         "button.hh_manual_60",
     ):
         assert entity_id in text, entity_id
-    assert [view["path"] for view in dashboard["views"]] == ["prehled", "grafy"]
+    assert [view["path"] for view in dashboard["views"]] == ["prehled", "grafy", "vysvetlivky"]
 
 
 async def test_dashboard_without_demo(hass: HomeAssistant) -> None:
@@ -265,13 +267,29 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history = dashboard["views"]
+    overview, history, legend = dashboard["views"]
     assert overview["type"] == "sections"
-    assert {b["entity"] for b in overview["badges"]} >= {
+    badges = [b["entity"] for b in overview["badges"]]
+    assert set(badges) >= {
         "sensor.hh_state",
         "binary_sensor.hh_boiler_command",
-        "sensor.hh_flow_setpoint",
+        "sensor.hh_outdoor_temperature",
+        "sensor.hh_open_windows",
     }
+    # The curve only with the duty limit by the curve (off here).
+    assert "sensor.hh_flow_setpoint" not in badges
+    # The legend is a subview opened from the last badge.
+    assert overview["badges"][-1]["tap_action"] == {
+        "action": "navigate",
+        "navigation_path": "vysvetlivky",
+    }
+    assert legend["subview"] is True
+    assert legend["path"] == "vysvetlivky"
+    rows = legend["sections"][0]["cards"][1]["content"]
+    assert '<ha-icon icon="mdi:pipe-valve"></ha-icon> | **Valve**' in rows
+    assert "**Window block**" in rows  # the virtual house has windows
+    assert "**Duty limit**" not in rows
+    assert "**Flow temperature**" not in rows
     # Control row (heating, boiler, boiler operation), demo across the width, rooms.
     headings = [
         next((c["heading"] for c in s["cards"] if c["type"] == "heading"), None)
@@ -285,19 +303,23 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
         "Rooms – individual settings",
         "Obývák",
         "Ložnice",
-        "Legend",
     ]
-    legend = overview["sections"][-1]
-    assert legend["column_span"] == 3
-    assert '<ha-icon icon="mdi:pipe-valve"></ha-icon> | **Valve**' in legend["cards"][2]["content"]
     assert overview["sections"][3]["column_span"] == 3
     divider = overview["sections"][4]
     assert divider["column_span"] == 3
     assert divider["cards"][0]["content"] == "<hr>"
     assert divider["cards"][1]["heading_style"] == "title"
-    living = overview["sections"][-3]["cards"]
+    living = overview["sections"][-2]["cards"]
     assert living[0]["icon"] == "mdi:sofa-outline"
-    assert living[1]["entity"] == "climate.hh_obyvak"
+    assert living[0]["badges"][0]["entity"] == "binary_sensor.hh_obyvak_window"
+    # Thermostat, then the demand (the cause) and the valve (the result), no text.
+    assert [c.get("entity") for c in living[1:4]] == [
+        "climate.hh_obyvak",
+        "sensor.hh_obyvak_demand",
+        "sensor.hh_obyvak_valve_state",
+    ]
+    assert all(c["type"] != "markdown" for c in living)
+    assert "color" not in living[1]  # room thermostats keep the colors of HA
     # Room mode switch first (back to auto in one tap), then target and presets.
     assert [f["type"] for f in living[1]["features"]] == [
         "climate-hvac-modes",
@@ -323,9 +345,12 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history = dashboard["views"]
+    overview, history, _legend = dashboard["views"]
     badges = {b["entity"]: b for b in overview["badges"]}
     assert "sensor.hh_boiler_reason" in badges
+    assert badges["sensor.hh_boiler_reason"]["color"] == "deep-orange"
+    # No windows in the rooms: no window tiles.
+    assert "sensor.hh_open_windows" not in badges
     hold_badge = badges["sensor.hh_boiler_hold_ends_at"]
     assert hold_badge["visibility"][0]["state_not"] == ["unknown", "unavailable"]
     boiler = overview["sections"][1]["cards"]
@@ -333,19 +358,73 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     assert boiler[2]["entity"] == "sensor.hh_boiler_hold_ends_at"
     assert "visibility" in boiler[2]
     assert "state_attr('sensor.hh_boiler_reason', 'detail')" in boiler[3]["content"]
+    # Without a flow sensor and the duty limit no water temperature; real outdoor values.
     assert [c.get("entity") for c in boiler[4:]] == [
         "sensor.hh_demand_total",
-        "sensor.hh_flow_setpoint",
-        "sensor.hh_outdoor_temperature_damped",
+        "sensor.hh_outdoor_temperature",
+        "sensor.hh_outdoor_mean_4h",
     ]
+    assert boiler[-1]["name"] == "Outdoor – 4 h mean (limit 13 °C)"
+    # Boiler operation by priority, only configured features.
     operation = overview["sections"][2]["cards"]
-    assert operation[1]["entity"] == "binary_sensor.hh_boiler_command"
-    assert operation[-1]["entity"] == "binary_sensor.hh_problem"
+    assert [c["entity"] for c in operation[1:]] == [
+        "binary_sensor.hh_boiler_command",
+        "binary_sensor.hh_heat_demand",
+        "sensor.hh_outdoor_mean_4h",
+        "binary_sensor.hh_problem",
+        "binary_sensor.hh_heating_season",
+        "sensor.hh_boiler_starts_today",
+        "sensor.hh_boiler_duty",
+    ]
     # In the demo the demo section explains what is switched, not the shadow banner.
     assert "shadow_mode" not in str(overview["sections"][3])
     timeline = history["sections"][1]["cards"][2]["entities"]
     assert timeline[0]["entity"] == "sensor.hh_boiler_reason"
     assert timeline[2]["entity"] == "switch.hh_demo_boiler"
+    assert "binary_sensor.hh_window_block" not in str(timeline)
+    outdoor = history["sections"][1]["cards"][3]
+    assert outdoor["title"] == "Outdoor temperature"
+    assert [e["entity"] for e in outdoor["entities"]] == [
+        "sensor.hh_outdoor_temperature",
+        "sensor.hh_outdoor_mean_4h",
+    ]
+
+
+async def test_dashboard_with_flow_sensor_and_duty_limit(hass: HomeAssistant) -> None:
+    """The measured water temperature; the curve and duty limit only when used."""
+    hass.states.async_set("sensor.stoupacka", "45.0", CELSIUS)
+    await _setup(
+        hass,
+        **{CONF_FLOW_TEMP_ENTITY: "sensor.stoupacka", CONF_EQUITHERMAL_DUTY_ENABLED: True},
+    )
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    overview, history, legend = dashboard["views"]
+    badges = {b["entity"]: b for b in overview["badges"]}
+    assert badges["sensor.stoupacka"]["name"] == "Flow temperature"
+    assert badges["sensor.stoupacka"]["icon"] == "mdi:thermometer-water"
+    assert "sensor.hh_flow_setpoint" not in badges  # the measured value wins in the bar
+    boiler = [c.get("entity") for c in overview["sections"][1]["cards"]]
+    assert boiler[5:] == [
+        "sensor.stoupacka",
+        "sensor.hh_flow_setpoint",
+        "sensor.hh_outdoor_temperature",
+        "sensor.hh_outdoor_mean_4h",
+    ]
+    operation = overview["sections"][2]["cards"]
+    assert operation[-1]["entity"] == "sensor.hh_duty_limit"
+    chart = history["sections"][1]["cards"][3]
+    assert [e["entity"] for e in chart["entities"]] == [
+        "sensor.hh_outdoor_temperature",
+        "sensor.hh_outdoor_mean_4h",
+        "sensor.stoupacka",
+        "sensor.hh_outdoor_temperature_damped",
+        "sensor.hh_flow_setpoint",
+    ]
+    rows = legend["sections"][0]["cards"][1]["content"]
+    assert "**Flow temperature**" in rows
+    assert "**Duty limit**" in rows
 
 
 async def test_dashboard_shadow_banner(hass: HomeAssistant) -> None:

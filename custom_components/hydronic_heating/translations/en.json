@@ -24,11 +24,13 @@
         "title": "Boiler switch",
         "data": {
           "heat_source_entity": "Boiler switch",
-          "feedback_entity": "Feedback (optional)"
+          "feedback_entity": "Feedback (optional)",
+          "flow_temp_entity": "Flow temperature (optional)"
         },
         "data_description": {
           "heat_source_entity": "Switch or input_boolean that enables the boiler (a stateful Loxone Switch block, not a Pushbutton).",
-          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor.",
+          "flow_temp_entity": "Sensor of the measured water temperature from the boiler, for example on the riser. Shown on the dashboard and used to check that the boiler really heats."
         }
       },
       "heat_source_actions": {
@@ -36,12 +38,14 @@
         "data": {
           "heat_source_on_entity": "Turn-on action",
           "heat_source_off_entity": "Turn-off action",
-          "feedback_entity": "Feedback (optional)"
+          "feedback_entity": "Feedback (optional)",
+          "flow_temp_entity": "Flow temperature (optional)"
         },
         "data_description": {
           "heat_source_on_entity": "Script or button that turns the boiler on.",
           "heat_source_off_entity": "Script or button that turns the boiler off.",
-          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor.",
+          "flow_temp_entity": "Sensor of the measured water temperature from the boiler, for example on the riser. Shown on the dashboard and used to check that the boiler really heats."
         }
       },
       "heat_source_select": {
@@ -50,10 +54,12 @@
           "heat_source_select_entity": "Select entity",
           "heat_source_select_on": "Option for on",
           "heat_source_select_off": "Option for off",
-          "feedback_entity": "Feedback (optional)"
+          "feedback_entity": "Feedback (optional)",
+          "flow_temp_entity": "Flow temperature (optional)"
         },
         "data_description": {
-          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor.",
+          "flow_temp_entity": "Sensor of the measured water temperature from the boiler, for example on the riser. Shown on the dashboard and used to check that the boiler really heats."
         }
       },
       "outdoor": {
@@ -134,11 +140,13 @@
         "title": "Boiler switch",
         "data": {
           "heat_source_entity": "Boiler switch",
-          "feedback_entity": "Feedback (optional)"
+          "feedback_entity": "Feedback (optional)",
+          "flow_temp_entity": "Flow temperature (optional)"
         },
         "data_description": {
           "heat_source_entity": "Switch or input_boolean that enables the boiler (a stateful Loxone Switch block, not a Pushbutton).",
-          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor.",
+          "flow_temp_entity": "Sensor of the measured water temperature from the boiler, for example on the riser. Shown on the dashboard and used to check that the boiler really heats."
         }
       },
       "heat_source_actions": {
@@ -146,12 +154,14 @@
         "data": {
           "heat_source_on_entity": "Turn-on action",
           "heat_source_off_entity": "Turn-off action",
-          "feedback_entity": "Feedback (optional)"
+          "feedback_entity": "Feedback (optional)",
+          "flow_temp_entity": "Flow temperature (optional)"
         },
         "data_description": {
           "heat_source_on_entity": "Script or button that turns the boiler on.",
           "heat_source_off_entity": "Script or button that turns the boiler off.",
-          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor.",
+          "flow_temp_entity": "Sensor of the measured water temperature from the boiler, for example on the riser. Shown on the dashboard and used to check that the boiler really heats."
         }
       },
       "heat_source_select": {
@@ -160,10 +170,12 @@
           "heat_source_select_entity": "Select entity",
           "heat_source_select_on": "Option for on",
           "heat_source_select_off": "Option for off",
-          "feedback_entity": "Feedback (optional)"
+          "feedback_entity": "Feedback (optional)",
+          "flow_temp_entity": "Flow temperature (optional)"
         },
         "data_description": {
-          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor."
+          "feedback_entity": "Entity that confirms the burner is running, for example a binary_sensor.",
+          "flow_temp_entity": "Sensor of the measured water temperature from the boiler, for example on the riser. Shown on the dashboard and used to check that the boiler really heats."
         }
       },
       "outdoor": {
@@ -214,6 +226,8 @@
           "fault_recovery_time": "Fault recovery time",
           "heartbeat_entity": "Heartbeat output (optional)",
           "heartbeat_interval": "Heartbeat interval",
+          "flow_check_time": "Heating check: time",
+          "flow_check_rise": "Heating check: water temperature rise",
           "notify_service": "Notification service (optional)"
         },
         "data_description": {
@@ -221,7 +235,9 @@
           "startup_grace": "Outputs are not switched until all required entities are available, at most this long.",
           "fault_recovery_time": "How long the boiler must be available and match the command before leaving the fault state.",
           "heartbeat_entity": "Toggled periodically for a hardware watchdog, for example in Loxone.",
-          "notify_service": "For example notify.mobile_app_phone."
+          "notify_service": "For example notify.mobile_app_phone.",
+          "flow_check_time": "When the boiler runs this long and the water temperature does not rise by the given difference, the problem \"boiler runs but does not heat\" is reported. Only with a flow temperature sensor, 0 = off.",
+          "flow_check_rise": "How much the water temperature must rise above its lowest value during the boiler run."
         }
       },
       "valves": {
@@ -560,7 +576,19 @@
         "name": "Heat demand"
       },
       "boiler_command": {
-        "name": "Boiler command"
+        "name": "Boiler command",
+        "state_attributes": {
+          "flow_check": {
+            "name": "Heating check",
+            "state": {
+              "off": "Off",
+              "idle": "Boiler idle",
+              "waiting": "Waiting for the rise",
+              "ok": "Heats",
+              "failed": "Does not heat"
+            }
+          }
+        }
       },
       "window_block": {
         "name": "Window block"
@@ -727,6 +755,9 @@
       "demand_total": {
         "name": "Total demand"
       },
+      "outdoor_temperature": {
+        "name": "Outdoor temperature"
+      },
       "outdoor_temperature_damped": {
         "name": "Damped outdoor temperature"
       },
@@ -822,6 +853,10 @@
     "sensor_failure": {
       "title": "Temperature sensors of {room} failed",
       "description": "No temperature sensor of {room} has a valid value. The room runs in the fallback mode from its settings. Check the sensors or change them in the room settings."
+    },
+    "no_heat": {
+      "title": "Boiler runs but does not heat",
+      "description": "The boiler has run for {minutes} min but the water temperature has not risen by {rise} °C. Check the boiler (fault, water pressure), a closed circuit or air in the system. The issue clears by itself when the water warms up again while the boiler runs."
     }
   },
   "services": {

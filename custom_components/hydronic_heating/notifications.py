@@ -13,6 +13,12 @@ MESSAGES: dict[str, dict[str, tuple[str, str]]] = {
             "Kotel byl přepnut do bezpečného stavu: {reason}. Topení je vypnuté a ventily "
             "jsou v klidovém stavu, protimrazovou ochranu nelze zajistit kotlem.",
         ),
+        "no_heat": (
+            "Kotel běží, ale netopí",
+            "Kotel běží {minutes} min, ale teplota vody nestoupla ani o {rise} °C. "
+            "Zkontrolujte kotel (porucha, tlak vody), zavřený okruh nebo vzduch v systému. "
+            "Hlášení zmizí, až teplota vody při běhu kotle zase stoupne.",
+        ),
         "sensor_failure": (
             "Výpadek čidel: {room}",
             "Žádné teplotní čidlo místnosti {room} nemá platnou hodnotu. Místnost jede "
@@ -38,6 +44,12 @@ MESSAGES: dict[str, dict[str, tuple[str, str]]] = {
             "Heating fault",
             "The boiler was switched to the safe state: {reason}. Heating is off and the "
             "valves are in their idle position; frost protection by the boiler is not possible.",
+        ),
+        "no_heat": (
+            "Boiler runs but does not heat",
+            "The boiler has run for {minutes} min but the water temperature has not risen by "
+            "{rise} °C. Check the boiler (fault, water pressure), a closed circuit or air in "
+            "the system. The message clears when the water warms up again while the boiler runs.",
         ),
         "sensor_failure": (
             "Sensor failure: {room}",

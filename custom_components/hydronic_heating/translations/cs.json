@@ -24,11 +24,13 @@
         "title": "Spínač kotle",
         "data": {
           "heat_source_entity": "Spínač kotle",
-          "feedback_entity": "Zpětná vazba (volitelné)"
+          "feedback_entity": "Zpětná vazba (volitelné)",
+          "flow_temp_entity": "Teplota vody (volitelné)"
         },
         "data_description": {
           "heat_source_entity": "Spínač nebo input_boolean, který povoluje topení kotle (stavový blok Switch v Loxone, ne Pushbutton).",
-          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor.",
+          "flow_temp_entity": "Čidlo měřené teploty vody od kotle, například na stoupačce. Ukáže se na dashboardu a hlídá, že kotel opravdu topí."
         }
       },
       "heat_source_actions": {
@@ -36,12 +38,14 @@
         "data": {
           "heat_source_on_entity": "Akce pro zapnutí",
           "heat_source_off_entity": "Akce pro vypnutí",
-          "feedback_entity": "Zpětná vazba (volitelné)"
+          "feedback_entity": "Zpětná vazba (volitelné)",
+          "flow_temp_entity": "Teplota vody (volitelné)"
         },
         "data_description": {
           "heat_source_on_entity": "Skript nebo tlačítko, které kotel zapne.",
           "heat_source_off_entity": "Skript nebo tlačítko, které kotel vypne.",
-          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor.",
+          "flow_temp_entity": "Čidlo měřené teploty vody od kotle, například na stoupačce. Ukáže se na dashboardu a hlídá, že kotel opravdu topí."
         }
       },
       "heat_source_select": {
@@ -50,10 +54,12 @@
           "heat_source_select_entity": "Entita výběru",
           "heat_source_select_on": "Volba pro zapnuto",
           "heat_source_select_off": "Volba pro vypnuto",
-          "feedback_entity": "Zpětná vazba (volitelné)"
+          "feedback_entity": "Zpětná vazba (volitelné)",
+          "flow_temp_entity": "Teplota vody (volitelné)"
         },
         "data_description": {
-          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor.",
+          "flow_temp_entity": "Čidlo měřené teploty vody od kotle, například na stoupačce. Ukáže se na dashboardu a hlídá, že kotel opravdu topí."
         }
       },
       "outdoor": {
@@ -134,11 +140,13 @@
         "title": "Spínač kotle",
         "data": {
           "heat_source_entity": "Spínač kotle",
-          "feedback_entity": "Zpětná vazba (volitelné)"
+          "feedback_entity": "Zpětná vazba (volitelné)",
+          "flow_temp_entity": "Teplota vody (volitelné)"
         },
         "data_description": {
           "heat_source_entity": "Spínač nebo input_boolean, který povoluje topení kotle (stavový blok Switch v Loxone, ne Pushbutton).",
-          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor.",
+          "flow_temp_entity": "Čidlo měřené teploty vody od kotle, například na stoupačce. Ukáže se na dashboardu a hlídá, že kotel opravdu topí."
         }
       },
       "heat_source_actions": {
@@ -146,12 +154,14 @@
         "data": {
           "heat_source_on_entity": "Akce pro zapnutí",
           "heat_source_off_entity": "Akce pro vypnutí",
-          "feedback_entity": "Zpětná vazba (volitelné)"
+          "feedback_entity": "Zpětná vazba (volitelné)",
+          "flow_temp_entity": "Teplota vody (volitelné)"
         },
         "data_description": {
           "heat_source_on_entity": "Skript nebo tlačítko, které kotel zapne.",
           "heat_source_off_entity": "Skript nebo tlačítko, které kotel vypne.",
-          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor.",
+          "flow_temp_entity": "Čidlo měřené teploty vody od kotle, například na stoupačce. Ukáže se na dashboardu a hlídá, že kotel opravdu topí."
         }
       },
       "heat_source_select": {
@@ -160,10 +170,12 @@
           "heat_source_select_entity": "Entita výběru",
           "heat_source_select_on": "Volba pro zapnuto",
           "heat_source_select_off": "Volba pro vypnuto",
-          "feedback_entity": "Zpětná vazba (volitelné)"
+          "feedback_entity": "Zpětná vazba (volitelné)",
+          "flow_temp_entity": "Teplota vody (volitelné)"
         },
         "data_description": {
-          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor."
+          "feedback_entity": "Entita, která potvrzuje běh hořáku, například binary_sensor.",
+          "flow_temp_entity": "Čidlo měřené teploty vody od kotle, například na stoupačce. Ukáže se na dashboardu a hlídá, že kotel opravdu topí."
         }
       },
       "outdoor": {
@@ -214,6 +226,8 @@
           "fault_recovery_time": "Doba pro návrat z poruchy",
           "heartbeat_entity": "Výstup heartbeat (volitelné)",
           "heartbeat_interval": "Interval heartbeatu",
+          "flow_check_time": "Kontrola topení: doba",
+          "flow_check_rise": "Kontrola topení: nárůst teploty vody",
           "notify_service": "Notifikační služba (volitelné)"
         },
         "data_description": {
@@ -221,7 +235,9 @@
           "startup_grace": "Výstupy se nespínají, dokud nejsou dostupné povinné entity, nejdéle po tuto dobu.",
           "fault_recovery_time": "Jak dlouho musí být kotel dostupný a souhlasit s povelem, než se systém vrátí z poruchy.",
           "heartbeat_entity": "Pravidelně se přepíná pro watchdog v hardwaru, například v Loxone.",
-          "notify_service": "Například notify.mobile_app_telefon."
+          "notify_service": "Například notify.mobile_app_telefon.",
+          "flow_check_time": "Když kotel běží tak dlouho a teplota vody nestoupne o zadaný rozdíl, ohlásí se porucha „kotel běží, ale netopí“. Jen s čidlem teploty vody, 0 = vypnuto.",
+          "flow_check_rise": "O kolik musí teplota vody stoupnout od nejnižší hodnoty během běhu kotle."
         }
       },
       "valves": {
@@ -560,7 +576,19 @@
         "name": "Požadavek na teplo"
       },
       "boiler_command": {
-        "name": "Povel kotli"
+        "name": "Povel kotli",
+        "state_attributes": {
+          "flow_check": {
+            "name": "Kontrola topení",
+            "state": {
+              "off": "Vypnuto",
+              "idle": "Kotel stojí",
+              "waiting": "Čeká na nárůst",
+              "ok": "Topí",
+              "failed": "Netopí"
+            }
+          }
+        }
       },
       "window_block": {
         "name": "Blokace okny"
@@ -727,6 +755,9 @@
       "demand_total": {
         "name": "Celkový požadavek"
       },
+      "outdoor_temperature": {
+        "name": "Venkovní teplota"
+      },
       "outdoor_temperature_damped": {
         "name": "Tlumená venkovní teplota"
       },
@@ -822,6 +853,10 @@
     "sensor_failure": {
       "title": "Výpadek teplotních čidel: {room}",
       "description": "Žádné teplotní čidlo místnosti {room} nemá platnou hodnotu. Místnost jede v záložním režimu podle svého nastavení. Zkontrolujte čidla nebo je změňte v nastavení místnosti."
+    },
+    "no_heat": {
+      "title": "Kotel běží, ale netopí",
+      "description": "Kotel běží {minutes} min, ale teplota vody nestoupla ani o {rise} °C. Zkontrolujte kotel (porucha, tlak vody), zavřený okruh nebo vzduch v systému. Hlášení zmizí samo, až teplota vody při běhu kotle zase stoupne."
     }
   },
   "services": {

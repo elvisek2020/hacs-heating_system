@@ -67,6 +67,9 @@ from .const import (
     CONF_FALLBACK_HOLD,
     CONF_FAULT_RECOVERY_TIME,
     CONF_FEEDBACK_ENTITY,
+    CONF_FLOW_CHECK_RISE,
+    CONF_FLOW_CHECK_TIME,
+    CONF_FLOW_TEMP_ENTITY,
     CONF_FLOW_TEMP_MAX,
     CONF_FLOW_TEMP_MIN,
     CONF_FROST_IDLE_MAX,
@@ -287,6 +290,7 @@ def _heat_source_switch_schema(values: Mapping[str, Any]) -> vol.Schema:
         {
             _required(CONF_HEAT_SOURCE_ENTITY, values): _entity(["switch", "input_boolean"]),
             _optional(CONF_FEEDBACK_ENTITY, values): _entity(_FEEDBACK_DOMAINS),
+            _optional(CONF_FLOW_TEMP_ENTITY, values): _entity("sensor"),
         }
     )
 
@@ -298,6 +302,7 @@ def _heat_source_actions_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_HEAT_SOURCE_ON_ENTITY, values): _entity(action_domains),
             _required(CONF_HEAT_SOURCE_OFF_ENTITY, values): _entity(action_domains),
             _optional(CONF_FEEDBACK_ENTITY, values): _entity(_FEEDBACK_DOMAINS),
+            _optional(CONF_FLOW_TEMP_ENTITY, values): _entity("sensor"),
         }
     )
 
@@ -309,6 +314,7 @@ def _heat_source_select_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_HEAT_SOURCE_SELECT_ON, values): _TEXT,
             _required(CONF_HEAT_SOURCE_SELECT_OFF, values): _TEXT,
             _optional(CONF_FEEDBACK_ENTITY, values): _entity(_FEEDBACK_DOMAINS),
+            _optional(CONF_FLOW_TEMP_ENTITY, values): _entity("sensor"),
         }
     )
 
@@ -374,6 +380,8 @@ def _safety_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_FAULT_RECOVERY_TIME, values): _number(60, 1800, unit="s"),
             _optional(CONF_HEARTBEAT_ENTITY, values): _entity(["switch", "input_boolean"]),
             _required(CONF_HEARTBEAT_INTERVAL, values): _number(10, 600, unit="s"),
+            _required(CONF_FLOW_CHECK_TIME, values): _number(0, 120, unit="min"),
+            _required(CONF_FLOW_CHECK_RISE, values): _number(1, 30, step=0.5, unit=_CELSIUS),
             _optional(CONF_NOTIFY_SERVICE, values): _TEXT,
         }
     )

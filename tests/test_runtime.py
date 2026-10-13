@@ -19,6 +19,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.hydronic_heating.const import (
     CONF_COMFORT_TEMP,
+    CONF_FLOW_TEMP_ENTITY,
     CONF_HAS_BYPASS,
     CONF_HEAT_SOURCE_ENTITY,
     CONF_MIRROR_TIMER_ENTITY,
@@ -114,6 +115,7 @@ async def test_entities_follow_prd_naming(hass: HomeAssistant) -> None:
         "sensor.hh_manual_ends_at",
         "sensor.hh_state",
         "sensor.hh_demand_total",
+        "sensor.hh_outdoor_temperature",
         "sensor.hh_outdoor_temperature_damped",
         "sensor.hh_boiler_duty",
         "sensor.hh_boiler_starts_today",
@@ -309,6 +311,28 @@ async def test_fault_creates_repair_and_recovers(
         await _settle(hass)
     assert hass.states.get("sensor.hh_state").state == "auto"
     assert issues.async_get_issue(DOMAIN, "fault_safe") is None
+
+
+async def test_boiler_without_heat_creates_repair(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """The measured water does not warm up while the boiler runs (FR-SAFE-08)."""
+    freezer.move_to("2026-01-15 11:00:00+00:00")
+    hass.states.async_set("sensor.stoupacka", "30.0", CELSIUS)
+    await _setup(hass, **{CONF_SHADOW_MODE: False, CONF_FLOW_TEMP_ENTITY: "sensor.stoupacka"})
+    await _wait(hass, freezer, 5 * 60)
+    command = hass.states.get("binary_sensor.hh_boiler_command")
+    assert command.state == "on"
+    assert command.attributes["flow_check"] == "waiting"
+    await _wait(hass, freezer, 15 * 60)
+    issues = ir.async_get(hass)
+    assert issues.async_get_issue(DOMAIN, "no_heat") is not None
+    assert hass.states.get("binary_sensor.hh_problem").attributes["problems"] == ["no_heat"]
+    hass.states.async_set("sensor.stoupacka", "36.0", CELSIUS)
+    await _settle(hass)
+    assert issues.async_get_issue(DOMAIN, "no_heat") is None
+    command = hass.states.get("binary_sensor.hh_boiler_command")
+    assert command.attributes["flow_check"] == "ok"
 
 
 async def test_state_survives_reload(hass: HomeAssistant) -> None:
