@@ -21,6 +21,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .core.model import BoilerPhase, RoomHvacMode, SystemMode, SystemState
 from .entity import HydronicEntity
+from .explain import room_detail
 from .runtime import HydronicConfigEntry
 
 PARALLEL_UPDATES = 0
@@ -221,6 +222,11 @@ class RoomClimate(HydronicEntity, ClimateEntity):
             "schedule_state": room.schedule_on,
             "schedule_next": _iso(room.schedule_next),
             "presence": room.present,
+            "presence_entity": room.presence_entity,
+            "presence_source": room.presence_source,
+            "target_reason": room.target_reason.value,
+            "target_until": _iso(room.target_until),
+            "target_detail": room_detail(self.hass, room),
             "preheating": room.preheating,
             "preheat_until": _iso(room.preheat_until),
             "preheat_planned": _iso(room.preheat_planned),

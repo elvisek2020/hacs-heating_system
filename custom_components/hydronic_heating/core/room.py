@@ -18,6 +18,7 @@ from .model import (
     RoomConfig,
     RoomHvacMode,
     Snapshot,
+    TargetReason,
     ValvePhysical,
     WindowState,
 )
@@ -46,6 +47,7 @@ class RoomContext:
     window_max_block_s: float
     # FR-SCH-01: schedule of the whole house, used by rooms without their own.
     house_schedule_entity: str | None = None
+    house_presence_entity: str | None = None
     house_present: bool | None = None
     long_away: bool = False
     expected_return: datetime | None = None
@@ -53,6 +55,9 @@ class RoomContext:
     preheat_enabled: bool = False
     preheat_max_s: float = 4 * 3600
     timezone: ZoneInfo = UTC_ZONE
+    manual: bool = False
+    # Why heating is not allowed: "summer" or "off" (None = allowed).
+    no_heat_reason: str | None = None
 
     @property
     def house_absent(self) -> bool:
@@ -152,6 +157,11 @@ class RoomController:
         self.preheat_until: datetime | None = None
         self.preheat_source: str | None = None
         self.preheat_planned: datetime | None = None
+        # Why the room has its target, which presence entity it follows and until when.
+        self.target_reason = TargetReason.COMFORT
+        self.target_until: datetime | None = None
+        self.presence_entity: str | None = None
+        self.presence_source = "none"
         self.window = WindowMachine()
         self.valves: dict[str, ValveState] = {v.entity_id: ValveState() for v in cfg.valves}
         self.valve_open_cmd: bool | None = None
@@ -374,6 +384,47 @@ class RoomController:
         self.target = self.cfg.comfort_temp if self.preheating else base
         self.demand = self._compute_demand(ctx)
         self._track_not_reached(ctx.now)
+        self._explain_target(ctx)
+
+    def _explain_target(self, ctx: RoomContext) -> None:
+        """Reason of the target, in the priority the controller applies it."""
+        if self.cfg.presence_entity:
+            self.presence_entity, self.presence_source = self.cfg.presence_entity, "room"
+        elif ctx.house_presence_entity:
+            self.presence_entity, self.presence_source = ctx.house_presence_entity, "house"
+        else:
+            self.presence_entity, self.presence_source = None, "none"
+        reason, until = self._target_reason(ctx)
+        self.target_reason, self.target_until = reason, until
+
+    def _target_reason(self, ctx: RoomContext) -> tuple[TargetReason, datetime | None]:
+        if self.frost_active:
+            return TargetReason.FROST, None
+        if self.window.effective_open:
+            return TargetReason.WINDOW, None
+        if ctx.manual:
+            return TargetReason.MANUAL, None
+        if self.hvac_mode is RoomHvacMode.OFF:
+            return TargetReason.ROOM_OFF, None
+        if not ctx.heating_allowed:
+            return (
+                TargetReason.SUMMER if ctx.no_heat_reason == "summer" else TargetReason.SYSTEM_OFF
+            ), None
+        if ctx.away:
+            return TargetReason.SYSTEM_AWAY, None
+        if self.hvac_mode is RoomHvacMode.HEAT:
+            return TargetReason.OVERRIDE, None
+        if self.preheating:
+            return TargetReason.PREHEAT, self.preheat_until
+        if ctx.long_away:
+            return TargetReason.LONG_AWAY, ctx.expected_return
+        if self.present is False or ctx.house_present is False:
+            return TargetReason.ABSENT, ctx.expected_return
+        if self.schedule_on is False:
+            return TargetReason.SCHEDULE_ECO, self.schedule_next
+        if self.schedule_on:
+            return TargetReason.SCHEDULE_COMFORT, self.schedule_next
+        return TargetReason.COMFORT, None
 
     def _compute_demand(self, ctx: RoomContext) -> float:
         cfg = self.cfg

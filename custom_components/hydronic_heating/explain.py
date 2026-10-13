@@ -361,6 +361,8 @@ def decision_text(
         message = texts[f"presence_{state}"].format_map(fill)
         if state != "home" and decision.params.get("expected_return") is not None:
             message += texts["return_suffix"].format_map(fill)
+    elif decision.kind == "room_target":
+        message = room_target_text(hass, decision.params)
     elif decision.kind == "preheat":
         fill["source_word"] = texts.get(f"source_{decision.params.get('source')}", "")
         message = texts["preheat"].format_map(fill)
@@ -414,3 +416,147 @@ class _Defaults(dict):
 
     def __missing__(self, key: str) -> str:
         return "{" + key + "}"
+
+
+# --- Room target (why comfort, setback or away) ------------------------------
+
+ROOM: dict[str, dict[str, str]] = {
+    "cs": {
+        "frost": "Protimrazová ochrana: místnost je pod {frost} °C, topí naplno.",
+        "window": "Otevřené okno: ventil je zavřený.",
+        "manual": "Manuální topení: ventil je otevřený, dokud manuál běží.",
+        "room_off": "Místnost je vypnutá.",
+        "summer": "Léto: netopí se.",
+        "system_off": "Topení je vypnuté.",
+        "system_away": "Režim Pryč: {temp} °C.",
+        "override": "Ruční změna: {temp} °C, rozvrh ani přítomnost se nepoužívají.",
+        "preheat": "Předtápění na {temp} °C do {until} ({source}).",
+        "long_away": "Dlouhodobá nepřítomnost: {temp} °C.",
+        "absent": "{Word} {temp} °C: nikdo doma ({presence}).",
+        "schedule_eco": "Útlum {temp} °C podle rozvrhu ({schedule}).",
+        "schedule_eco_until": "Útlum {temp} °C podle rozvrhu ({schedule}) do {until}.",
+        "schedule_comfort": "Komfort {temp} °C podle rozvrhu ({schedule}).",
+        "schedule_comfort_until": "Komfort {temp} °C podle rozvrhu ({schedule}) do {until}.",
+        "comfort": "Komfort {temp} °C.",
+        "return": " Návrat {until}.",
+        "source_schedule": "začátek komfortu podle rozvrhu",
+        "source_return": "očekávaný návrat",
+        "word_comfort": "komfort",
+        "word_eco": "útlum",
+        "word_away": "teplota Pryč",
+        "log_absent": "{room}: {word} {temp} °C, nikdo doma ({presence}).",
+        "log_long_away": "{room}: teplota Pryč {temp} °C, dlouhodobá nepřítomnost.",
+        "log_back": "{room}: {word} {temp} °C, někdo je doma ({presence}).",
+        "log_schedule": "{room}: {word} {temp} °C podle rozvrhu ({schedule}).",
+        "log_schedule_until": "{room}: {word} {temp} °C podle rozvrhu ({schedule}) do {until}.",
+        "log_comfort": "{room}: komfort {temp} °C.",
+    },
+    "en": {
+        "frost": "Frost protection: the room is below {frost} °C and heats at full power.",
+        "window": "Open window: the valve is closed.",
+        "manual": "Manual heating: the valve is open while manual heating runs.",
+        "room_off": "The room is off.",
+        "summer": "Summer: no heating.",
+        "system_off": "Heating is off.",
+        "system_away": "Away mode: {temp} °C.",
+        "override": "Manual change: {temp} °C, schedule and presence are not used.",
+        "preheat": "Preheating to {temp} °C by {until} ({source}).",
+        "long_away": "Long absence: {temp} °C.",
+        "absent": "{Word} {temp} °C: nobody home ({presence}).",
+        "schedule_eco": "Setback {temp} °C by schedule ({schedule}).",
+        "schedule_eco_until": "Setback {temp} °C by schedule ({schedule}) until {until}.",
+        "schedule_comfort": "Comfort {temp} °C by schedule ({schedule}).",
+        "schedule_comfort_until": "Comfort {temp} °C by schedule ({schedule}) until {until}.",
+        "comfort": "Comfort {temp} °C.",
+        "return": " Back {until}.",
+        "source_schedule": "comfort starts by schedule",
+        "source_return": "expected return",
+        "word_comfort": "comfort",
+        "word_eco": "setback",
+        "word_away": "away temperature",
+        "log_absent": "{room}: {word} {temp} °C, nobody home ({presence}).",
+        "log_long_away": "{room}: away temperature {temp} °C, long absence.",
+        "log_back": "{room}: {word} {temp} °C, somebody is home ({presence}).",
+        "log_schedule": "{room}: {word} {temp} °C by schedule ({schedule}).",
+        "log_schedule_until": "{room}: {word} {temp} °C by schedule ({schedule}) until {until}.",
+        "log_comfort": "{room}: comfort {temp} °C.",
+    },
+}
+
+
+def entity_name(hass: HomeAssistant, entity_id: str | None) -> str:
+    """Friendly name of an entity, or its ID when it does not exist (yet)."""
+    if not entity_id:
+        return "?"
+    state = hass.states.get(entity_id)
+    return state.name if state else entity_id
+
+
+def _room_values(
+    hass: HomeAssistant,
+    *,
+    temp: Any,
+    preset: str,
+    until: Any,
+    presence: str | None,
+    schedule: str | None,
+) -> dict[str, Any]:
+    texts = ROOM[language(hass)]
+    word = texts.get(f"word_{preset}", texts["word_comfort"])
+    return {
+        "temp": number(hass, temp) if temp is not None else "?",
+        "until": moment(until),
+        "presence": entity_name(hass, presence),
+        "schedule": entity_name(hass, schedule),
+        "word": word,
+        "Word": word[:1].upper() + word[1:],
+    }
+
+
+def room_detail(hass: HomeAssistant, room: Any) -> str:
+    """Sentence that explains the target of a room (attribute `target_detail`)."""
+    texts = ROOM[language(hass)]
+    reason = room.target_reason.value
+    values = _room_values(
+        hass,
+        temp=room.target,
+        preset=room.effective_preset.value,
+        until=room.target_until,
+        presence=room.presence_entity,
+        schedule=room.schedule_entity,
+    )
+    values["frost"] = number(hass, room.cfg.frost_temp)
+    values["source"] = texts.get(f"source_{room.preheat_source}", "")
+    key = reason
+    if reason.startswith("schedule_") and room.target_until is not None:
+        key = f"{reason}_until"
+    text = texts[key].format_map(_Defaults(values))
+    if reason in ("absent", "long_away") and room.target_until is not None:
+        text += texts["return"].format_map(_Defaults(values))
+    return text
+
+
+def room_target_text(hass: HomeAssistant, params: Mapping[str, Any]) -> str:
+    """Logbook sentence when presence or the schedule changed a room's target."""
+    texts = ROOM[language(hass)]
+    values = _room_values(
+        hass,
+        temp=params.get("target"),
+        preset=str(params.get("preset")),
+        until=params.get("target_until"),
+        presence=params.get("presence_entity"),
+        schedule=params.get("schedule_entity"),
+    )
+    values["room"] = params.get("room", "?")
+    reason = params.get("reason")
+    if reason == "absent":
+        key = "log_absent"
+    elif reason == "long_away":
+        key = "log_long_away"
+    elif params.get("previous") in ("absent", "long_away"):
+        key = "log_back"
+    elif reason in ("schedule_eco", "schedule_comfort"):
+        key = "log_schedule_until" if params.get("target_until") else "log_schedule"
+    else:
+        key = "log_comfort"
+    return texts[key].format_map(_Defaults(values))

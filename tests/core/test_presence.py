@@ -13,6 +13,7 @@ from custom_components.hydronic_heating.core.model import (
     RoomHvacMode,
     SystemMode,
     SystemState,
+    TargetReason,
     ValveReason,
 )
 from custom_components.hydronic_heating.core.presence import HeatRate
@@ -250,3 +251,60 @@ def test_preheat_before_the_house_schedule() -> None:
     house.run(3600)
     assert obyvak.preheating
     assert obyvak.preheat_source == "schedule"
+
+
+def test_target_reason_and_presence_source() -> None:
+    """Why a room has its target, and which presence entity it follows."""
+    ctrl = controller(
+        room("obyvak"),
+        room("loznice", **{c.CONF_PRESENCE_ENTITY: "person.ronny"}),
+        **{
+            **PRESENCE,
+            c.CONF_HOUSE_SCHEDULE_ENTITY: "schedule.dum",
+            c.CONF_PREHEAT_ENABLED: False,
+        },
+    )
+    house = House(ctrl, temperatures={"obyvak": 20.0, "loznice": 20.0})
+    house.set(FAMILY, "home")
+    house.set(LONG_AWAY, "off")
+    house.set(RETURN, "unknown")
+    house.set("person.ronny", "home")
+    night_ends = T0 + timedelta(hours=8)
+    house.set("schedule.dum", "off", next_event=night_ends)
+    house.step()
+    obyvak, loznice = ctrl.rooms["id_obyvak"], ctrl.rooms["id_loznice"]
+    assert (obyvak.presence_entity, obyvak.presence_source) == (FAMILY, "house")
+    assert (loznice.presence_entity, loznice.presence_source) == ("person.ronny", "room")
+    assert obyvak.target_reason is TargetReason.SCHEDULE_ECO
+    assert obyvak.target_until == night_ends
+
+    # Ronny leaves: only the bedroom follows her, it is logged with the reason.
+    house.set("person.ronny", "not_home")
+    house.set("schedule.dum", "on", next_event=night_ends)
+    house.now += timedelta(seconds=30)
+    house.step()
+    assert loznice.target_reason is TargetReason.ABSENT
+    assert obyvak.target_reason is TargetReason.SCHEDULE_COMFORT
+    logged = {d.params["room"]: d.params for d in ctrl.decisions if d.kind == "room_target"}
+    assert logged["Loznice"]["reason"] == "absent"
+    assert logged["Loznice"]["presence_entity"] == "person.ronny"
+    assert logged["Obyvak"]["reason"] == "schedule_comfort"
+
+    ctrl.rooms["id_obyvak"].set_target(22.0, house.now)
+    house.run(30)
+    assert obyvak.target_reason is TargetReason.OVERRIDE
+    assert not [d for d in ctrl.decisions if d.kind == "room_target"]
+
+
+def test_target_reason_preheat_and_no_presence() -> None:
+    ctrl = controller(
+        room("obyvak", **{c.CONF_SCHEDULE_ENTITY: "schedule.obyvak"}),
+        **{c.CONF_HAS_BYPASS: True, c.CONF_PREHEAT_MAX: 1},
+    )
+    house = House(ctrl, temperatures={"obyvak": 19.0})
+    house.set("schedule.obyvak", "off", next_event=T0 + timedelta(minutes=30))
+    house.step()
+    obyvak = ctrl.rooms["id_obyvak"]
+    assert obyvak.presence_source == "none"
+    assert obyvak.target_reason is TargetReason.PREHEAT
+    assert obyvak.target_until == T0 + timedelta(minutes=30)

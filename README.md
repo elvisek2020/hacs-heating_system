@@ -101,6 +101,15 @@ Přítomnost se nastavuje běžnými entitami, například vlastním modulem př
 
 Bez nastavené přítomnosti a bez rozvrhu se nic nemění.
 
+**Proč má místnost zrovna komfort nebo útlum:**
+- Termostat místnosti má atributy:
+  - `target_reason`: důvod cíle, třeba `schedule_eco`, `absent`, `preheat`, `override` nebo `window`,
+  - `target_until`: do kdy cíl platí,
+  - `target_detail`: celá věta, například „Útlum 19 °C: nikdo doma (Rodiče doma).“,
+  - `presence_entity` a `presence_source`: podle čí přítomnosti místnost jede (`room` = vlastní, `house` = celý dům).
+- Dashboard ukazuje u místnosti tuhle větu a dlaždice přítomnosti a rozvrhu, podle kterých jede. Když je přítomnost místnosti skupina, ukáže i její členy.
+- Když místnost změní cíl kvůli přítomnosti nebo rozvrhu, zapíše se to do logbooku, například „Kuchyně: útlum 19 °C, nikdo doma (Rodiče doma).“
+
 ## Proč kotel topí nebo stojí
 
 Ochrana kotle někdy drží kotel v chodu nebo ve stání i proti tomu, co zrovna chcete. Například po **Stop** kotel doběhne svou minimální dobu běhu. Proto integrace vždy ukazuje, proč je kotel v aktuálním stavu a kdy se to změní:

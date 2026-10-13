@@ -140,6 +140,37 @@ class ValveReason(StrEnum):
     MIN_FLOW = "min_flow"
 
 
+class TargetReason(StrEnum):
+    """Why a room has its current target (attribute `target_reason`)."""
+
+    FROST = "frost"
+    WINDOW = "window"
+    MANUAL = "manual"
+    ROOM_OFF = "room_off"
+    SUMMER = "summer"
+    SYSTEM_OFF = "system_off"
+    SYSTEM_AWAY = "system_away"
+    OVERRIDE = "override"
+    PREHEAT = "preheat"
+    LONG_AWAY = "long_away"
+    ABSENT = "absent"
+    SCHEDULE_ECO = "schedule_eco"
+    SCHEDULE_COMFORT = "schedule_comfort"
+    COMFORT = "comfort"
+
+
+# Reasons that follow presence or the schedule; their changes go to the logbook.
+PRESENCE_SCHEDULE_REASONS = frozenset(
+    {
+        TargetReason.LONG_AWAY,
+        TargetReason.ABSENT,
+        TargetReason.SCHEDULE_ECO,
+        TargetReason.SCHEDULE_COMFORT,
+        TargetReason.COMFORT,
+    }
+)
+
+
 # --- Configuration --------------------------------------------------------
 
 

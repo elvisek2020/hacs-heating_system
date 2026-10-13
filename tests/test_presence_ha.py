@@ -119,3 +119,71 @@ async def test_house_schedule_in_rooms_and_dashboard(hass: HomeAssistant) -> Non
     tile = next(c for c in system if c.get("entity") == "schedule.dum")
     assert tile["name"] == "House schedule"
     assert tile["state_content"] == ["state", "next_event"]
+
+
+async def test_room_shows_what_it_follows(hass: HomeAssistant) -> None:
+    """Presence group with members, schedule and the reason of the target."""
+    hass.states.async_set(
+        "binary_sensor.rodice_doma",
+        "on",
+        {"entity_id": ["person.elvisek", "person.ronny"], "friendly_name": "Rodiče doma"},
+    )
+    hass.states.async_set("person.elvisek", "home")
+    hass.states.async_set("person.ronny", "home")
+    hass.states.async_set(
+        "binary_sensor.nekdo_doma",
+        "on",
+        {"people": ["Zdeněk", "Adam"], "friendly_name": "Někdo doma"},
+    )
+    hass.states.async_set("schedule.dum", "on", {"friendly_name": "Topení dům"})
+    entry = await _setup(
+        hass,
+        **{
+            CONF_HOUSE_PRESENCE_ENTITY: "binary_sensor.nekdo_doma",
+            CONF_HOUSE_SCHEDULE_ENTITY: "schedule.dum",
+        },
+    )
+    kitchen = next(s for s in entry.subentries.values() if s.unique_id == "obyvak")
+    hass.config_entries.async_update_subentry(
+        entry, kitchen, data={**kitchen.data, "presence_entity": "binary_sensor.rodice_doma"}
+    )
+    await _settle(hass)
+    living = hass.states.get("climate.hh_obyvak").attributes
+    assert living["presence_entity"] == "binary_sensor.rodice_doma"
+    assert living["presence_source"] == "room"
+    assert living["target_reason"] == "schedule_comfort"
+    assert living["target_detail"] == "Comfort 21 °C by schedule (Topení dům)."
+    bedroom = hass.states.get("climate.hh_loznice").attributes
+    assert bedroom["presence_source"] == "house"
+
+    events = async_capture_events(hass, EVENT_DECISION)
+    hass.states.async_set(
+        "binary_sensor.rodice_doma",
+        "off",
+        {"entity_id": ["person.elvisek", "person.ronny"], "friendly_name": "Rodiče doma"},
+    )
+    await _settle(hass)
+    living = hass.states.get("climate.hh_obyvak").attributes
+    assert living["target_reason"] == "absent"
+    assert living["target_detail"] == "Setback 19 °C: nobody home (Rodiče doma)."
+    logged = [e.data for e in events if e.data["kind"] == "room_target"]
+    assert logged[0]["entity_id"] == "climate.hh_obyvak"
+    assert logged[0]["message"] == ("[Shadow] Obývák: setback 19 °C, nobody home (Rodiče doma).")
+
+    dashboard = await hass.services.async_call(
+        "hydronic_heating", "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    rooms = {s["cards"][0]["heading"]: s["cards"] for s in dashboard["views"][0]["sections"][4:]}
+    living_cards = rooms["Obývák"]
+    assert "state_attr('climate.hh_obyvak', 'target_detail')" in living_cards[2]["content"]
+    entities = [c.get("entity") for c in living_cards]
+    assert entities[-4:] == [
+        "binary_sensor.rodice_doma",
+        "schedule.dum",
+        "person.elvisek",
+        "person.ronny",
+    ]
+    bedroom_cards = rooms["Ložnice"]
+    presence = next(c for c in bedroom_cards if c.get("entity") == "binary_sensor.nekdo_doma")
+    assert presence["name"] == "Presence (house)"
+    assert presence["state_content"] == ["state", "people"]

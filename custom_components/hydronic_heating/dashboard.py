@@ -24,6 +24,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "history": "Grafy",
         "heating": "Topení",
         "boiler": "Kotel",
+        "boiler_operation": "Provoz kotle",
         "outdoor": "Venku",
         "rooms": "Místnosti",
         "system": "Systém",
@@ -44,6 +45,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "open_windows": "Okna",
         "presence": "Doma",
         "house_schedule": "Rozvrh domu",
+        "presence_room": "Přítomnost",
+        "presence_house": "Přítomnost (dům)",
+        "schedule_room": "Rozvrh",
+        "schedule_house": "Rozvrh (dům)",
         "long_away": "Dlouhodobě pryč",
         "heat_demand": "Požadavek na teplo",
         "demand_total": "Celkový požadavek",
@@ -93,6 +98,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "history": "History",
         "heating": "Heating",
         "boiler": "Boiler",
+        "boiler_operation": "Boiler operation",
         "outdoor": "Outdoor",
         "rooms": "Rooms",
         "system": "System",
@@ -114,6 +120,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "open_windows": "Windows",
         "presence": "Home",
         "house_schedule": "House schedule",
+        "presence_room": "Presence",
+        "presence_house": "Presence (house)",
+        "schedule_room": "Schedule",
+        "schedule_house": "Schedule (house)",
         "long_away": "Long absence",
         "heat_demand": "Heat demand",
         "demand_total": "Total demand",
@@ -310,9 +320,18 @@ def _overview(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) 
                 visibility=_when_on(cfg.long_away_entity),
             )
         )
-    sections = [_system_section(runtime, ids, text), _boiler_section(ids, text)]
+    # Fixed order: one row of control blocks, the shadow or demo note across the
+    # whole width (it ends the row, so rooms never mix with the control blocks),
+    # then the rooms.
+    sections = [
+        _system_section(runtime, ids, text),
+        _boiler_section(ids, text),
+        _boiler_operation_section(ids, text),
+    ]
     if runtime.layout is not None:
-        sections.append(_demo_section(runtime, text))
+        sections.append({**_demo_section(runtime, text), "column_span": 3})
+    else:
+        sections.append(_shadow_section(shadow, text))
     sections.extend(_room_section(runtime, ids, text, room) for room in runtime.rooms)
     return {
         "title": text["overview"],
@@ -325,21 +344,27 @@ def _overview(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) 
     }
 
 
-def _system_section(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) -> dict:
-    sid = ids.system
-    durations = runtime.controller.cfg.manual_durations
-    shadow = sid("switch", "shadow_mode")
-    cards: list[dict[str, Any]] = [_heading(text["heating"], "mdi:radiator")]
-    if runtime.layout is None:
-        # In the demo the demo section explains what is switched.
-        cards.append(
+def _shadow_section(shadow: str, text: dict[str, str]) -> dict:
+    """Warning that nothing is switched; shown only in shadow mode (not in the demo)."""
+    return {
+        "type": "grid",
+        "column_span": 3,
+        "visibility": _when_on(shadow),
+        "cards": [
             {
                 "type": "markdown",
                 "content": f'<ha-alert alert-type="warning">{text["shadow_banner"]}</ha-alert>',
                 "text_only": True,
-                "visibility": _when_on(shadow),
+                "grid_options": FULL,
             }
-        )
+        ],
+    }
+
+
+def _system_section(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str]) -> dict:
+    sid = ids.system
+    durations = runtime.controller.cfg.manual_durations
+    cards: list[dict[str, Any]] = [_heading(text["heating"], "mdi:radiator")]
     cards += [
         _tile(
             sid("climate", "system"),
@@ -410,10 +435,6 @@ def _boiler_section(ids: _Ids, text: dict[str, str]) -> dict:
                 "content": f"{{{{ state_attr('{reason}', 'detail') }}}}",
                 "text_only": True,
             },
-            _half(
-                sid("binary_sensor", "boiler_command"), text["boiler_command"], color="deep-orange"
-            ),
-            _half(sid("binary_sensor", "heat_demand"), text["heat_demand"], color="orange"),
             _full(
                 sid("sensor", "demand_total"),
                 text["demand_total"],
@@ -426,6 +447,21 @@ def _boiler_section(ids: _Ids, text: dict[str, str]) -> dict:
                 text["outdoor_damped"],
                 features=[trend],
             ),
+        ],
+    }
+
+
+def _boiler_operation_section(ids: _Ids, text: dict[str, str]) -> dict:
+    """Command, demand, statistics and blocks of the boiler."""
+    sid = ids.system
+    return {
+        "type": "grid",
+        "cards": [
+            _heading(text["boiler_operation"], "mdi:chart-box-outline"),
+            _half(
+                sid("binary_sensor", "boiler_command"), text["boiler_command"], color="deep-orange"
+            ),
+            _half(sid("binary_sensor", "heat_demand"), text["heat_demand"], color="orange"),
             _half(sid("sensor", "boiler_duty"), text["boiler_duty"]),
             _half(sid("sensor", "boiler_starts_today"), text["boiler_starts_today"]),
             _half(sid("sensor", "duty_limit"), text["duty_limit"]),
@@ -475,6 +511,7 @@ def _room_section(
 ) -> dict:
     window = ids.room("binary_sensor", room, "window")
     problem = ids.room("binary_sensor", room, "problem")
+    climate = ids.room("climate", room, "")
     layout = runtime.layout
     demo = (
         next((d for d in layout.rooms if d.room.room_id == room.room_id), None)
@@ -502,7 +539,7 @@ def _room_section(
             ],
         ),
         _full(
-            ids.room("climate", room, ""),
+            climate,
             text["temperature"],
             state_content=["current_temperature", "hvac_action"],
             features=[
@@ -510,6 +547,12 @@ def _room_section(
                 {"type": "climate-preset-modes", "style": "dropdown", "preset_modes": PRESETS},
             ],
         ),
+        # Why comfort, setback or away right now (target_detail of the climate).
+        {
+            "type": "markdown",
+            "content": f"{{{{ state_attr('{climate}', 'target_detail') }}}}",
+            "text_only": True,
+        },
         _full(
             ids.room("sensor", room, "demand"),
             text["demand"],
@@ -521,11 +564,45 @@ def _room_section(
     # travel time, so "open" means open regardless of NO/NC heads.
     valve_name = text["valve"] if len(room.valves) == 1 else text["valves"]
     cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name))
+    cards.extend(_room_basis(runtime, text, room))
     if demo is not None and layout is not None and layout.house:
         cards.append(_heading(text["simulation"], "mdi:test-tube", subtitle=True))
         cards.append(_half(demo.window.entity_id, text["window"], color="blue"))
         cards.append(_half(demo.sensor_fault.entity_id, text["demo_sensor_fault"], color="red"))
     return {"type": "grid", "cards": cards}
+
+
+def _room_basis(
+    runtime: HydronicHeatingRuntime, text: dict[str, str], room: RoomConfig
+) -> list[dict[str, Any]]:
+    """Presence and schedule the room follows; members of a presence group.
+
+    Works with any entities: a group lists its members in `entity_id`, a presence
+    module may list names in `people`.
+    """
+    cfg = runtime.controller.cfg
+    presence = room.presence_entity or cfg.house_presence_entity
+    schedule = room.schedule_entity or cfg.house_schedule_entity
+    tiles: list[dict[str, Any]] = []
+    if presence:
+        name = text["presence_room"] if room.presence_entity else text["presence_house"]
+        state = runtime.hass.states.get(presence)
+        attrs = state.attributes if state else {}
+        extra: dict[str, Any] = {}
+        if isinstance(attrs.get("people"), list):
+            extra["state_content"] = ["state", "people"]
+        tiles.append(_tile(presence, name, color="green", **extra))
+    if schedule:
+        name = text["schedule_room"] if room.schedule_entity else text["schedule_house"]
+        tiles.append(_tile(schedule, name, state_content=["state", "next_event"]))
+    if room.presence_entity:
+        # Members only for the room's own group, the house group would repeat everywhere.
+        state = runtime.hass.states.get(room.presence_entity)
+        members = state.attributes.get("entity_id") if state else None
+        if isinstance(members, list | tuple):
+            tiles.extend(_tile(member, color="green") for member in members)
+    size = FULL if len(tiles) == 1 else HALF
+    return [{**tile, "grid_options": size} for tile in tiles]
 
 
 # --- History ------------------------------------------------------------------

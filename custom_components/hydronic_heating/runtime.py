@@ -392,7 +392,7 @@ class HydronicHeatingRuntime:
                 entity_id = decision.params.get("entity_id")
             elif decision.kind == "presence":
                 entity_id = self.system_entity_id("climate", "system")
-            elif decision.kind == "preheat":
+            elif decision.kind in ("preheat", "room_target"):
                 entity_id = registry.async_get_entity_id(
                     "climate",
                     DOMAIN,

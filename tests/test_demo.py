@@ -271,8 +271,20 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
         "binary_sensor.hh_boiler_command",
         "sensor.hh_flow_setpoint",
     }
-    headings = [s["cards"][0]["heading"] for s in overview["sections"]]
-    assert headings[-2:] == ["Obývák", "Ložnice"]
+    # Control row (heating, boiler, boiler operation), demo across the width, rooms.
+    headings = [
+        next((c["heading"] for c in s["cards"] if c["type"] == "heading"), None)
+        for s in overview["sections"]
+    ]
+    assert headings == [
+        "Heating",
+        "Boiler",
+        "Boiler operation",
+        "Demo · virtual house",
+        "Obývák",
+        "Ložnice",
+    ]
+    assert overview["sections"][3]["column_span"] == 3
     living = overview["sections"][-2]["cards"]
     assert living[0]["icon"] == "mdi:sofa-outline"
     assert living[1]["entity"] == "climate.hh_obyvak"
@@ -308,8 +320,16 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     assert boiler[2]["entity"] == "sensor.hh_boiler_hold_ends_at"
     assert "visibility" in boiler[2]
     assert "state_attr('sensor.hh_boiler_reason', 'detail')" in boiler[3]["content"]
+    assert [c.get("entity") for c in boiler[4:]] == [
+        "sensor.hh_demand_total",
+        "sensor.hh_flow_setpoint",
+        "sensor.hh_outdoor_temperature_damped",
+    ]
+    operation = overview["sections"][2]["cards"]
+    assert operation[1]["entity"] == "binary_sensor.hh_boiler_command"
+    assert operation[-1]["entity"] == "binary_sensor.hh_problem"
     # In the demo the demo section explains what is switched, not the shadow banner.
-    assert overview["sections"][0]["cards"][1]["type"] == "tile"
+    assert "shadow_mode" not in str(overview["sections"][3])
     timeline = history["sections"][1]["cards"][2]["entities"]
     assert timeline[0]["entity"] == "sensor.hh_boiler_reason"
     assert timeline[2]["entity"] == "switch.hh_demo_boiler"
@@ -321,12 +341,15 @@ async def test_dashboard_shadow_banner(hass: HomeAssistant) -> None:
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    banner = dashboard["views"][0]["sections"][0]["cards"][1]
-    assert banner["type"] == "markdown"
-    assert banner["content"].startswith('<ha-alert alert-type="warning">**Shadow mode:**')
-    assert banner["visibility"] == [
+    # Right after the boiler operation block, shown only in shadow mode.
+    section = dashboard["views"][0]["sections"][3]
+    assert section["column_span"] == 3
+    assert section["visibility"] == [
         {"condition": "state", "entity": "switch.hh_shadow_mode", "state": "on"}
     ]
+    banner = section["cards"][0]
+    assert banner["type"] == "markdown"
+    assert banner["content"].startswith('<ha-alert alert-type="warning">**Shadow mode:**')
 
 
 async def test_dashboard_room_shows_the_valve_not_the_heads(hass: HomeAssistant) -> None:

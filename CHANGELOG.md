@@ -5,6 +5,30 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.8.0 — 2026-10-13
+
+### ✨ Novinky
+
+- **U místnosti je vidět, proč má zrovna komfort nebo útlum.**
+  - Pod termostatem je věta, například „Útlum 19 °C: nikdo doma (Rodiče doma).“, „Komfort 21 °C podle rozvrhu (Topení dům) do 22:30.“ nebo „Předtápění na 21 °C do 14:30.“
+  - Termostat má atributy `target_reason`, `target_until`, `target_detail`, `presence_entity` a `presence_source` (vlastní přítomnost místnosti, nebo celého domu).
+- **Přítomnost a rozvrh místnosti na dashboardu.**
+  - U místnosti jsou dlaždice přítomnosti a rozvrhu, podle kterých jede. Je u nich poznat, jestli jde o vlastní nastavení, nebo o celý dům.
+  - Když je přítomnost místnosti skupina, ukážou se i její členové. Entita se seznamem jmen (atribut `people`) je ukáže rovnou na dlaždici.
+- **Deník:** když místnost změní cíl kvůli přítomnosti nebo rozvrhu, zapíše se věta do logbooku, například „Kuchyně: útlum 19 °C, nikdo doma (Rodiče doma).“
+
+### 🎨 Vzhled
+
+- **Přehled má pevné pořadí.**
+  - Nahoře je jedna řada: Topení, Kotel a Provoz kotle.
+  - Pod ní je přes celou šířku upozornění na shadow režim, v demu blok Demo.
+  - Teprve potom jsou místnosti. Místnosti se už nemíchají mezi bloky řízení.
+- **Kotel je rozdělený na dva bloky:**
+  - *Kotel*: proč, další změna, vysvětlení, celkový požadavek, teplota vody a venku,
+  - *Provoz kotle*: povel, požadavek na teplo, střída, starty, omezení střídy, léto, blokace okny a porucha.
+
+Po aktualizaci restartuj Home Assistant a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.7.0 — 2026-10-13
 
 ### ✨ Novinky

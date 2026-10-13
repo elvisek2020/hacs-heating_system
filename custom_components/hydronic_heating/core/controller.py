@@ -12,6 +12,7 @@ from .exercise import ExerciseScheduler
 from .heat_source import NO_FLOW_MARGIN_S, Arbitration, BoilerSequencer, RoomDemand, arbitrate
 from .model import (
     HOLD_REASONS,
+    PRESENCE_SCHEDULE_REASONS,
     BoilerPhase,
     BoilerReason,
     BoilerStatus,
@@ -25,6 +26,7 @@ from .model import (
     SystemConfig,
     SystemMode,
     SystemState,
+    TargetReason,
     ValveConfig,
     ValvePhysical,
     ValveReason,
@@ -202,6 +204,7 @@ class HydronicController:
             window_outdoor_condition=cfg.window_outdoor_condition,
             window_max_block_s=cfg.window_max_block_s,
             house_schedule_entity=cfg.house_schedule_entity,
+            house_presence_entity=cfg.house_presence_entity,
             house_present=self.house_present,
             long_away=self.long_away and mode is SystemMode.AUTO,
             expected_return=self.expected_return,
@@ -209,8 +212,11 @@ class HydronicController:
             preheat_enabled=cfg.preheat_enabled,
             preheat_max_s=cfg.preheat_max_s,
             timezone=cfg.timezone,
+            manual=manual,
+            no_heat_reason=None if heating_allowed else ("summer" if self.summer else "off"),
         )
         preheating_before = {room_id: r.preheating for room_id, r in self.rooms.items()}
+        reasons_before = {room_id: r.target_reason for room_id, r in self.rooms.items()}
         for room in self.rooms.values():
             room.update(snap, ctx)
 
@@ -275,6 +281,7 @@ class HydronicController:
         self.decisions = self._boiler_decisions(previous, was_on=was_on, now_on=boiler_on)
         if previous is not None and self.ready:
             self.decisions += self._presence_decisions(presence_before, preheating_before)
+            self.decisions += self._room_target_decisions(reasons_before)
         self._learn_heat_rates(now)
         self.last_step = now
 
@@ -814,6 +821,40 @@ class HydronicController:
                         },
                     )
                 )
+        return decisions
+
+    def _room_target_decisions(self, reasons_before: dict[str, TargetReason]) -> list[Decision]:
+        """Log rooms whose target changed because of presence or the schedule."""
+        decisions: list[Decision] = []
+        for room_id, room in self.rooms.items():
+            before = reasons_before.get(room_id)
+            reason = room.target_reason
+            # Only changes between presence and schedule reasons; a manual stop,
+            # a window or a permanent change explain themselves elsewhere.
+            if (
+                before is None
+                or reason is before
+                or before not in PRESENCE_SCHEDULE_REASONS
+                or reason not in PRESENCE_SCHEDULE_REASONS
+            ):
+                continue
+            decisions.append(
+                Decision(
+                    "room_target",
+                    self.boiler_status,
+                    {
+                        "room": room.cfg.name,
+                        "room_id": room_id,
+                        "reason": reason.value,
+                        "previous": before.value,
+                        "target": room.target,
+                        "preset": room.effective_preset.value,
+                        "target_until": room.target_until,
+                        "presence_entity": room.presence_entity,
+                        "schedule_entity": room.schedule_entity,
+                    },
+                )
+            )
         return decisions
 
     def _off_cause(self, previous: BoilerStatus) -> str:
