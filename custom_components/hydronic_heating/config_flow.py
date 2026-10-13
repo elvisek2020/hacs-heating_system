@@ -88,7 +88,6 @@ from .const import (
     CONF_HEAT_SOURCE_SELECT_ON,
     CONF_HEAT_SOURCE_TYPE,
     CONF_HEATING_LIMIT,
-    CONF_HEATING_LIMIT_HYSTERESIS,
     CONF_HOT_TOLERANCE,
     CONF_HOUSE_PRESENCE_ENTITY,
     CONF_HOUSE_SCHEDULE_ENTITY,
@@ -113,6 +112,7 @@ from .const import (
     CONF_ROOM_CALL_THRESHOLD,
     CONF_ROOM_NAME,
     CONF_SCHEDULE_ENTITY,
+    CONF_SCHEDULE_MODE,
     CONF_SENSOR_FALLBACK,
     CONF_SENSOR_MAX,
     CONF_SENSOR_MIN,
@@ -122,7 +122,6 @@ from .const import (
     CONF_STARTUP_GRACE,
     CONF_STOP_POLICY,
     CONF_STOP_RESPECTS_MIN_ON,
-    CONF_SUMMER_SWITCH_DELAY,
     CONF_TPI_COEF_EXT,
     CONF_TPI_COEF_INT,
     CONF_USE_FORECAST,
@@ -159,6 +158,7 @@ from .const import (
     MANUAL_DURATIONS_MAX_COUNT,
     MANUAL_RESTART_POLICIES,
     MANUAL_SCOPES,
+    SCHEDULE_MODES,
     SENSOR_FALLBACKS,
     STOP_POLICIES,
     SUBENTRY_ROOM,
@@ -443,9 +443,7 @@ def _equithermal_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_FLOW_TEMP_MIN, values): _number(20, 85, unit=_CELSIUS),
             _required(CONF_FLOW_TEMP_MAX, values): _number(20, 85, unit=_CELSIUS),
             _required(CONF_HEATING_LIMIT, values): _number(10, 22, 0.5, _CELSIUS),
-            _required(CONF_HEATING_LIMIT_HYSTERESIS, values): _number(0.5, 5, 0.5, "K"),
             _required(CONF_OUTDOOR_DAMPING_HOURS, values): _number(0, 72, unit="h"),
-            _required(CONF_SUMMER_SWITCH_DELAY, values): _number(0, 48, unit="h"),
             _required(CONF_EQUITHERMAL_DUTY_ENABLED, values): _BOOL,
             _required(CONF_BOILER_FIXED_FLOW_TEMP, values): _number(30, 85, unit=_CELSIUS),
             _required(CONF_BOILER_CYCLE_PERIOD, values): _number(10, 60, unit="min"),
@@ -548,10 +546,17 @@ def _room_windows_schema(values: Mapping[str, Any]) -> vol.Schema:
 
 
 def _room_schedule_schema(values: Mapping[str, Any]) -> vol.Schema:
+    mode = values.get(CONF_SCHEDULE_MODE) or (
+        "own" if values.get(CONF_SCHEDULE_ENTITY) else "house"
+    )
     return vol.Schema(
         {
+            vol.Required(CONF_SCHEDULE_MODE, default=mode): _choice(
+                SCHEDULE_MODES, CONF_SCHEDULE_MODE, as_list=True
+            ),
             _optional(CONF_SCHEDULE_ENTITY, values): _entity(SCHEDULE_DOMAINS),
             _optional(CONF_PRESENCE_ENTITY, values): _entity(PRESENCE_DOMAINS),
+            _optional(CONF_EXPECTED_RETURN_ENTITY, values): _entity(["sensor", "input_datetime"]),
         }
     )
 
@@ -1088,12 +1093,19 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
     async def async_step_schedule(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Schedule and presence entities, optional (FR-SCH-01, FR-SCH-02)."""
+        """Schedule (house or own), presence and expected return (FR-SCH-01, FR-SCH-02)."""
         schema = _room_schedule_schema(self._data)
+        errors: Errors = {}
         if user_input is not None:
-            self._data = _apply(self._data, schema, user_input)
-            return await self.async_step_control()
-        return self.async_show_form(step_id="schedule", data_schema=schema)
+            if user_input[CONF_SCHEDULE_MODE] == "own" and not user_input.get(CONF_SCHEDULE_ENTITY):
+                errors[CONF_SCHEDULE_ENTITY] = "schedule_required"
+            else:
+                if user_input[CONF_SCHEDULE_MODE] == "house":
+                    user_input.pop(CONF_SCHEDULE_ENTITY, None)
+                self._data = _apply(self._data, schema, user_input)
+                return await self.async_step_control()
+            schema = self.add_suggested_values_to_schema(schema, user_input)
+        return self.async_show_form(step_id="schedule", data_schema=schema, errors=errors)
 
     async def async_step_control(
         self, user_input: dict[str, Any] | None = None

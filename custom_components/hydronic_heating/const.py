@@ -130,9 +130,7 @@ CONF_CURVE_OFFSET: Final = "curve_offset"
 CONF_FLOW_TEMP_MIN: Final = "flow_temp_min"
 CONF_FLOW_TEMP_MAX: Final = "flow_temp_max"
 CONF_HEATING_LIMIT: Final = "heating_limit"
-CONF_HEATING_LIMIT_HYSTERESIS: Final = "heating_limit_hysteresis"
 CONF_OUTDOOR_DAMPING_HOURS: Final = "outdoor_damping_hours"
-CONF_SUMMER_SWITCH_DELAY: Final = "summer_switch_delay"
 CONF_EQUITHERMAL_DUTY_ENABLED: Final = "equithermal_duty_enabled"
 CONF_BOILER_FIXED_FLOW_TEMP: Final = "boiler_fixed_flow_temp"
 CONF_BOILER_CYCLE_PERIOD: Final = "boiler_cycle_period"
@@ -184,6 +182,9 @@ CONF_WINDOWS: Final = "windows"
 CONF_WINDOW_INVERT: Final = "window_invert"
 
 CONF_SCHEDULE_ENTITY: Final = "schedule_entity"
+# "house" = the house schedule, "own" = the room's own schedule_entity.
+CONF_SCHEDULE_MODE: Final = "schedule_mode"
+SCHEDULE_MODES: Final = ["house", "own"]
 CONF_PRESENCE_ENTITY: Final = "presence_entity"
 
 CONF_CONTROL_ALGORITHM: Final = "control_algorithm"
@@ -250,10 +251,8 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_CURVE_OFFSET: 0,
     CONF_FLOW_TEMP_MIN: 30,
     CONF_FLOW_TEMP_MAX: 75,
-    CONF_HEATING_LIMIT: 15,
-    CONF_HEATING_LIMIT_HYSTERESIS: 2,
+    CONF_HEATING_LIMIT: 13,
     CONF_OUTDOOR_DAMPING_HOURS: 24,
-    CONF_SUMMER_SWITCH_DELAY: 12,
     CONF_EQUITHERMAL_DUTY_ENABLED: False,
     CONF_BOILER_FIXED_FLOW_TEMP: 70,
     CONF_BOILER_CYCLE_PERIOD: 20,

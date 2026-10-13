@@ -5,6 +5,38 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.9.0 — 2026-10-13
+
+### ✨ Novinky
+
+- **Hlavice bez proudu, když kotel stojí.**
+  - Když nikdo nechce teplo a kotel stojí, jsou všechny hlavice v klidové poloze (výchozí bez proudu, NO = otevřeno). Nehřejí a neberou proud zbytečně celé hodiny.
+  - Při požadavku se nejdřív zavřou ventily místností, které teplo nechtějí, a teprve pak naskočí kotel. Start se tím zpozdí zhruba o dobu přestavení hlavic. „Proč“ mezitím ukazuje „Zavírají se ventily“.
+- **Topná sezóna podle průměru venkovní teploty za 4 hodiny.**
+  - Začne hned, jakmile 4h průměr klesne pod hranici (výchozí 13 °C). Skončí po 3 celých dnech po sobě, kdy průměr ani jednou neklesl pod ni.
+  - Nový výběr **Topná sezóna**: Automaticky / Topná sezóna / Mimo sezónu.
+  - Nové entity `binary_sensor.hh_heating_season` a `sensor.hh_outdoor_mean_4h`.
+  - Začátek a konec sezóny se zapíše do logbooku.
+- **Rozvrh místnosti podle domu, nebo vlastní.** V nastavení místnosti (Překonfigurovat → Rozvrh). Úprava vlastního plánu mění jen tuto místnost.
+- **Vlastní očekávaný návrat místnosti.** Místnost s vlastní přítomností předtápí jen podle svého návratu, ne podle návratu domácnosti.
+
+### 🎨 Vzhled
+
+- **Karta místnosti:**
+  - nahoře ovládání: přepínač automaticky / ručně / vypnuto pro rychlý návrat na automatiku, cílová teplota, předvolba,
+  - uprostřed zobrazení: proč, **kdo je doma jménem**, ventil, požadavek,
+  - dole vlastní rozvrh.
+- Pod blokem Provoz kotle je přehled **Kdo je doma**: každá osoba se stavem a časem poslední změny.
+- Nad místnostmi je oddělovač „Místnosti – individuální nastavení“, úplně dole **Vysvětlivky** ke každé dlaždici.
+
+### ⚠️ Změny, které vyžadují zásah
+
+- Režim systému **Léto** je zrušený, nahrazuje ho výběr Topná sezóna. Uložený režim Léto se převede na Mimo sezónu.
+- Zrušené jsou i volby „Hystereze meze vytápění“, „Zpoždění přechodu do léta“ a entita `binary_sensor.hh_summer`. Automatizace, které ji používaly, přepni na `binary_sensor.hh_heating_season`.
+- Hranice 13 °C je výchozí jen pro nové instalace. Zkontroluj ji v Konfigurovat → Ekviterm → **Hranice topné sezóny**.
+
+Po aktualizaci restartuj Home Assistant a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.8.0 — 2026-10-13
 
 ### ✨ Novinky

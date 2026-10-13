@@ -7,10 +7,10 @@
       "window_block": {
         "default": "mdi:window-open-variant"
       },
-      "summer": {
-        "default": "mdi:weather-sunny",
+      "heating_season": {
+        "default": "mdi:radiator",
         "state": {
-          "off": "mdi:snowflake"
+          "off": "mdi:radiator-off"
         }
       }
     },
@@ -37,6 +37,14 @@
       "system_mode": {
         "default": "mdi:radiator"
       },
+      "heating_season": {
+        "default": "mdi:calendar-range",
+        "state": {
+          "auto": "mdi:thermometer-auto",
+          "on": "mdi:radiator",
+          "off": "mdi:radiator-off"
+        }
+      },
       "demo_boiler_behavior": {
         "default": "mdi:water-boiler-alert"
       }
@@ -51,9 +59,10 @@
           "startup": "mdi:progress-clock",
           "idle": "mdi:fire-off",
           "off": "mdi:power",
-          "summer": "mdi:weather-sunny",
+          "summer": "mdi:radiator-off",
           "window_block": "mdi:window-open-variant",
           "pre_open": "mdi:pipe-valve",
+          "pre_close": "mdi:pipe-valve",
           "no_flow_hold": "mdi:pipe-disconnected",
           "min_off_hold": "mdi:timer-sand",
           "max_starts_hold": "mdi:timer-sand",
@@ -99,6 +108,9 @@
       },
       "duty_limit": {
         "default": "mdi:sine-wave"
+      },
+      "outdoor_mean_4h": {
+        "default": "mdi:thermometer-lines"
       }
     },
     "switch": {

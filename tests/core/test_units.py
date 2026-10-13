@@ -11,6 +11,7 @@ from custom_components.hydronic_heating.core.aggregation import aggregate, combi
 from custom_components.hydronic_heating.core.controller import HydronicController
 from custom_components.hydronic_heating.core.heat_source import RoomDemand, arbitrate
 from custom_components.hydronic_heating.core.model import (
+    BoilerReason,
     EntityReading,
     Preset,
     RoomHvacMode,
@@ -18,6 +19,7 @@ from custom_components.hydronic_heating.core.model import (
     SystemState,
     ValveConfig,
     ValvePhysical,
+    ValveReason,
 )
 from custom_components.hydronic_heating.core.safety import OutputTracker
 from custom_components.hydronic_heating.core.valve import (
@@ -124,15 +126,47 @@ def test_valve_commands_for_no_nc_and_valve_domain() -> None:
         room("a", valves=[valve("switch.no")]),
         room("b", valves=[valve("switch.nc", normally_open=False)]),
         room("v", valves=[valve("valve.v")]),
+        room("z"),  # cold, keeps the boiler running
     ]
     ctrl = controller(*rooms, **{c.CONF_HAS_BYPASS: True})
-    house = House(ctrl, temperatures={"a": 25.0, "b": 25.0, "v": 25.0})
+    house = House(ctrl, temperatures={"a": 25.0, "b": 25.0, "v": 25.0, "z": 15.0})
     house.set("switch.nc", "on")  # NC energized = open
-    house.run(60)
-    # All rooms warm: valves closed.
+    house.run(240)  # the warm rooms close their valves first (120 s), then the boiler
+    # The boiler runs for z; the warm rooms close their valves.
+    assert house.boiler_on
     assert house.state("switch.no") == "on"
     assert house.state("switch.nc") == "off"
     assert house.state("valve.v") == "closed"
+
+
+def test_valves_without_current_while_the_boiler_is_idle() -> None:
+    """No heat wanted and the boiler stands: no head draws current (FR-VAL-07)."""
+    ctrl = controller(room("a"), room("b"), **{c.CONF_HAS_BYPASS: True})
+    house = House(ctrl, temperatures={"a": 25.0, "b": 25.0})
+    house.set("switch.hlavice_a", "on")
+    house.set("switch.hlavice_b", "on")
+    house.run(60)
+    assert not house.boiler_on
+    assert house.state("switch.hlavice_a") == "off"
+    assert house.state("switch.hlavice_b") == "off"
+    assert ctrl.valve_status["switch.hlavice_a"].reason is ValveReason.IDLE_POLICY
+
+
+def test_unneeded_valves_close_before_the_boiler_starts() -> None:
+    """Heat wanted in one room: the other room's valve closes first, then the boiler."""
+    ctrl = controller(room("a"), room("b"), **{c.CONF_HAS_BYPASS: True})
+    house = House(ctrl, temperatures={"a": 25.0, "b": 25.0})
+    house.run(60)
+    assert house.state("switch.hlavice_b") == "off"  # idle, open
+    house.temp("a", 15.0)
+    house.run(30)
+    assert house.state("switch.hlavice_b") == "on"  # closing
+    assert not house.boiler_on
+    assert ctrl.boiler_status.reason is BoilerReason.PRE_CLOSE
+    house.run(120)
+    assert not house.boiler_on  # valve close time 120 s from the observed change
+    house.run(30)
+    assert house.boiler_on
 
 
 # --- Arbitration (FR-ARB-01, FR-ARB-02) ---------------------------------------
@@ -334,11 +368,11 @@ def test_preset_change_is_override() -> None:
 
 
 def test_room_off_closes_valve_but_keeps_frost() -> None:
-    ctrl = controller(room("obyvak"), **{c.CONF_HAS_BYPASS: True})
+    ctrl = controller(room("obyvak"), room("b"), **{c.CONF_HAS_BYPASS: True})
     ctrl.rooms["id_obyvak"].set_hvac_mode(RoomHvacMode.OFF, T0)
-    house = House(ctrl, temperatures={"obyvak": 15.0})
+    house = House(ctrl, temperatures={"obyvak": 15.0, "b": 15.0})
     house.run(60)
-    assert house.state("switch.hlavice_obyvak") == "on"  # closed
+    assert house.state("switch.hlavice_obyvak") == "on"  # closed while b heats
     house.temp("obyvak", 4.0)
     house.run(30)
     assert house.state("switch.hlavice_obyvak") == "off"  # open for frost
@@ -407,8 +441,8 @@ def test_long_window_and_not_reached_problems() -> None:
 
 
 def test_valve_command_failure_is_reported() -> None:
-    ctrl = controller(room("obyvak"), **{c.CONF_HAS_BYPASS: True})
-    house = House(ctrl, temperatures={"obyvak": 25.0})
+    ctrl = controller(room("obyvak"), room("b"), **{c.CONF_HAS_BYPASS: True})
+    house = House(ctrl, temperatures={"obyvak": 25.0, "b": 15.0})
     house.ignore.add("switch.hlavice_obyvak")
     house.run(120, every=5)
     assert "valve_command_switch.hlavice_obyvak" in ctrl.problems

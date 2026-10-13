@@ -31,6 +31,12 @@ async def async_get_config_entry_diagnostics(
             "heat_request": ctrl.heat_request,
             "window_block": ctrl.window_block,
             "summer": ctrl.summer,
+            "season": {
+                "active": ctrl.season.active,
+                "mode": ctrl.season.mode,
+                "mean_4h": ctrl.season.mean_4h,
+                "days_above": ctrl.season.days_above,
+            },
             "fault_reason": ctrl.fault_reason,
             "blocked_by": ctrl.blocked_by,
             "boiler_phase": ctrl.sequencer.phase.value,

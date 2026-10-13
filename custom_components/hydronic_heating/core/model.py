@@ -25,7 +25,6 @@ class SystemMode(StrEnum):
     MANUAL = "manual"
     OFF = "off"
     AWAY = "away"
-    SUMMER = "summer"
 
 
 class SystemState(StrEnum):
@@ -94,6 +93,7 @@ class BoilerReason(StrEnum):
     SUMMER = "summer"
     WINDOW_BLOCK = "window_block"
     PRE_OPEN = "pre_open"
+    PRE_CLOSE = "pre_close"
     NO_FLOW_HOLD = "no_flow_hold"
     MIN_OFF_HOLD = "min_off_hold"
     MAX_STARTS_HOLD = "max_starts_hold"
@@ -111,6 +111,7 @@ class BoilerReason(StrEnum):
 HOLD_REASONS = frozenset(
     {
         BoilerReason.PRE_OPEN,
+        BoilerReason.PRE_CLOSE,
         BoilerReason.NO_FLOW_HOLD,
         BoilerReason.MIN_OFF_HOLD,
         BoilerReason.MAX_STARTS_HOLD,
@@ -238,6 +239,7 @@ class RoomConfig:
     window_invert: bool
     schedule_entity: str | None
     presence_entity: str | None
+    expected_return_entity: str | None
     algorithm: str
     cold_tolerance: float
     hot_tolerance: float
@@ -275,8 +277,12 @@ class RoomConfig:
             valves=tuple(ValveConfig.from_data(v) for v in data.get(c.CONF_VALVES, ())),
             windows=tuple(data.get(c.CONF_WINDOWS, ())),
             window_invert=bool(_get(data, d, c.CONF_WINDOW_INVERT)),
-            schedule_entity=data.get(c.CONF_SCHEDULE_ENTITY),
+            # An own schedule only when chosen; before 0.9 a filled entity meant own.
+            schedule_entity=data.get(c.CONF_SCHEDULE_ENTITY)
+            if data.get(c.CONF_SCHEDULE_MODE, "own") == "own"
+            else None,
             presence_entity=data.get(c.CONF_PRESENCE_ENTITY),
+            expected_return_entity=data.get(c.CONF_EXPECTED_RETURN_ENTITY),
             algorithm=str(_get(data, d, c.CONF_CONTROL_ALGORITHM)),
             cold_tolerance=num(c.CONF_COLD_TOLERANCE),
             hot_tolerance=num(c.CONF_HOT_TOLERANCE),
@@ -377,9 +383,7 @@ class SystemConfig:
     stop_respects_min_on: bool
     mirror_timer_entity: str | None
     heating_limit: float
-    heating_limit_hysteresis: float
     outdoor_damping_s: float
-    summer_switch_delay_s: float
     frost_outdoor_protection: bool
     frost_outdoor_temp: float
     frost_idle_max_s: float
@@ -470,9 +474,7 @@ class SystemConfig:
             stop_respects_min_on=bool(opt(c.CONF_STOP_RESPECTS_MIN_ON)),
             mirror_timer_entity=options.get(c.CONF_MIRROR_TIMER_ENTITY),
             heating_limit=num(c.CONF_HEATING_LIMIT),
-            heating_limit_hysteresis=num(c.CONF_HEATING_LIMIT_HYSTERESIS),
             outdoor_damping_s=num(c.CONF_OUTDOOR_DAMPING_HOURS) * 3600,
-            summer_switch_delay_s=num(c.CONF_SUMMER_SWITCH_DELAY) * 3600,
             frost_outdoor_protection=bool(opt(c.CONF_FROST_OUTDOOR_PROTECTION)),
             frost_outdoor_temp=num(c.CONF_FROST_OUTDOOR_TEMP),
             frost_idle_max_s=num(c.CONF_FROST_IDLE_MAX) * 3600,

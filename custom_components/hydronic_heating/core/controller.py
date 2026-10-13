@@ -37,6 +37,7 @@ from .modes import ModeManager
 from .presence import read_expected_return, read_presence
 from .room import RoomContext, RoomController
 from .safety import OutputTracker
+from .season import HeatingSeason
 from .valve import deenergized_open, observed_open, pwm_on_time
 
 BOILER_KEY = "boiler"
@@ -53,6 +54,8 @@ class HydronicController:
         self.rooms: dict[str, RoomController] = {r.room_id: RoomController(r) for r in rooms}
         self.modes = ModeManager()
         self.outdoor = OutdoorEngine()
+        self.season = HeatingSeason()
+        self._season_logged: bool | None = None
         self.sequencer = BoilerSequencer()
         self.exercise = ExerciseScheduler()
         self.tracker = OutputTracker()
@@ -86,6 +89,7 @@ class HydronicController:
         self.decisions: list[Decision] = []
         self.last_revert: dict[str, Any] | None = None
         self._stop_immediate = False
+        self._closing_until: datetime | None = None
         self._heartbeat_at: datetime | None = None
         self._circulation_until: datetime | None = None
 
@@ -132,7 +136,7 @@ class HydronicController:
             found.update(rc.sensors)
             found.update(rc.windows)
             found.update(v.entity_id for v in rc.valves)
-            for entity in (rc.schedule_entity, rc.presence_entity):
+            for entity in (rc.schedule_entity, rc.presence_entity, rc.expected_return_entity):
                 if entity:
                     found.add(entity)
         return found
@@ -152,6 +156,10 @@ class HydronicController:
         return self.cfg.shadow_mode or not self.ready
 
     # --- User actions -----------------------------------------------------
+
+    def set_season_mode(self, mode: str, now: datetime) -> None:
+        """Heating season: auto, on or off, chosen by the user (FR-EQ-03)."""
+        self.season.set_mode(mode, now)
 
     def set_mode(self, mode: SystemMode, now: datetime) -> None:
         """Select a system mode (FR-MODE-01)."""
@@ -188,9 +196,9 @@ class HydronicController:
 
         mode = self.modes.mode
         manual = mode is SystemMode.MANUAL
-        self.summer = mode is SystemMode.SUMMER or (
-            mode in (SystemMode.AUTO, SystemMode.AWAY) and self.outdoor.summer
-        )
+        # FR-EQ-03: out of the heating season only auto and away stop heating.
+        self.season.update(now, self.outdoor.current, cfg.heating_limit, cfg.timezone)
+        self.summer = mode in (SystemMode.AUTO, SystemMode.AWAY) and not self.season.active
         heating_allowed = manual or (not self.summer and mode is not SystemMode.OFF)
 
         ctx = RoomContext(
@@ -246,6 +254,11 @@ class HydronicController:
         self._update_fault(now)
 
         duty_run_s = self._duty_run_s(manual=manual)
+        # Close the valves of rooms without demand before the boiler starts.
+        self._closing_until = self._closing_ends(
+            now, manual=manual, heating_allowed=heating_allowed
+        )
+        valves_ready = self._closing_until is None
         if self.fault_safe:
             self.sequencer.force_off(now)
         else:
@@ -259,6 +272,7 @@ class HydronicController:
                 open_valves=self._valves_in(now, {ValvePhysical.OPEN, ValvePhysical.OPENING}),
                 max_travel_s=self._max_travel_s,
                 duty_run_s=duty_run_s,
+                valves_ready=valves_ready,
             )
         self._stop_immediate = False
 
@@ -282,6 +296,8 @@ class HydronicController:
         if previous is not None and self.ready:
             self.decisions += self._presence_decisions(presence_before, preheating_before)
             self.decisions += self._room_target_decisions(reasons_before)
+            self.decisions += self._season_decisions()
+        self._season_logged = self.season.active
         self._learn_heat_rates(now)
         self.last_step = now
 
@@ -501,6 +517,7 @@ class HydronicController:
         cfg = self.cfg
         plan: dict[str, bool] = {}
         status: dict[str, ValveStatus] = {}
+        boiler_idle = self.sequencer.phase is BoilerPhase.IDLE and not self.heat_request
         for room in self.rooms.values():
             forced = True
             want: bool | None
@@ -509,6 +526,9 @@ class HydronicController:
                 want, reason = None, ValveReason.FAULT_SAFE
             elif room.frost_active:
                 want, reason = True, ValveReason.FROST
+            elif boiler_idle:
+                # Boiler off and no heat wanted: no head draws current (FR-VAL-07).
+                want, reason = None, ValveReason.IDLE_POLICY
             elif room.window.effective_open:
                 want, reason = False, ValveReason.WINDOW
             elif manual:
@@ -560,6 +580,44 @@ class HydronicController:
             status = {entity_id: ValveStatus(ValveReason.STARTUP) for entity_id in plan}
         self.valve_status = status
         return plan
+
+    def _room_wants_heat(self, room: RoomController, now: datetime, *, manual: bool) -> bool:
+        """Whether the room's valves stay open once the boiler runs (without hold times)."""
+        if room.frost_active:
+            return True
+        if room.window.effective_open or room.hvac_mode is RoomHvacMode.OFF:
+            return False
+        if manual:
+            return self.cfg.manual_scope == "all_rooms" or room.demand > 0
+        return room.pwm_want(now)
+
+    def _closing_ends(
+        self, now: datetime, *, manual: bool, heating_allowed: bool
+    ) -> datetime | None:
+        """When valves of rooms without demand are closed (None = nothing to wait for).
+
+        Valves that close right now count; on the step the boiler leaves idle the
+        valves that are about to close count too, they have not been commanded yet.
+        """
+        ends: list[datetime] = []
+        for room, valve in self.valve_configs:
+            state = room.valves[valve.entity_id]
+            physical = state.physical(valve, now)
+            if physical is ValvePhysical.CLOSING and (end := state.transition_ends_at(valve)):
+                ends.append(end)
+        if (
+            self.sequencer.phase is BoilerPhase.IDLE
+            and self.heat_request
+            and heating_allowed
+            and not self.fault_safe
+        ):
+            for room, valve in self.valve_configs:
+                physical = room.valves[valve.entity_id].physical(valve, now)
+                if physical in (ValvePhysical.OPEN, ValvePhysical.OPENING) and not (
+                    self._room_wants_heat(room, now, manual=manual)
+                ):
+                    ends.append(now + timedelta(seconds=valve.close_time_s))
+        return max(ends) if ends else None
 
     @staticmethod
     def _pwm_switch_at(room: RoomController, now: datetime) -> datetime | None:
@@ -742,6 +800,22 @@ class HydronicController:
                 f"min_open_valves = {cfg.min_open_valves}",
                 params,
             )
+        status = self._start_hold_status(now)
+        # Valves still closing: report it when it is the rule that ends last.
+        if self._closing_until is not None and (
+            status.until is None or self._closing_until > status.until
+        ):
+            return BoilerStatus(
+                BoilerReason.PRE_CLOSE,
+                self._closing_until,
+                f"valve_close_time = {self._max_travel_s:.0f} s",
+            )
+        return status
+
+    def _start_hold_status(self, now: datetime) -> BoilerStatus:
+        """Duty limit, start limit or minimum pause that delays the start."""
+        cfg = self.cfg
+        seq = self.sequencer
         if seq.duty_holding(now):
             cycle = round(cfg.boiler_cycle_period_s / 60)
             return BoilerStatus(
@@ -822,6 +896,25 @@ class HydronicController:
                     )
                 )
         return decisions
+
+    def _season_decisions(self) -> list[Decision]:
+        """Log the start or end of the heating season (automatic or by hand)."""
+        season = self.season
+        if self._season_logged is None or season.active == self._season_logged:
+            return []
+        return [
+            Decision(
+                "season",
+                self.boiler_status,
+                {
+                    "active": season.active,
+                    "mode": season.mode,
+                    "mean": season.mean_4h,
+                    "limit": self.cfg.heating_limit,
+                    "days": season.days_above,
+                },
+            )
+        ]
 
     def _room_target_decisions(self, reasons_before: dict[str, TargetReason]) -> list[Decision]:
         """Log rooms whose target changed because of presence or the schedule."""
@@ -1023,6 +1116,7 @@ class HydronicController:
             "format": STORAGE_FORMAT,
             "modes": self.modes.to_dict(),
             "outdoor": self.outdoor.to_dict(),
+            "season": self.season.to_dict(),
             "boiler": self.sequencer.to_dict(),
             "exercise": self.exercise.to_dict(),
             "rooms": {room_id: room.to_dict() for room_id, room in self.rooms.items()},
@@ -1031,7 +1125,18 @@ class HydronicController:
     def restore(self, data: dict[str, Any] | None, now: datetime) -> None:
         """Restore the state saved by `to_dict`."""
         data = data or {}
-        self.modes.restore(data.get("modes", {}))
+        modes = dict(data.get("modes", {}))
+        season = dict(data.get("season", {}))
+        if not season:
+            # Before 0.9: summer was a system mode and a flag of the outdoor engine.
+            season = {"active": not data.get("outdoor", {}).get("summer", False)}
+            if modes.get("mode") == "summer":
+                season.update(mode="off", active=False)
+        for key in ("mode", "mode_before_manual"):
+            if modes.get(key) == "summer":
+                modes[key] = SystemMode.AUTO.value
+        self.modes.restore(modes)
+        self.season.restore(season)
         self.outdoor.restore(data.get("outdoor", {}))
         self.sequencer.restore(data.get("boiler", {}), now)
         self.exercise.restore(data.get("exercise", {}))

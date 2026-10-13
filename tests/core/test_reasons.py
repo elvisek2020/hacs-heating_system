@@ -162,7 +162,7 @@ def test_blocked_and_idle_reasons() -> None:
     house = House(ctrl, temperatures={"obyvak": 23.0})
     house.step()
     assert ctrl.boiler_status.reason is BoilerReason.IDLE
-    ctrl.set_mode(SystemMode.SUMMER, house.now)
+    ctrl.set_season_mode("off", house.now)
     house.step()
     assert ctrl.boiler_status.reason is BoilerReason.SUMMER
     ctrl.set_mode(SystemMode.OFF, house.now)
@@ -268,10 +268,12 @@ def test_valve_reasons() -> None:
     assert status.reason is ValveReason.PWM
 
     house.set("binary_sensor.okno", "on")
-    _run(house, 10 * 60)
+    _run(house, 90)  # window delay 60 s, the boiler still runs its minimum time
     assert ctrl.valve_status["switch.hlavice_obyvak"].reason is ValveReason.WINDOW
+    _run(house, 10 * 60)  # boiler idle: no current, whatever the window says
+    assert ctrl.valve_status["switch.hlavice_obyvak"].reason is ValveReason.IDLE_POLICY
 
-    ctrl.set_mode(SystemMode.SUMMER, house.now)
+    ctrl.set_season_mode("off", house.now)
     house.set("binary_sensor.okno", "off")
     _run(house, 5 * 60)
     assert ctrl.valve_status["switch.hlavice_obyvak"].reason is ValveReason.IDLE_POLICY

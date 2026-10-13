@@ -22,7 +22,14 @@ from .model import (
     ValvePhysical,
     WindowState,
 )
-from .presence import BOILER_START_S, PREHEAT_TOLERANCE, HeatRate, read_next_event, read_presence
+from .presence import (
+    BOILER_START_S,
+    PREHEAT_TOLERANCE,
+    HeatRate,
+    read_expected_return,
+    read_next_event,
+    read_presence,
+)
 from .valve import ValveState, pwm_open
 
 FROST_HYSTERESIS_K = 2.0
@@ -150,6 +157,7 @@ class RoomController:
         self.schedule_on: bool | None = None
         self.schedule_next: datetime | None = None
         self.present: bool | None = None
+        self.expected_return: datetime | None = None
         # Preset whose temperature the room uses in auto (shown on the climate).
         self.auto_preset = Preset.COMFORT
         # Preheating (FR-SCH-03): learned rate, latched target time, next start.
@@ -305,6 +313,10 @@ class RoomController:
         deficit = max(0.0, self.cfg.comfort_temp - temperature)
         return min(max_s, dead_s + deficit / self.heat_rate.rate(outdoor) * 3600)
 
+    def return_at(self, ctx: RoomContext) -> datetime | None:
+        """Return the room's expected return: own with own presence, else the household's."""
+        return self.expected_return if self.cfg.presence_entity else ctx.expected_return
+
     def _comfort_at(self, when: datetime, ctx: RoomContext) -> bool:
         """Whether the room will want comfort at `when` (schedule and presence)."""
         if self.schedule_entity and self.schedule_on is not None:
@@ -313,10 +325,11 @@ class RoomController:
                 return False
             if not self.schedule_on and (following is None or following > when):
                 return False
+        back = self.return_at(ctx)
         if self.present is False:
-            return False
+            return back is not None and back <= when
         if ctx.house_absent:
-            return ctx.expected_return is not None and ctx.expected_return <= when
+            return back is not None and back <= when
         return True
 
     def _update_preheat(self, ctx: RoomContext, base: float | None) -> None:
@@ -337,8 +350,9 @@ class RoomController:
         candidates: list[tuple[datetime, str]] = []
         if self.schedule_on is False and self.schedule_next is not None:
             candidates.append((self.schedule_next, "schedule"))
-        if ctx.house_absent and ctx.expected_return is not None:
-            candidates.append((ctx.expected_return, "return"))
+        back = self.return_at(ctx)
+        if (self.present is False or ctx.house_absent) and back is not None:
+            candidates.append((back, "return"))
         valid = [(t, src) for t, src in candidates if t > now and self._comfort_at(t, ctx)]
         if not valid:
             self.preheat_until = self.preheat_source = None
@@ -370,6 +384,11 @@ class RoomController:
         else:
             self.schedule_on = self.schedule_next = None
         self.present = self._read_presence(snap) if self.cfg.presence_entity else None
+        self.expected_return = (
+            read_expected_return(snap.get(self.cfg.expected_return_entity), ctx.now, ctx.timezone)
+            if self.cfg.expected_return_entity
+            else None
+        )
         condition_ok = (
             not ctx.window_outdoor_condition
             or ctx.outdoor_now is None
@@ -417,9 +436,9 @@ class RoomController:
         if self.preheating:
             return TargetReason.PREHEAT, self.preheat_until
         if ctx.long_away:
-            return TargetReason.LONG_AWAY, ctx.expected_return
+            return TargetReason.LONG_AWAY, self.return_at(ctx)
         if self.present is False or ctx.house_present is False:
-            return TargetReason.ABSENT, ctx.expected_return
+            return TargetReason.ABSENT, self.return_at(ctx)
         if self.schedule_on is False:
             return TargetReason.SCHEDULE_ECO, self.schedule_next
         if self.schedule_on:

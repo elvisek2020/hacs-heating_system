@@ -21,13 +21,14 @@ DETAIL: dict[str, dict[str, str]] = {
         "startup": "Integrace startuje a čeká na načtení entit, nejpozději do {until}.",
         "idle": "Žádná místnost nepotřebuje teplo, kotel stojí.",
         "off": "Režim je vypnutý, kotel netopí. Protimrazová ochrana platí dál.",
-        "summer": (
-            "Léto: tlumená venkovní teplota je nad mezí vytápění, kotel netopí. "
-            "Protimrazová ochrana platí dál."
-        ),
+        "summer": ("Mimo topnou sezónu, kotel netopí. Protimrazová ochrana platí dál."),
         "window_block": "Otevřená okna blokují topení, kotel stojí.",
         "pre_open": "Kotel čeká, až se otevřou ventily. Start nejdříve v {until}.",
         "pre_open_now": "Kotel čeká na start.",
+        "pre_close": (
+            "Kotel čeká, až se zavřou ventily místností, které teplo nechtějí, aby voda "
+            "netekla tam, kde se netopí. Start nejdříve v {until}."
+        ),
         "no_flow_hold": (
             "Ventily se neotevřely: otevřeno {open} z potřebných {needed}. Pokud se do "
             "{until} neotevřou, přejde topení do poruchy."
@@ -66,12 +67,15 @@ DETAIL: dict[str, dict[str, str]] = {
         "idle": "No room needs heat, the boiler is idle.",
         "off": "The mode is off, the boiler does not heat. Frost protection still applies.",
         "summer": (
-            "Summer: the damped outdoor temperature is above the heating limit, the boiler "
-            "does not heat. Frost protection still applies."
+            "Off the heating season, the boiler does not heat. Frost protection still applies."
         ),
         "window_block": "Open windows block heating, the boiler is idle.",
         "pre_open": "The boiler waits for the valves to open. Start at {until} at the earliest.",
         "pre_open_now": "The boiler waits to start.",
+        "pre_close": (
+            "The boiler waits until the valves of rooms without demand are closed, so the "
+            "water does not go where nobody heats. Start at {until} at the earliest."
+        ),
         "no_flow_hold": (
             "The valves did not open: {open} of {needed} needed are open. If they do not "
             "open by {until}, heating goes to the fault state."
@@ -118,7 +122,17 @@ DECISION: dict[str, dict[str, str]] = {
         "off_min_on_done": "uplynula minimální doba běhu a teplo nikdo nechce",
         "off_no_demand": "teplo nikdo nechce",
         "off_mode_off": "režim vypnuto",
-        "off_summer": "léto, venku je nad mezí vytápění",
+        "off_summer": "skončila topná sezóna",
+        "season_start": (
+            "Začala topná sezóna: průměr venkovní teploty za 4 h {mean} °C klesl pod "
+            "hranici {limit} °C."
+        ),
+        "season_end": (
+            "Skončila topná sezóna: {days} dny po sobě byl průměr venkovní teploty za 4 h "
+            "celý den nad hranicí {limit} °C."
+        ),
+        "season_on": "Topná sezóna zapnuta ručně.",
+        "season_off": "Topná sezóna vypnuta ručně, mimo sezónu se netopí.",
         "off_window_block": "otevřená okna",
         "off_duty_limit": "omezení střídy, další start nejdříve v {next_start}",
         "off_no_flow": "chybí průtok, otevřených ventilů je málo",
@@ -129,6 +143,9 @@ DECISION: dict[str, dict[str, str]] = {
         "hold_max_starts_hold": "Start odložen do {until}: limit {count} startů za hodinu.",
         "hold_duty_hold": "Start odložen do {until}: omezení střídy, cyklus {cycle_min} min.",
         "hold_pre_open": "Start odložen do {until}: čeká se na otevření ventilů.",
+        "hold_pre_close": (
+            "Start odložen do {until}: zavírají se ventily místností, které teplo nechtějí."
+        ),
         "hold_no_flow_hold": (
             "Ventily se neotevřely (otevřeno {open} z {needed}). Pokud se neotevřou, "
             "přejde topení v {until} do poruchy."
@@ -167,7 +184,17 @@ DECISION: dict[str, dict[str, str]] = {
         "off_min_on_done": "the minimum run time is over and nobody needs heat",
         "off_no_demand": "nobody needs heat",
         "off_mode_off": "mode off",
-        "off_summer": "summer, the outdoor temperature is above the heating limit",
+        "off_summer": "the heating season ended",
+        "season_start": (
+            "Heating season started: the 4 h mean outdoor temperature {mean} °C dropped "
+            "below the limit of {limit} °C."
+        ),
+        "season_end": (
+            "Heating season ended: for {days} days in a row the 4 h mean outdoor "
+            "temperature stayed above the limit of {limit} °C all day."
+        ),
+        "season_on": "Heating season switched on by hand.",
+        "season_off": "Heating season switched off by hand, no heating off season.",
         "off_window_block": "open windows",
         "off_duty_limit": "duty limit, next start at {next_start} at the earliest",
         "off_no_flow": "no flow, too few valves are open",
@@ -179,6 +206,9 @@ DECISION: dict[str, dict[str, str]] = {
         "hold_max_starts_hold": "Start delayed until {until}: limit of {count} starts per hour.",
         "hold_duty_hold": "Start delayed until {until}: duty limit, cycle of {cycle_min} min.",
         "hold_pre_open": "Start delayed until {until}: waiting for the valves to open.",
+        "hold_pre_close": (
+            "Start delayed until {until}: the valves of rooms without demand are closing."
+        ),
         "hold_no_flow_hold": (
             "The valves did not open ({open} of {needed} open). If they stay closed, heating "
             "goes to the fault state at {until}."
@@ -252,9 +282,8 @@ MODES: dict[str, dict[str, str]] = {
         "manual": "manuál",
         "off": "vypnuto",
         "away": "pryč",
-        "summer": "léto",
     },
-    "en": {"auto": "auto", "manual": "manual", "off": "off", "away": "away", "summer": "summer"},
+    "en": {"auto": "auto", "manual": "manual", "off": "off", "away": "away"},
 }
 
 
@@ -361,6 +390,17 @@ def decision_text(
         message = texts[f"presence_{state}"].format_map(fill)
         if state != "home" and decision.params.get("expected_return") is not None:
             message += texts["return_suffix"].format_map(fill)
+    elif decision.kind == "season":
+        params = decision.params
+        if params.get("mode") == "on":
+            key = "season_on"
+        elif params.get("mode") == "off":
+            key = "season_off"
+        else:
+            key = "season_start" if params.get("active") else "season_end"
+        fill["mean"] = number(hass, params.get("mean")) if params.get("mean") is not None else "?"
+        fill["limit"] = number(hass, params.get("limit"))
+        message = texts[key].format_map(fill)
     elif decision.kind == "room_target":
         message = room_target_text(hass, decision.params)
     elif decision.kind == "preheat":
@@ -426,7 +466,7 @@ ROOM: dict[str, dict[str, str]] = {
         "window": "Otevřené okno: ventil je zavřený.",
         "manual": "Manuální topení: ventil je otevřený, dokud manuál běží.",
         "room_off": "Místnost je vypnutá.",
-        "summer": "Léto: netopí se.",
+        "summer": "Mimo topnou sezónu: netopí se.",
         "system_off": "Topení je vypnuté.",
         "system_away": "Režim Pryč: {temp} °C.",
         "override": "Ruční změna: {temp} °C, rozvrh ani přítomnost se nepoužívají.",
@@ -456,7 +496,7 @@ ROOM: dict[str, dict[str, str]] = {
         "window": "Open window: the valve is closed.",
         "manual": "Manual heating: the valve is open while manual heating runs.",
         "room_off": "The room is off.",
-        "summer": "Summer: no heating.",
+        "summer": "Off the heating season: no heating.",
         "system_off": "Heating is off.",
         "system_away": "Away mode: {temp} °C.",
         "override": "Manual change: {temp} °C, schedule and presence are not used.",

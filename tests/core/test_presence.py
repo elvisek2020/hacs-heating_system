@@ -308,3 +308,34 @@ def test_target_reason_preheat_and_no_presence() -> None:
     assert obyvak.presence_source == "none"
     assert obyvak.target_reason is TargetReason.PREHEAT
     assert obyvak.target_until == T0 + timedelta(minutes=30)
+
+
+def test_room_with_own_presence_uses_its_own_return() -> None:
+    """Item 7 of the to-do: the household return is not used for a room of one person."""
+    options = {
+        c.CONF_PRESENCE_ENTITY: "person.ronny",
+        c.CONF_EXPECTED_RETURN_ENTITY: "sensor.navrat_ronny",
+    }
+    ctrl = controller(
+        room("loznice", **options),
+        room("pracovna", **{c.CONF_PRESENCE_ENTITY: "person.zdenek"}),
+        **{**PRESENCE, c.CONF_PREHEAT_MAX: 1},
+    )
+    house = House(ctrl, temperatures={"loznice": 19.0, "pracovna": 19.0})
+    house.set(FAMILY, "not_home")
+    house.set(LONG_AWAY, "off")
+    house.set("person.ronny", "not_home")
+    house.set("person.zdenek", "not_home")
+    household_back = T0 + timedelta(minutes=20)
+    ronny_back = T0 + timedelta(hours=3)
+    house.set(RETURN, household_back.isoformat())
+    house.set("sensor.navrat_ronny", ronny_back.isoformat())
+    house.step()
+    loznice, pracovna = ctrl.rooms["id_loznice"], ctrl.rooms["id_pracovna"]
+    assert loznice.target_until == ronny_back
+    assert not loznice.preheating
+    assert loznice.preheat_planned == ronny_back - timedelta(hours=1)
+    # Own presence without an own return: no preheating by the household return.
+    assert pracovna.target_until is None
+    assert not pracovna.preheating
+    assert pracovna.preheat_planned is None

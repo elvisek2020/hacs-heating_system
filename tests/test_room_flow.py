@@ -176,3 +176,57 @@ async def test_reconfigure_room(hass: HomeAssistant, config_entry: MockConfigEnt
     assert room.unique_id == "obyvaci_pokoj"
     assert room.data[CONF_COMFORT_TEMP] == 22
     assert [valve[CONF_NORMALLY_OPEN] for valve in room.data[CONF_VALVES]] == [True, False]
+
+
+async def test_schedule_by_the_house_or_own(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Item 5 of the to-do: the room follows the house schedule or its own."""
+    hass.states.async_set("schedule.loznice", "on")
+    result = await hass.config_entries.subentries.async_init(
+        (config_entry.entry_id, SUBENTRY_ROOM), context={"source": SOURCE_USER}
+    )
+    result = await _configure(hass, result, "basics", name="Ložnice")
+    result = await _configure(hass, result, "sensors", sensors=["sensor.loznice_teplota"])
+    result = await _configure(hass, result, "valves", valves=["switch.hlavice_obyvak"])
+    result = await _configure(hass, result, "valve")
+    result = await _configure(hass, result, "windows")
+    assert result["data_schema"]({})["schedule_mode"] == "house"
+    # Own without a schedule is refused.
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"schedule_mode": "own"}
+    )
+    assert result["errors"] == {"schedule_entity": "schedule_required"}
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"],
+        {
+            "schedule_mode": "own",
+            "schedule_entity": "schedule.loznice",
+            "expected_return_entity": "sensor.navrat_ronny",
+        },
+    )
+    result = await _configure(hass, result, "control")
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    data = _room(config_entry, "Ložnice").data
+    assert data["schedule_mode"] == "own"
+    assert data[CONF_SCHEDULE_ENTITY] == "schedule.loznice"
+    assert data["expected_return_entity"] == "sensor.navrat_ronny"
+
+
+async def test_schedule_by_the_house_drops_the_own_one(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    await _create_room(hass, config_entry, "Pokoj", ["switch.hlavice_obyvak"])
+    await hass.async_block_till_done()
+    room = _room(config_entry, "Pokoj")
+    result = await config_entry.start_subentry_reconfigure_flow(hass, room.subentry_id)
+    for step in ("basics", "sensors", "valves", "valve", "windows"):
+        result = await _configure(hass, result, step)
+    result = await hass.config_entries.subentries.async_configure(
+        result["flow_id"], {"schedule_mode": "house", "schedule_entity": "schedule.pokoj"}
+    )
+    result = await _configure(hass, result, "control")
+    await hass.async_block_till_done()
+    data = config_entry.subentries[room.subentry_id].data
+    assert data["schedule_mode"] == "house"
+    assert CONF_SCHEDULE_ENTITY not in data

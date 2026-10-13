@@ -11,7 +11,7 @@ Integrace pro Home Assistant, která řídí teplovodní ústřední topení: ko
 
 - místnosti s 1..n teplotními čidly a ventily, regulace TPI nebo hystereze, PWM ventilů s ohledem na pomalé hlavice
 - kotel se sekvencí ventily → kotel → doběh a s ochranou proti cyklování (minimální běh, pauza, počet startů)
-- režimy, manuální topení s odpočtem, rozvrhy, okna, protimrazová ochrana, léto podle venkovní teploty
+- režimy, manuální topení s odpočtem, rozvrhy, okna, protimrazová ochrana, topná sezóna podle venkovní teploty
 - ekviterm: virtuální teplota vody podle topné křivky a volitelné omezení střídy kotle
 - přítomnost domácnosti a předtápění, které se učí rychlost ohřevu místností
 - vysvětlení, proč kotel topí nebo stojí, a deník rozhodnutí v logbooku
@@ -64,7 +64,7 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 
 ### Doporučený postup přepnutí
 
-1. **Virtuální dům:** vyzkoušejte otevřené okno, výpadek čidla, nedostupný kotel, manuál a změnu venkovní teploty (léto). Ověřte, že reakce odpovídají očekávání.
+1. **Virtuální dům:** vyzkoušejte otevřené okno, výpadek čidla, nedostupný kotel, manuál a změnu venkovní teploty (topná sezóna). Ověřte, že reakce odpovídají očekávání.
 2. **Virtuální výstupy, několik dní:** v grafech porovnávejte virtuální kotel se skutečným, který řídí Loxone.
 3. **Loxone:** kotel a hlavice jako bloky **Switch**, odpojit IRC a Climate Controller od výstupů a zavést watchdog na heartbeat.
 4. **Přepnutí:** demo režim vypnout, pak vypnout `switch.hh_shadow_mode`. Od té chvíle integrace spíná skutečné výstupy.
@@ -72,20 +72,32 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 ## Jak řídí
 
 - **Místnost:** teplota z 1..n čidel (průměr, minimum, maximum, medián nebo první platné). Požadavek 0–100 % počítá algoritmus TPI nebo hystereze. Ventily jedou v PWM (perioda 30 min, synchronní začátek), s minimální dobou stavu kvůli pomalým hlavicím.
-- **Kotel:** zapne se, když vážený požadavek místností překročí práh (s hysterezí), nebo když volá dost místností. Nejdřív se otevřou ventily, kotel startuje až po době přestavení (nebo hned, když má soustava obtok). Hlídá minimální dobu běhu, minimální pauzu a počet startů za hodinu. Po vypnutí drží ventily otevřené po dobu doběhu.
-- **Priority:** porucha > protimrazová ochrana > manuál > blokace okny > léto > zvolený režim (vypnuto, pryč, automaticky).
+- **Kotel:** zapne se, když vážený požadavek místností překročí práh (s hysterezí), nebo když volá dost místností. Nejdřív se zavřou ventily místností, které teplo nechtějí, a otevřou ty, které ho chtějí. Kotel startuje až po době přestavení, aby voda netekla tam, kde se netopí. Hlídá minimální dobu běhu, minimální pauzu a počet startů za hodinu. Po vypnutí drží ventily otevřené po dobu doběhu.
+- **Ventily v klidu:** když kotel stojí a nikdo nechce teplo, jdou všechny hlavice do klidové polohy (výchozí bez proudu, u NO hlavic otevřeno). Hlavice tak nehřejí a neberou proud zbytečně celé hodiny. Proud dostanou jen hlavice místností bez požadavku, a jen během běhu kotle a doběhu.
+- **Priority:** porucha > protimrazová ochrana > manuál > blokace okny > mimo topnou sezónu > zvolený režim (vypnuto, pryč, automaticky).
 - **Okna:** po zpoždění zavřou ventily místnosti. Při otevření oken ve více místnostech (globální práh) se zastaví kotel, kromě manuálu.
-- **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a v létě. Tuto ochranu nejde vypnout.
-- **Léto:** tlumená venkovní teplota nad mezí vytápění po nastavenou dobu přepne systém do léta. Pod mezí mínus hysterezi se vrátí do zimy hned.
+- **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a mimo topnou sezónu. Tuto ochranu nejde vypnout.
+- **Topná sezóna:**
+  - Řídí se průměrem venkovní teploty za poslední 4 hodiny (`sensor.hh_outdoor_mean_4h`), ne denním průměrem, který by schoval studené večery po slunečném dni.
+  - Začne hned, jakmile 4h průměr klesne pod hranici (výchozí 13 °C, Konfigurovat → Ekviterm → Hranice topné sezóny).
+  - Skončí po 3 celých dnech po sobě, kdy 4h průměr ani jednou neklesl pod hranici.
+  - Ručně jde přepnout výběrem `select.hh_heating_season`: Automaticky, Topná sezóna, Mimo sezónu.
+  - Stav ukazuje `binary_sensor.hh_heating_season` (atributy: 4h průměr, celé dny nad hranicí, od kdy). Začátek a konec se zapíše do logbooku.
 - **Ekviterm:** z tlumené venkovní teploty se podle topné křivky počítá teplota vody, kterou by soustava potřebovala (`sensor.hh_flow_setpoint`). U kotle řízeného jen kontaktem je to virtuální hodnota: kotel si vodu drží sám. Z ní a z teploty nastavené na kotli vychází povolená střída (`sensor.hh_duty_limit`). Po zapnutí omezení střídy (Konfigurovat → Ekviterm) kotel v cyklu (výchozí 20 min) běží jen tuto část času, nikdy ale kratší dobu, než je jeho minimální doba běhu. Ve výchozím stavu je omezení vypnuté. U nekondenzačního kotle ho zapínejte až po ověření minimální teploty vody v návodu kotle, protože zkracuje běhy.
-- **Předpověď (volitelně):** s entitou počasí se pro mez vytápění i křivku bere průměr tlumené teploty a průměrné předpovědi na příštích 24 hodin.
+- **Předpověď (volitelně):** s entitou počasí se pro topnou křivku bere průměr tlumené teploty a průměrné předpovědi na příštích 24 hodin.
 - **Ochrany:** ověření každého povelu s opakováním, keep-alive, obnovení stavu ventilů po výpadku, bezpečný stav při nedostupném kotli, heartbeat pro watchdog v Loxone, upozornění na zastaralá čidla.
 
 ## Rozvrh, přítomnost a předtápění
 
 Všechno se nastavuje v **Konfigurovat → Rozvrh, přítomnost a předtápění**.
 
-**Rozvrh domu** je jeden pomocník **Plán** (`schedule`) pro celý dům: zapnuto = komfort, vypnuto = útlum (noc, práce, škola). Platí pro všechny místnosti, které nemají vlastní rozvrh. Vlastní rozvrh místnosti (Překonfigurovat → Rozvrh) ho přebije, třeba když ložnice chce jiné časy. Plán se zakládá v Nastavení → Zařízení a služby → Pomocníci → Vytvořit pomocníka → Plán.
+**Rozvrh domu** je jeden pomocník **Plán** (`schedule`) pro celý dům: zapnuto = komfort, vypnuto = útlum (noc, práce, škola). Plán se zakládá v Nastavení → Zařízení a služby → Pomocníci → Vytvořit pomocníka → Plán.
+
+U každé místnosti jde v Překonfigurovat → Rozvrh zvolit:
+- **Podle domu** (výchozí): místnost jede podle rozvrhu domu.
+- **Vlastní**: místnost dostane vlastní plán, například když ložnice chce jiné časy. Úprava vlastního plánu mění jen tuto místnost.
+
+Tamtéž jde nastavit **očekávaný návrat** místnosti, třeba návrat osoby, podle které místnost jede. Pro předtápění místnosti s vlastní přítomností platí jen její vlastní návrat. Návrat domácnosti se použije jen u místností bez vlastní přítomnosti.
 
 Přítomnost se nastavuje běžnými entitami, například vlastním modulem přítomnosti, skupinou osob nebo `zone.home` (počet lidí doma).
 
@@ -107,8 +119,25 @@ Bez nastavené přítomnosti a bez rozvrhu se nic nemění.
   - `target_until`: do kdy cíl platí,
   - `target_detail`: celá věta, například „Útlum 19 °C: nikdo doma (Rodiče doma).“,
   - `presence_entity` a `presence_source`: podle čí přítomnosti místnost jede (`room` = vlastní, `house` = celý dům).
-- Dashboard ukazuje u místnosti tuhle větu a dlaždice přítomnosti a rozvrhu, podle kterých jede. Když je přítomnost místnosti skupina, ukáže i její členy.
+- Dashboard ukazuje u místnosti tuhle větu, **kdo je doma jménem** a rozvrh domu. Vlastní rozvrh je dole v kartě jako upravitelná dlaždice.
+  - Jména se berou z atributu `people` (modul přítomnosti), u skupin z členů v atributu `entity_id`.
+  - Pod blokem Provoz kotle je přehled „Kdo je doma“: každá osoba se stavem a časem poslední změny, takže je vidět, kdo právě odešel.
 - Když místnost změní cíl kvůli přítomnosti nebo rozvrhu, zapíše se to do logbooku, například „Kuchyně: útlum 19 °C, nikdo doma (Rodiče doma).“
+
+## Dashboard
+
+Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instalaci (vložit přes ⋮ → Upravit → ⋮ → Editor kódu YAML).
+
+- **Nahoře jedna řada:**
+  - Topení: systém, režim, topná sezóna, rozvrh domu, manuál.
+  - Kotel: proč, další změna, celkový požadavek, teplota vody a venku.
+  - Provoz kotle: povel, statistiky, sezóna, blokace a porucha, pod tím Kdo je doma.
+- **Pod řadou** upozornění na shadow režim přes celou šířku, v demu blok Demo.
+- **Místnosti – individuální nastavení:**
+  - nahoře ovládání (režim místnosti automaticky / ručně / vypnuto, cílová teplota, předvolba),
+  - uprostřed zobrazení (proč, kdo je doma, ventil, požadavek),
+  - dole vlastní rozvrh.
+- **Vysvětlivky** úplně dole: každá dlaždice se stejnou ikonou a jednou až dvěma větami, co znamená.
 
 ## Proč kotel topí nebo stojí
 
@@ -126,19 +155,21 @@ Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastn�
 | Entita | Popis |
 |---|---|
 | `climate.hh_system` | souhrn systému; vypnuto / automaticky / topit (= manuál) |
-| `select.hh_system_mode` | auto, manual, off, away, summer |
+| `select.hh_system_mode` | auto, manual, off, away |
+| `select.hh_heating_season` | topná sezóna: automaticky, topná sezóna, mimo sezónu |
 | `button.hh_manual_30` … `_180`, `button.hh_stop` | manuální topení a jeho zastavení |
 | `sensor.hh_manual_ends_at` | konec manuálu (časové razítko) |
-| `sensor.hh_state` | stav automatu (start, auto, pryč, vypnuto, léto, manuál, porucha) |
+| `sensor.hh_state` | stav automatu (start, auto, pryč, vypnuto, mimo sezónu, manuál, porucha) |
 | `sensor.hh_boiler_reason` | proč je kotel v aktuálním stavu (atributy: do kdy, zbývá, pravidlo, vysvětlení) |
 | `sensor.hh_boiler_hold_ends_at` | kdy skončí časové pravidlo, které kotel drží (minimální běh, pauza, doběh…) |
 | `sensor.hh_demand_total` | vážený požadavek místností |
 | `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota (atributy: aktuální, předpověď, efektivní) |
+| `sensor.hh_outdoor_mean_4h` | průměr venkovní teploty za 4 h, podle něj se řídí topná sezóna |
 | `sensor.hh_flow_setpoint` | teplota vody podle topné křivky (virtuální) |
 | `sensor.hh_duty_limit` | povolená střída kotle a doba běhu v cyklu |
 | `sensor.hh_boiler_duty`, `sensor.hh_boiler_starts_today` | střída kotle za 24 h a počet startů dnes |
 | `sensor.hh_open_windows` | počet místností s otevřeným oknem |
-| `binary_sensor.hh_heat_demand`, `_boiler_command`, `_window_block`, `_summer`, `_problem` | požadavek, povel kotli, blokace okny, léto, porucha |
+| `binary_sensor.hh_heat_demand`, `_boiler_command`, `_window_block`, `_heating_season`, `_problem` | požadavek, povel kotli, blokace okny, topná sezóna, porucha |
 | `switch.hh_shadow_mode` | shadow režim |
 | `climate.hh_<místnost>` | termostat místnosti s presety komfort, eco, pryč a ruční teplota |
 | `sensor.hh_<místnost>_temperature`, `_demand`, `_valve_state` | teplota, požadavek, stav ventilů |

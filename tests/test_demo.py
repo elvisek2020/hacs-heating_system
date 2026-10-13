@@ -156,9 +156,10 @@ async def test_virtual_house_heats_and_reacts_to_events(
     )
     await _run(hass, freezer, 90)
     assert hass.states.get("binary_sensor.hh_obyvak_window").state == "on"
-    # Valves that were open stay open during the boiler overrun (180 s), then close.
+    # Valves that were open stay open during the boiler overrun (180 s); then the
+    # boiler stands and no head draws current (NO = open).
     await _run(hass, freezer, 180)
-    assert hass.states.get("switch.hh_obyvak_demo_valve_1").state == "on"  # closed
+    assert hass.states.get("switch.hh_obyvak_demo_valve_1").state == "off"
 
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": "switch.hh_loznice_demo_sensor_fault"}, blocking=True
@@ -281,17 +282,29 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
         "Boiler",
         "Boiler operation",
         "Demo · virtual house",
+        "Rooms – individual settings",
         "Obývák",
         "Ložnice",
+        "Legend",
     ]
+    legend = overview["sections"][-1]
+    assert legend["column_span"] == 3
+    assert '<ha-icon icon="mdi:pipe-valve"></ha-icon> | **Valve**' in legend["cards"][2]["content"]
     assert overview["sections"][3]["column_span"] == 3
-    living = overview["sections"][-2]["cards"]
+    divider = overview["sections"][4]
+    assert divider["column_span"] == 3
+    assert divider["cards"][0]["content"] == "<hr>"
+    assert divider["cards"][1]["heading_style"] == "title"
+    living = overview["sections"][-3]["cards"]
     assert living[0]["icon"] == "mdi:sofa-outline"
     assert living[1]["entity"] == "climate.hh_obyvak"
-    assert {f["type"] for f in living[1]["features"]} == {
+    # Room mode switch first (back to auto in one tap), then target and presets.
+    assert [f["type"] for f in living[1]["features"]] == [
+        "climate-hvac-modes",
         "target-temperature",
         "climate-preset-modes",
-    }
+    ]
+    assert living[1]["features"][0]["hvac_modes"] == ["auto", "heat", "off"]
     # Manual buttons press the button entity directly.
     system = overview["sections"][0]["cards"]
     manual = [c for c in system if c.get("entity", "").startswith("button.hh_manual_")]
@@ -363,9 +376,12 @@ async def test_dashboard_room_shows_the_valve_not_the_heads(hass: HomeAssistant)
         text = str(dashboard)
         assert "input_boolean.hlavice_obyvak" not in text
         assert "demo_valve" not in text
-        living = dashboard["views"][0]["sections"][-2]["cards"]
-        assert living[-1]["entity"] == "sensor.hh_obyvak_valve_state"
-        assert living[-1]["name"] == "Valve"  # test instance runs in English
+        rooms = {
+            s["cards"][0].get("heading"): s["cards"] for s in dashboard["views"][0]["sections"]
+        }
+        valve = next(c for c in rooms["Obývák"] if c.get("entity", "").endswith("valve_state"))
+        assert valve["entity"] == "sensor.hh_obyvak_valve_state"
+        assert valve["name"] == "Valve"  # test instance runs in English
         timeline = dashboard["views"][1]["sections"][2]["cards"][-1]["entities"]
         assert timeline == [
             {"entity": "sensor.hh_obyvak_valve_state", "name": "Obývák"},

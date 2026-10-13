@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import async_capture_events
 
@@ -173,17 +174,31 @@ async def test_room_shows_what_it_follows(hass: HomeAssistant) -> None:
     dashboard = await hass.services.async_call(
         "hydronic_heating", "generate_dashboard", {}, blocking=True, return_response=True
     )
-    rooms = {s["cards"][0]["heading"]: s["cards"] for s in dashboard["views"][0]["sections"][4:]}
+    sections = dashboard["views"][0]["sections"]
+    rooms = {s["cards"][0].get("heading"): s["cards"] for s in sections}
     living_cards = rooms["Obývák"]
-    assert "state_attr('climate.hh_obyvak', 'target_detail')" in living_cards[2]["content"]
-    entities = [c.get("entity") for c in living_cards]
-    assert entities[-4:] == [
+    explanation = living_cards[2]["content"]
+    assert "state_attr('climate.hh_obyvak', 'target_detail')" in explanation
+    assert "**Home:**" in explanation
+    assert "state_attr('binary_sensor.rodice_doma', 'entity_id')" in explanation
+    assert "**House schedule:**" in explanation
+    # Who is home: the people behind the presence entities, under the boiler operation.
+    operation = rooms["Boiler operation"]
+    people = [c["entity"] for c in operation if c.get("state_content") == ["state", "last_changed"]]
+    assert people == ["binary_sensor.nekdo_doma", "person.elvisek", "person.ronny"]
+    bedroom = rooms["Ložnice"][2]["content"]
+    assert "**Home in the house:**" in bedroom
+    assert "state_attr('binary_sensor.nekdo_doma', 'people')" in bedroom
+
+    # The names come out of the templates as the frontend renders them.
+    hass.states.async_set(
         "binary_sensor.rodice_doma",
-        "schedule.dum",
-        "person.elvisek",
-        "person.ronny",
-    ]
-    bedroom_cards = rooms["Ložnice"]
-    presence = next(c for c in bedroom_cards if c.get("entity") == "binary_sensor.nekdo_doma")
-    assert presence["name"] == "Presence (house)"
-    assert presence["state_content"] == ["state", "people"]
+        "on",
+        {"entity_id": ["person.elvisek", "person.ronny"], "friendly_name": "Rodiče doma"},
+    )
+    hass.states.async_set("person.ronny", "not_home", {"friendly_name": "Ronny"})
+    hass.states.async_set("person.elvisek", "home", {"friendly_name": "ElvisEK"})
+    names = Template(explanation.split("**Home:** ", 1)[1].split("  \n")[0], hass)
+    assert names.async_render() == "ElvisEK"
+    names = Template(bedroom.split("**Home in the house:** ", 1)[1].split("  \n")[0], hass)
+    assert names.async_render() == "Zdeněk, Adam"

@@ -227,14 +227,14 @@
       "valves": {
         "title": "Valve idle state and exercise",
         "data": {
-          "idle_valve_policy": "Valves outside the heating season",
+          "idle_valve_policy": "Valves at rest",
           "exercise_interval_days": "Exercise interval",
           "exercise_duration": "Exercise duration",
           "exercise_time": "Exercise time",
           "exercise_parallel": "Valves exercised at once"
         },
         "data_description": {
-          "idle_valve_policy": "De-energized means that NO valve heads are open and draw no power.",
+          "idle_valve_policy": "When the boiler stands and nobody wants heat, and off the heating season. De-energized means that NO valve heads are open and draw no power. While the boiler runs, only the valves of rooms that want heat stay open.",
           "exercise_interval_days": "0 = off.",
           "exercise_duration": "At least the valve travel time + 60 s."
         }
@@ -281,10 +281,8 @@
           "curve_offset": "Curve offset",
           "flow_temp_min": "Minimum flow temperature",
           "flow_temp_max": "Maximum flow temperature",
-          "heating_limit": "Heating limit",
-          "heating_limit_hysteresis": "Heating limit hysteresis",
+          "heating_limit": "Heating season limit",
           "outdoor_damping_hours": "Outdoor temperature damping",
-          "summer_switch_delay": "Summer switch delay",
           "equithermal_duty_enabled": "Limit boiler duty by the curve",
           "boiler_fixed_flow_temp": "Water temperature set on the boiler",
           "boiler_cycle_period": "Duty cycle period",
@@ -293,9 +291,9 @@
         },
         "data_description": {
           "design_flow_temp": "Water temperature the house needs at the design outdoor temperature.",
-          "heating_limit": "Above this damped outdoor temperature the system switches to summer.",
+          "heating_limit": "The heating season starts as soon as the mean outdoor temperature of the last 4 hours drops below this limit. It ends after 3 whole days in a row in which the 4 h mean never dropped below it.",
           "equithermal_duty_enabled": "For non-condensing boilers enable it only after verifying the minimum water temperature.",
-          "use_forecast": "Mean of the damped temperature and the 24 h forecast of the weather entity, for the heating limit and the curve."
+          "use_forecast": "Mean of the damped temperature and the 24 h forecast of the weather entity, for the heating curve."
         }
       },
       "equithermal_confirm": {
@@ -424,12 +422,16 @@
         "schedule": {
           "title": "Schedule",
           "data": {
-            "schedule_entity": "Schedule (optional)",
-            "presence_entity": "Presence (optional)"
+            "schedule_mode": "Schedule",
+            "schedule_entity": "Own schedule",
+            "presence_entity": "Presence (optional)",
+            "expected_return_entity": "Expected return (optional)"
           },
           "data_description": {
-            "schedule_entity": "On = comfort, off = setback. Empty = the house schedule (Schedule, presence and preheating).",
-            "presence_entity": "Absence switches the room to setback or away, see Presence and preheating."
+            "schedule_mode": "By the house schedule (Schedule, presence and preheating), or an own schedule helper for this room.",
+            "schedule_entity": "Only with an own schedule: on = comfort, off = setback.",
+            "presence_entity": "Absence switches the room to setback or away, see Schedule, presence and preheating.",
+            "expected_return_entity": "Timestamp of the return of whoever the room's presence follows, for preheating. Without own presence the household return applies."
           }
         },
         "control": {
@@ -459,7 +461,8 @@
         "not_temperature_sensor": "Select sensors that report a temperature.",
         "sensor_range": "The lowest value must be below the highest.",
         "valves_required": "Select at least one valve.",
-        "min_state_too_short": "Must be at least the valve travel time ({valve_time} s)."
+        "min_state_too_short": "Must be at least the valve travel time ({valve_time} s).",
+        "schedule_required": "Choose the room's own schedule."
       }
     }
   },
@@ -543,6 +546,12 @@
         "eco": "Setback (eco)",
         "away": "Away"
       }
+    },
+    "schedule_mode": {
+      "options": {
+        "house": "By the house",
+        "own": "Own"
+      }
     }
   },
   "entity": {
@@ -556,8 +565,30 @@
       "window_block": {
         "name": "Window block"
       },
-      "summer": {
-        "name": "Summer (heating limit)"
+      "heating_season": {
+        "name": "Heating season",
+        "state_attributes": {
+          "mode": {
+            "name": "Mode",
+            "state": {
+              "auto": "Automatic",
+              "on": "Heating season",
+              "off": "Off season"
+            }
+          },
+          "outdoor_mean_4h": {
+            "name": "Outdoor 4 h mean"
+          },
+          "limit": {
+            "name": "Limit"
+          },
+          "days_above": {
+            "name": "Whole days above the limit"
+          },
+          "since": {
+            "name": "Since"
+          }
+        }
       },
       "problem": {
         "name": "Problem"
@@ -592,8 +623,15 @@
           "auto": "Automatic",
           "away": "Away",
           "off": "Off",
-          "summer": "Summer",
           "manual": "Manual"
+        }
+      },
+      "heating_season": {
+        "name": "Heating season",
+        "state": {
+          "auto": "Automatic",
+          "on": "Heating season",
+          "off": "Off season"
         }
       },
       "demo_boiler_behavior": {
@@ -615,9 +653,10 @@
           "startup": "Starting up",
           "idle": "No demand",
           "off": "Off",
-          "summer": "Summer",
+          "summer": "Off season",
           "window_block": "Window block",
           "pre_open": "Waiting for valves",
+          "pre_close": "Closing valves",
           "no_flow_hold": "No flow",
           "min_off_hold": "Minimum pause",
           "max_starts_hold": "Start limit",
@@ -654,9 +693,10 @@
               "startup": "Starting up",
               "idle": "No demand",
               "off": "Off",
-              "summer": "Summer",
+              "summer": "Off season",
               "window_block": "Window block",
               "pre_open": "Waiting for valves",
+              "pre_close": "Closing valves",
               "no_flow_hold": "No flow",
               "min_off_hold": "Minimum pause",
               "max_starts_hold": "Start limit",
@@ -679,7 +719,7 @@
           "auto": "Automatic",
           "away": "Away",
           "off": "Off",
-          "summer": "Summer",
+          "summer": "Off season",
           "manual": "Manual",
           "fault_safe": "Fault"
         }
@@ -689,6 +729,9 @@
       },
       "outdoor_temperature_damped": {
         "name": "Damped outdoor temperature"
+      },
+      "outdoor_mean_4h": {
+        "name": "Outdoor (4 h mean)"
       },
       "boiler_duty": {
         "name": "Boiler duty (24 h)"

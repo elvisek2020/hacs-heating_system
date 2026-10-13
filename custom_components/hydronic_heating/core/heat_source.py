@@ -157,10 +157,13 @@ class BoilerSequencer:
         open_valves: set[str],
         max_travel_s: float,
         duty_run_s: float | None = None,
+        valves_ready: bool = True,
     ) -> None:
         """Advance the sequence by one step.
 
         `duty_run_s` is the allowed run time per cycle (FR-EQ-05), None = no limit.
+        `valves_ready` is False while valves of rooms without demand still close,
+        so the first hot water does not go where nobody wants heat.
         """
         wants_heat = request and not blocked
         if self.duty_hold_until is not None and now >= self.duty_hold_until:
@@ -179,7 +182,7 @@ class BoilerSequencer:
                 self.no_flow = False
             elif flow_ok:
                 self.no_flow = False
-                if self.can_start(now, cfg):
+                if valves_ready and self.can_start(now, cfg):
                     self._turn_on(now)
             elif self._pre_open_s(now) > max_travel_s + NO_FLOW_MARGIN_S:
                 # Waiting for anti-cycling is fine; only missing flow is a fault.

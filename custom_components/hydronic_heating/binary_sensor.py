@@ -12,8 +12,10 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import DOMAIN
 from .core.controller import HydronicController
 from .core.room import RoomController
 from .entity import HydronicEntity
@@ -54,9 +56,15 @@ SYSTEM_BINARY: tuple[SystemBinaryDescription, ...] = (
     ),
     SystemBinaryDescription(key="window_block", is_on_fn=lambda ctrl: ctrl.window_block),
     SystemBinaryDescription(
-        key="summer",
-        is_on_fn=lambda ctrl: ctrl.outdoor.summer,
-        attrs_fn=lambda ctrl: {"damped": ctrl.outdoor.damped_rounded},
+        key="heating_season",
+        is_on_fn=lambda ctrl: ctrl.season.active,
+        attrs_fn=lambda ctrl: {
+            "mode": ctrl.season.mode,
+            "outdoor_mean_4h": ctrl.season.mean_4h,
+            "limit": ctrl.cfg.heating_limit,
+            "days_above": ctrl.season.days_above,
+            "since": ctrl.season.since.isoformat() if ctrl.season.since else None,
+        },
     ),
     SystemBinaryDescription(
         key="problem",
@@ -96,6 +104,10 @@ async def async_setup_entry(
 ) -> None:
     """Add system and room binary sensors."""
     runtime = entry.runtime_data
+    # Before 0.9 the season was the "summer" sensor; drop it from the registry.
+    registry = er.async_get(hass)
+    if old := registry.async_get_entity_id("binary_sensor", DOMAIN, f"{entry.entry_id}_summer"):
+        registry.async_remove(old)
     async_add_entities(SystemBinarySensor(runtime, d) for d in SYSTEM_BINARY)
     for room in runtime.rooms:
         async_add_entities(

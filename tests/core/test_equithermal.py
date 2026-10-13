@@ -173,7 +173,6 @@ def test_forecast_complements_damped_temperature() -> None:
     options = {
         c.CONF_OUTDOOR_SENSORS: ["sensor.venku"],
         c.CONF_USE_FORECAST: True,
-        c.CONF_SUMMER_SWITCH_DELAY: 1,
     }
     ctrl = controller(room("obyvak"), **options)
     house = House(ctrl, temperatures={"obyvak": 21.0})
@@ -182,8 +181,6 @@ def test_forecast_complements_damped_temperature() -> None:
     house.run(30)
     assert ctrl.outdoor.effective == 17.0
     assert ctrl.flow_setpoint == flow_setpoint(17.0, ctrl.cfg)
-    house.run(3600)
-    assert ctrl.outdoor.summer  # 17 °C > 15 °C, although the damped value is 12 °C
 
     house.forecast = None  # forecast unavailable: damped value alone
     house.run(30)

@@ -116,6 +116,15 @@ SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
         },
     ),
     SystemSensorDescription(
+        key="outdoor_mean_4h",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda ctrl: ctrl.season.mean_4h,
+        attrs_fn=lambda ctrl: {"limit": ctrl.cfg.heating_limit},
+    ),
+    SystemSensorDescription(
         key="flow_setpoint",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,

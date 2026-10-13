@@ -43,7 +43,7 @@ def duty_limit(flow: float, cfg: SystemConfig) -> float:
 
 
 class OutdoorEngine:
-    """Outdoor source selection, damping, forecast and summer/winter switching."""
+    """Outdoor source selection, damping and forecast (the season is in season.py)."""
 
     def __init__(self) -> None:
         """Start without history."""
@@ -53,8 +53,6 @@ class OutdoorEngine:
         self.forecast: float | None = None
         self.use_forecast = False
         self.updated_at: datetime | None = None
-        self.summer = False
-        self.above_since: datetime | None = None
 
     def read(self, snap: Snapshot, cfg: SystemConfig) -> None:
         """Pick the first valid sensor, then the weather entity (FR-EQ-01)."""
@@ -84,7 +82,7 @@ class OutdoorEngine:
         return self.damped
 
     def update(self, snap: Snapshot, cfg: SystemConfig) -> None:
-        """Read the source, update the EMA and the heating limit."""
+        """Read the source and update the EMA."""
         self.read(snap, cfg)
         self.use_forecast = cfg.use_forecast
         self.forecast = snap.forecast_24h if cfg.use_forecast else None
@@ -98,18 +96,6 @@ class OutdoorEngine:
                 alpha = 1.0 if tau <= 0 else 1.0 - math.exp(-dt / tau)
                 self.damped += alpha * (self.current - self.damped)
             self.updated_at = now
-        effective = self.effective
-        if effective is None:
-            return
-        # FR-EQ-03: summer after a delay above the limit, winter immediately below it.
-        if effective > cfg.heating_limit:
-            self.above_since = self.above_since or now
-            if (now - self.above_since).total_seconds() >= cfg.summer_switch_delay_s:
-                self.summer = True
-        else:
-            self.above_since = None
-        if effective < cfg.heating_limit - cfg.heating_limit_hysteresis:
-            self.summer = False
 
     @property
     def damped_rounded(self) -> float | None:
@@ -121,8 +107,6 @@ class OutdoorEngine:
         return {
             "damped": self.damped,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "summer": self.summer,
-            "above_since": self.above_since.isoformat() if self.above_since else None,
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -130,6 +114,3 @@ class OutdoorEngine:
         self.damped = data.get("damped")
         if updated := data.get("updated_at"):
             self.updated_at = datetime.fromisoformat(updated)
-        self.summer = bool(data.get("summer", False))
-        if above := data.get("above_since"):
-            self.above_since = datetime.fromisoformat(above)

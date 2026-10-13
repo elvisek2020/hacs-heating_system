@@ -227,14 +227,14 @@
       "valves": {
         "title": "Klidový stav a protáčení ventilů",
         "data": {
-          "idle_valve_policy": "Ventily mimo topnou sezónu",
+          "idle_valve_policy": "Ventily v klidu",
           "exercise_interval_days": "Interval protáčení",
           "exercise_duration": "Délka protáčení",
           "exercise_time": "Čas protáčení",
           "exercise_parallel": "Současně protáčené ventily"
         },
         "data_description": {
-          "idle_valve_policy": "Bez proudu znamená, že NO hlavice jsou otevřené a nic neodebírají.",
+          "idle_valve_policy": "Když kotel stojí a nikdo nechce teplo, a mimo topnou sezónu. Bez proudu znamená, že NO hlavice jsou otevřené a nic neodebírají. Když kotel topí, zůstanou otevřené jen ventily místností, které teplo chtějí.",
           "exercise_interval_days": "0 = vypnuto.",
           "exercise_duration": "Aspoň doba přestavení ventilu + 60 s."
         }
@@ -281,10 +281,8 @@
           "curve_offset": "Posun křivky",
           "flow_temp_min": "Minimální teplota vody",
           "flow_temp_max": "Maximální teplota vody",
-          "heating_limit": "Mez vytápění",
-          "heating_limit_hysteresis": "Hystereze meze vytápění",
+          "heating_limit": "Hranice topné sezóny",
           "outdoor_damping_hours": "Tlumení venkovní teploty",
-          "summer_switch_delay": "Zpoždění přechodu do léta",
           "equithermal_duty_enabled": "Omezit střídu kotle podle křivky",
           "boiler_fixed_flow_temp": "Teplota vody nastavená na kotli",
           "boiler_cycle_period": "Perioda střídy",
@@ -293,9 +291,9 @@
         },
         "data_description": {
           "design_flow_temp": "Teplota vody, kterou dům potřebuje při výpočtové venkovní teplotě.",
-          "heating_limit": "Nad touto tlumenou venkovní teplotou se přejde do léta.",
+          "heating_limit": "Topná sezóna začne, jakmile průměr venkovní teploty za poslední 4 hodiny klesne pod tuto hranici. Skončí po 3 celých dnech po sobě, kdy 4h průměr ani jednou neklesl pod ni.",
           "equithermal_duty_enabled": "U nekondenzačních kotlů zapínat až po ověření minimální teploty vody.",
-          "use_forecast": "Průměr tlumené teploty a předpovědi na 24 h z entity počasí, pro mez vytápění i křivku."
+          "use_forecast": "Průměr tlumené teploty a předpovědi na 24 h z entity počasí, pro topnou křivku."
         }
       },
       "equithermal_confirm": {
@@ -424,12 +422,16 @@
         "schedule": {
           "title": "Rozvrh",
           "data": {
-            "schedule_entity": "Rozvrh (volitelné)",
-            "presence_entity": "Přítomnost (volitelné)"
+            "schedule_mode": "Rozvrh",
+            "schedule_entity": "Vlastní rozvrh",
+            "presence_entity": "Přítomnost (volitelné)",
+            "expected_return_entity": "Očekávaný návrat (volitelné)"
           },
           "data_description": {
-            "schedule_entity": "Zapnuto = komfort, vypnuto = útlum. Prázdné = rozvrh domu (Rozvrh, přítomnost a předtápění).",
-            "presence_entity": "Při nepřítomnosti jde místnost na útlum nebo Pryč podle nastavení Přítomnost a předtápění."
+            "schedule_mode": "Podle rozvrhu domu (Rozvrh, přítomnost a předtápění), nebo vlastní pomocník Plán jen pro tuto místnost.",
+            "schedule_entity": "Jen u vlastního rozvrhu: zapnuto = komfort, vypnuto = útlum.",
+            "presence_entity": "Při nepřítomnosti jde místnost na útlum nebo Pryč podle nastavení Rozvrh, přítomnost a předtápění.",
+            "expected_return_entity": "Časové razítko návratu toho, podle koho místnost jede, pro předtápění. Bez vlastní přítomnosti platí návrat domácnosti."
           }
         },
         "control": {
@@ -459,7 +461,8 @@
         "not_temperature_sensor": "Vyberte čidla, která měří teplotu.",
         "sensor_range": "Nejnižší hodnota musí být menší než nejvyšší.",
         "valves_required": "Vyberte aspoň jeden ventil.",
-        "min_state_too_short": "Musí být aspoň doba přestavení ventilu ({valve_time} s)."
+        "min_state_too_short": "Musí být aspoň doba přestavení ventilu ({valve_time} s).",
+        "schedule_required": "Vyberte vlastní rozvrh místnosti."
       }
     }
   },
@@ -543,6 +546,12 @@
         "eco": "Útlum (eco)",
         "away": "Pryč"
       }
+    },
+    "schedule_mode": {
+      "options": {
+        "house": "Podle domu",
+        "own": "Vlastní"
+      }
     }
   },
   "entity": {
@@ -556,8 +565,30 @@
       "window_block": {
         "name": "Blokace okny"
       },
-      "summer": {
-        "name": "Léto (mez vytápění)"
+      "heating_season": {
+        "name": "Topná sezóna",
+        "state_attributes": {
+          "mode": {
+            "name": "Režim",
+            "state": {
+              "auto": "Automaticky",
+              "on": "Topná sezóna",
+              "off": "Mimo sezónu"
+            }
+          },
+          "outdoor_mean_4h": {
+            "name": "Venku průměr 4 h"
+          },
+          "limit": {
+            "name": "Hranice"
+          },
+          "days_above": {
+            "name": "Celé dny nad hranicí"
+          },
+          "since": {
+            "name": "Od"
+          }
+        }
       },
       "problem": {
         "name": "Porucha"
@@ -592,8 +623,15 @@
           "auto": "Automaticky",
           "away": "Pryč",
           "off": "Vypnuto",
-          "summer": "Léto",
           "manual": "Manuál"
+        }
+      },
+      "heating_season": {
+        "name": "Topná sezóna",
+        "state": {
+          "auto": "Automaticky",
+          "on": "Topná sezóna",
+          "off": "Mimo sezónu"
         }
       },
       "demo_boiler_behavior": {
@@ -615,9 +653,10 @@
           "startup": "Start integrace",
           "idle": "Bez požadavku",
           "off": "Vypnuto",
-          "summer": "Léto",
+          "summer": "Mimo sezónu",
           "window_block": "Blokace okny",
           "pre_open": "Čeká na ventily",
+          "pre_close": "Zavírají se ventily",
           "no_flow_hold": "Chybí průtok",
           "min_off_hold": "Minimální pauza",
           "max_starts_hold": "Limit startů",
@@ -654,9 +693,10 @@
               "startup": "Start integrace",
               "idle": "Bez požadavku",
               "off": "Vypnuto",
-              "summer": "Léto",
+              "summer": "Mimo sezónu",
               "window_block": "Blokace okny",
               "pre_open": "Čeká na ventily",
+              "pre_close": "Zavírají se ventily",
               "no_flow_hold": "Chybí průtok",
               "min_off_hold": "Minimální pauza",
               "max_starts_hold": "Limit startů",
@@ -679,7 +719,7 @@
           "auto": "Automaticky",
           "away": "Pryč",
           "off": "Vypnuto",
-          "summer": "Léto",
+          "summer": "Mimo sezónu",
           "manual": "Manuál",
           "fault_safe": "Porucha"
         }
@@ -689,6 +729,9 @@
       },
       "outdoor_temperature_damped": {
         "name": "Tlumená venkovní teplota"
+      },
+      "outdoor_mean_4h": {
+        "name": "Venku (průměr 4 h)"
       },
       "boiler_duty": {
         "name": "Střída kotle (24 h)"

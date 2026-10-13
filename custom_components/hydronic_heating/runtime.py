@@ -392,6 +392,8 @@ class HydronicHeatingRuntime:
                 entity_id = decision.params.get("entity_id")
             elif decision.kind == "presence":
                 entity_id = self.system_entity_id("climate", "system")
+            elif decision.kind == "season":
+                entity_id = self.system_entity_id("binary_sensor", "heating_season")
             elif decision.kind in ("preheat", "room_target"):
                 entity_id = registry.async_get_entity_id(
                     "climate",
@@ -605,6 +607,12 @@ class HydronicHeatingRuntime:
         """Select the system mode (FR-MODE-01)."""
         self.controller.set_mode(SystemMode(mode), dt_util.utcnow())
         self._trigger = ("mode", mode)
+        self._after_action()
+
+    @callback
+    def set_season_mode(self, mode: str) -> None:
+        """Heating season: auto, on or off (FR-EQ-03)."""
+        self.controller.set_season_mode(mode, dt_util.utcnow())
         self._after_action()
 
     @callback

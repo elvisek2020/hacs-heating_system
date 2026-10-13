@@ -70,9 +70,10 @@ def test_3_window_closes_valve_and_restores() -> None:
     window = "binary_sensor.okno_obyvak"
     ctrl = controller(
         room("obyvak", windows=[window]),
+        room("b"),  # keeps the boiler running, so closed valves draw current
         **{c.CONF_HAS_BYPASS: True, c.CONF_BOILER_OVERRUN: 0},
     )
-    house = House(ctrl, temperatures={"obyvak": 19.0})
+    house = House(ctrl, temperatures={"obyvak": 19.0, "b": 15.0})
     house.set(window, "off")
     house.run(300)
     assert house.state("switch.hlavice_obyvak") == "off"  # NO head off = open
@@ -111,7 +112,8 @@ def test_window_without_bypass_keeps_flow_while_boiler_runs() -> None:
     house.run(150)
     assert house.state("switch.hlavice_obyvak") == "off"  # overrun 180 s
     house.run(30)
-    assert house.state("switch.hlavice_obyvak") == "on"
+    # Boiler idle and no demand: the head stays without current (NO = open).
+    assert house.state("switch.hlavice_obyvak") == "off"
 
 
 def test_4_two_windows_stop_the_boiler() -> None:
@@ -208,7 +210,7 @@ def test_7_boiler_ignoring_commands_goes_fault_safe() -> None:
 def test_8_summer_exercise_and_zero_power() -> None:
     """Scenario 8: 30 days of summer, weekly exercise, otherwise de-energized."""
     ctrl = controller(room("obyvak"))
-    ctrl.set_mode(SystemMode.SUMMER, T0)
+    ctrl.set_season_mode("off", T0)
     house = House(ctrl, temperatures={"obyvak": 23.0})
     energized_s = 0
     episodes = 0
@@ -227,23 +229,27 @@ def test_8_summer_exercise_and_zero_power() -> None:
     assert 4 * 600 <= energized_s <= 4 * (600 + step)
 
 
-def test_9_heating_limit_with_hysteresis() -> None:
-    """Scenario 9: summer after the delay above the limit, winter below limit - hysteresis."""
+def test_9_heating_season_by_the_4h_mean() -> None:
+    """Scenario 9: the season ends after 3 whole days above the limit, starts at once below."""
     ctrl = controller(room("obyvak"), outdoor_sensors=["sensor.venku"])
     house = House(ctrl, temperatures={"obyvak": 22.0})
     house.set("sensor.venku", "20", 20.0)
-    house.run(11 * 3600 + 50 * 60, every=600)
-    assert not ctrl.outdoor.summer
-    house.run(20 * 60, every=600)
-    assert ctrl.outdoor.summer
+    # T0 is 12:00 local on the 15th; the 15th, 16th and 17th stay above 13 °C.
+    house.run(60 * 3600 - 600, every=600)
+    assert ctrl.season.active
+    assert ctrl.season.days_above == 2
+    house.run(1200, every=600)  # local midnight: three whole days above
+    assert ctrl.season.days_above == 3
+    assert not ctrl.season.active
     assert ctrl.state is SystemState.SUMMER
 
-    house.run(3600, every=600)
     house.set("sensor.venku", "5", 5.0)
-    house.run(15 * 3600, every=600)
-    assert ctrl.outdoor.summer  # damped still above 13 °C
     house.run(3600, every=600)
-    assert not ctrl.outdoor.summer
+    assert ctrl.season.mean_4h > 13  # still mostly warm samples
+    assert not ctrl.season.active
+    house.run(3600, every=600)
+    assert ctrl.season.mean_4h < 13
+    assert ctrl.season.active
     assert ctrl.state is SystemState.AUTO
 
 
@@ -251,7 +257,7 @@ def test_10_frost_overrides_open_window_even_in_summer() -> None:
     """Scenario 10: frost opens the valve and requests the boiler despite window and summer."""
     window = "binary_sensor.okno_obyvak"
     ctrl = controller(room("obyvak", windows=[window]))
-    ctrl.set_mode(SystemMode.SUMMER, T0)
+    ctrl.set_season_mode("off", T0)
     house = House(ctrl, temperatures={"obyvak": 4.0})
     house.set(window, "on")
     house.run(300)
@@ -357,8 +363,8 @@ def test_14_setpoint_change_is_permanent_override() -> None:
 
 def test_15_valve_resync_after_unavailable() -> None:
     """Scenario 15: a valve that comes back in another state is corrected (FR-VAL-09)."""
-    ctrl = controller(room("obyvak"))
-    house = House(ctrl, temperatures={"obyvak": 23.0})
+    ctrl = controller(room("obyvak"), room("b"))
+    house = House(ctrl, temperatures={"obyvak": 23.0, "b": 15.0})
     house.run(10 * 60)
     assert house.state("switch.hlavice_obyvak") == "on"  # warm room, valve closed
 
