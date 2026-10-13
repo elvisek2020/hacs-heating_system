@@ -640,6 +640,9 @@
       "eco": {
         "name": "Eco temperature"
       },
+      "away": {
+        "name": "Away temperature"
+      },
       "demo_outdoor_temperature": {
         "name": "Demo outdoor temperature"
       }

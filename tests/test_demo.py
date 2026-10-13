@@ -14,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry, async_
 from custom_components.hydronic_heating.const import (
     CONF_DEMO_MODE,
     CONF_EQUITHERMAL_DUTY_ENABLED,
+    CONF_FEEDBACK_ENTITY,
     CONF_FLOW_TEMP_ENTITY,
     DEMO_VIRTUAL_HOUSE,
     DEMO_VIRTUAL_OUTPUTS,
@@ -312,12 +313,19 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
     living = overview["sections"][-2]["cards"]
     assert living[0]["icon"] == "mdi:sofa-outline"
     assert living[0]["badges"][0]["entity"] == "binary_sensor.hh_obyvak_window"
-    # Thermostat, then the demand (the cause) and the valve (the result), no text.
-    assert [c.get("entity") for c in living[1:4]] == [
+    # Thermostat, the demand (the cause), the valve (the result), then the lasting
+    # temperatures; no text. Without absence the away temperature is not used.
+    assert [c.get("entity") for c in living[1:6]] == [
         "climate.hh_obyvak",
         "sensor.hh_obyvak_demand",
         "sensor.hh_obyvak_valve_state",
+        "number.hh_obyvak_comfort",
+        "number.hh_obyvak_eco",
     ]
+    assert living[4]["features"] == [{"type": "numeric-input", "style": "buttons"}]
+    assert (living[4]["color"], living[5]["color"]) == ("orange", "teal")
+    assert living[5]["name"] == "Eco"  # as the preset of the thermostat
+    assert "**Away**" not in rows
     assert all(c["type"] != "markdown" for c in living)
     assert "color" not in living[1]  # room thermostats keep the colors of HA
     # Room mode switch first (back to auto in one tap), then target and presets.
@@ -349,6 +357,8 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     badges = {b["entity"]: b for b in overview["badges"]}
     assert "sensor.hh_boiler_reason" in badges
     assert badges["sensor.hh_boiler_reason"]["color"] == "deep-orange"
+    # Without feedback the Boiler badge shows the command.
+    assert overview["badges"][1]["entity"] == "binary_sensor.hh_boiler_command"
     # No windows in the rooms: no window tiles.
     assert "sensor.hh_open_windows" not in badges
     hold_badge = badges["sensor.hh_boiler_hold_ends_at"]
@@ -425,6 +435,30 @@ async def test_dashboard_with_flow_sensor_and_duty_limit(hass: HomeAssistant) ->
     rows = legend["sections"][0]["cards"][1]["content"]
     assert "**Flow temperature**" in rows
     assert "**Duty limit**" in rows
+
+
+async def test_dashboard_shows_the_actual_boiler_state(hass: HomeAssistant) -> None:
+    """With feedback: the actual boiler state in the bar, next to the command and in charts."""
+    hass.states.async_set("binary_sensor.horak", "off")
+    await _setup(hass, **{CONF_FEEDBACK_ENTITY: "binary_sensor.horak"})
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    overview, history, legend = dashboard["views"]
+    boiler_badge = overview["badges"][1]
+    assert boiler_badge["entity"] == "binary_sensor.horak"
+    assert boiler_badge["name"] == "Boiler"
+    assert boiler_badge["icon"] == "mdi:fire"
+    operation = overview["sections"][2]["cards"]
+    assert [c["entity"] for c in operation[1:4]] == [
+        "binary_sensor.hh_boiler_command",
+        "binary_sensor.horak",
+        "binary_sensor.hh_heat_demand",
+    ]
+    assert operation[2]["name"] == "Boiler (actual state)"
+    timeline = history["sections"][1]["cards"][2]["entities"]
+    assert timeline[2] == {"entity": "binary_sensor.horak", "name": "Boiler (actual state)"}
+    assert "**Boiler (actual state)**" in legend["sections"][0]["cards"][1]["content"]
 
 
 async def test_dashboard_shadow_banner(hass: HomeAssistant) -> None:

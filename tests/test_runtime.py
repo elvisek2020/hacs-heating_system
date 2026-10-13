@@ -9,6 +9,7 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntryState, ConfigSubentry, ConfigSubentryData
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.setup import async_setup_component
 import pytest
@@ -134,6 +135,7 @@ async def test_entities_follow_prd_naming(hass: HomeAssistant) -> None:
         "sensor.hh_obyvak_valve_state",
         "number.hh_obyvak_comfort",
         "number.hh_obyvak_eco",
+        "number.hh_obyvak_away",
         "binary_sensor.hh_obyvak_window",
         "binary_sensor.hh_obyvak_problem",
         "climate.hh_loznice",
@@ -269,6 +271,31 @@ async def test_number_updates_room_without_reload(hass: HomeAssistant) -> None:
     assert entry.runtime_data is runtime  # no reload
     assert hass.states.get("number.hh_obyvak_comfort").state == "22.5"
     assert hass.states.get("climate.hh_obyvak").attributes["temperature"] == 22.5
+
+
+async def test_room_temperatures_keep_their_order(hass: HomeAssistant) -> None:
+    """Bounds as in the room settings: frost < eco <= comfort, frost < away."""
+    await _setup(hass)
+    comfort = hass.states.get("number.hh_obyvak_comfort").attributes
+    eco = hass.states.get("number.hh_obyvak_eco").attributes
+    away = hass.states.get("number.hh_obyvak_away").attributes
+    assert (comfort["min"], comfort["max"]) == (19.0, 30.0)
+    assert (eco["min"], eco["max"]) == (5.5, 21.0)
+    assert (away["min"], away["max"]) == (5.5, 25.0)
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": "number.hh_obyvak_eco", "value": 22}, blocking=True
+        )
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": "number.hh_obyvak_comfort", "value": 23}, blocking=True
+    )
+    await _settle(hass)
+    assert hass.states.get("number.hh_obyvak_eco").attributes["max"] == 23.0
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": "number.hh_obyvak_away", "value": 12}, blocking=True
+    )
+    await _settle(hass)
+    assert hass.states.get("number.hh_obyvak_away").state == "12.0"
 
 
 async def test_new_room_reloads_with_new_entities(hass: HomeAssistant) -> None:

@@ -24,10 +24,13 @@
     },
     "number": {
       "comfort": {
-        "default": "mdi:sofa-outline"
+        "default": "mdi:sofa"
       },
       "eco": {
         "default": "mdi:leaf"
+      },
+      "away": {
+        "default": "mdi:home-export-outline"
       },
       "demo_outdoor_temperature": {
         "default": "mdi:thermometer"

@@ -102,6 +102,19 @@ async def test_czech_preheat_text_and_dashboard_badges(hass: HomeAssistant) -> N
     badges = {b["entity"]: b for b in dashboard["views"][0]["badges"]}
     assert badges["group.rodina"]["name"] == "Doma"
     assert badges["binary_sensor.dlouho_pryc"]["visibility"][0]["state"] == "on"
+    # With long absence the room shows its away temperature too.
+    rooms = {s["cards"][0].get("heading"): s["cards"] for s in dashboard["views"][0]["sections"]}
+    away = next(c for c in rooms["Obývák"] if c.get("entity") == "number.hh_obyvak_away")
+    assert away["name"] == "Pryč"
+    eco = next(c for c in rooms["Obývák"] if c.get("entity") == "number.hh_obyvak_eco")
+    assert eco["name"] == "ECO"
+    # The badges of the top bar are explained too, with the same icons.
+    assert badges["group.rodina"]["icon"] == "mdi:account-multiple"
+    assert badges["binary_sensor.dlouho_pryc"]["icon"] == "mdi:bag-suitcase"
+    rows = dashboard["views"][2]["sections"][0]["cards"][1]["content"]
+    assert "**Pryč**" in rows
+    assert '<ha-icon icon="mdi:account-multiple"></ha-icon> | **Doma**' in rows
+    assert '<ha-icon icon="mdi:bag-suitcase"></ha-icon> | **Dlouhodobě pryč**' in rows
 
 
 async def test_house_schedule_in_rooms_and_dashboard(hass: HomeAssistant) -> None:

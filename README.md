@@ -132,13 +132,15 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 - **Nahoře jedna řada:**
   - Topení: systém, režim, topná sezóna, rozvrh domu, manuál.
   - Kotel: proč, další změna, celkový požadavek, měřená teplota vody, venku a 4h průměr s hranicí topné sezóny.
-  - Provoz kotle podle priority: povel kotli, požadavek na teplo, venku (průměr 4 h), porucha, topná sezóna, starty dnes, střída 24 h, omezení střídy. Pod tím Kdo je doma.
+  - Provoz kotle podle priority: povel kotli, skutečný stav kotle (se zpětnou vazbou), požadavek na teplo, venku (průměr 4 h), porucha, topná sezóna, starty dnes, střída 24 h, omezení střídy. Pod tím Kdo je doma.
+- **Odznak Kotel** v horní liště ukazuje se zpětnou vazbou skutečný stav kotle, bez ní povel.
 - **Pod řadou** upozornění na shadow režim přes celou šířku, v demu blok Demo.
 - **Místnosti – individuální nastavení:**
   - nahoře ovládání (režim místnosti automaticky / ručně / vypnuto, cílová teplota, předvolba),
-  - pod ním požadavek (příčina) a ventil (následek),
+  - pak požadavek (příčina) a ventil (následek),
+  - pod nimi **Komfort** a **ECO** s tlačítky −/+, tedy trvalé teploty místnosti pro automatiku. **Pryč** jen tehdy, když se používá (dlouhodobá nepřítomnost, nebo předvolba nepřítomnosti Pryč). Pozor: −/+ na termostatu nastaví jen ruční cíl a místnost přepne na ručně.
   - dole vlastní rozvrh.
-- **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice se stejnou ikonou a jednou až dvěma větami, co znamená.
+- **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice a každý odznak se stejnou ikonou a jednou až dvěma větami, co znamená.
 - **Jen nastavené funkce.** Okna, blokace okny, omezení střídy, žádaná teplota z křivky, teplota vody ani rozvrh domu se negenerují, když je nepoužíváte. Po změně nastavení dashboard přegenerujte.
 - **Barvy podle významu:** kotel oranžově, požadavky a sezóna jantarově, voda a porucha červeně, venek modře, ventily a okna tyrkysově, osoby zeleně. Dvoustavové dlaždice svítí jen v aktivním stavu, termostaty mají barvy HA.
 
@@ -188,7 +190,7 @@ Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastn�
 | `switch.hh_shadow_mode` | shadow režim |
 | `climate.hh_<místnost>` | termostat místnosti s presety komfort, eco, pryč a ruční teplota |
 | `sensor.hh_<místnost>_temperature`, `_demand`, `_valve_state` | teplota, požadavek, stav ventilů |
-| `number.hh_<místnost>_comfort`, `_eco` | komfortní a útlumová teplota |
+| `number.hh_<místnost>_comfort`, `_eco`, `_away` | komfortní, útlumová a teplota Pryč (útlum nejde nad komfort, útlum a Pryč nejdou na protimrazovou teplotu nebo pod ni) |
 | `binary_sensor.hh_<místnost>_window`, `_problem` | blokace oknem, porucha místnosti |
 
 Ruční změna teploty nebo presetu místnosti v režimu automaticky platí trvale: místnost přejde do režimu topit a rozvrh se ignoruje, dokud ji nevrátíte na automaticky. Atribut `override_active` ukazuje, kde rozvrh neběží.

@@ -45,6 +45,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "minutes": "{minutes} min",
         "stop": "Stop",
         "boiler_command": "Povel kotli",
+        "boiler_actual": "Kotel (skutečný stav)",
         "boiler_reason": "Proč",
         "boiler_hold": "Další změna",
         "boiler_reason_timeline": "Důvod stavu kotle",
@@ -72,6 +73,9 @@ TEXTS: dict[str, dict[str, str]] = {
         "demand": "Požadavek",
         "valve": "Ventil",
         "valves": "Ventily",
+        "comfort": "Komfort",
+        "eco": "ECO",
+        "away": "Pryč",
         "window": "Okno",
         "simulation": "Simulace",
         "demo_outputs": "Demo · virtuální výstupy",
@@ -123,6 +127,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "minutes": "{minutes} min",
         "stop": "Stop",
         "boiler_command": "Boiler command",
+        "boiler_actual": "Boiler (actual state)",
         "boiler_reason": "Why",
         "boiler_hold": "Next change",
         "boiler_reason_timeline": "Boiler state reason",
@@ -151,6 +156,9 @@ TEXTS: dict[str, dict[str, str]] = {
         "demand": "Demand",
         "valve": "Valve",
         "valves": "Valves",
+        "comfort": "Comfort",
+        "eco": "Eco",
+        "away": "Away",
         "window": "Window",
         "simulation": "Simulation",
         "demo_outputs": "Demo · virtual outputs",
@@ -191,6 +199,24 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:state-machine",
             "Stav",
             "Stav řízení: automaticky, pryč, vypnuto, mimo sezónu, manuál nebo porucha.",
+        ),
+        (
+            "house_presence",
+            "mdi:account-multiple",
+            "Doma",
+            (
+                "Přítomnost domácnosti, kterou topení používá (například víc lidí doma). "
+                "Vypnuto = místnosti bez vlastní přítomnosti jedou na teplotu nepřítomnosti."
+            ),
+        ),
+        (
+            "long_away",
+            "mdi:bag-suitcase",
+            "Dlouhodobě pryč",
+            (
+                "Domácnost je dlouhodobě pryč (víkend, dovolená): všechny místnosti mají "
+                "teplotu Pryč. Odznak se ukáže jen tehdy."
+            ),
         ),
         (
             "",
@@ -269,6 +295,15 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             ),
         ),
         ("", "mdi:play", "Povel kotli", "Zda integrace kotli povoluje topit."),
+        (
+            "feedback",
+            "mdi:fire",
+            "Kotel (skutečný stav)",
+            (
+                "Zda kotel opravdu běží, podle zpětné vazby. Při povelu může chvíli stát, "
+                "když má vodu nahřátou. Odznak Kotel v horní liště ukazuje tento stav."
+            ),
+        ),
         ("", "mdi:fire-alert", "Požadavek na teplo", "Zda místnosti teplo chtějí."),
         (
             "",
@@ -301,6 +336,12 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
         (
             "windows",
             "mdi:window-open-variant",
+            "Okna",
+            "Počet místností s otevřeným oknem. Odznak se ukáže, jen když je nějaké otevřené.",
+        ),
+        (
+            "windows",
+            "mdi:window-open-variant",
             "Blokace okny",
             "Otevřená okna ve více místnostech zastavila kotel.",
         ),
@@ -319,8 +360,9 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Teplota (místnost)",
             (
                 "Aktuální teplota, režim místnosti (automaticky, ručně, vypnuto), cíl a "
-                "předvolba. Ruční změna platí trvale, zpět na automatiku jedním dotykem. Proč "
-                "má místnost svůj cíl, ukazují atributy termostatu a deník."
+                "předvolba. −/+ na termostatu nastaví ruční cíl a přepne místnost na ručně, "
+                "zpět na automatiku jedním dotykem. Proč má místnost svůj cíl, ukazují "
+                "atributy termostatu a deník."
             ),
         ),
         ("", "mdi:gauge", "Požadavek (místnost)", "Kolik procent tepla místnost chce."),
@@ -329,6 +371,30 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:pipe-valve",
             "Ventil",
             "Poloha ventilu radiátoru: otevřeno, otevírá se, zavírá se, zavřeno.",
+        ),
+        (
+            "",
+            "mdi:sofa",
+            "Komfort",
+            (
+                "Trvalá komfortní teplota místnosti pro automatiku (rozvrh zapnuto, někdo "
+                "doma). Změna platí hned a místnost zůstává v automatice."
+            ),
+        ),
+        (
+            "",
+            "mdi:leaf",
+            "ECO",
+            (
+                "Trvalá útlumová teplota (předvolba ECO) pro automatiku (rozvrh vypnuto, "
+                "nikdo doma). Nejde nastavit nad komfort."
+            ),
+        ),
+        (
+            "away",
+            "mdi:home-export-outline",
+            "Pryč",
+            "Teplota místnosti, když je celá domácnost dlouhodobě pryč nebo nikdo doma.",
         ),
         (
             "own_schedule",
@@ -349,6 +415,24 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:state-machine",
             "State",
             "Control state: auto, away, off, off season, manual or fault.",
+        ),
+        (
+            "house_presence",
+            "mdi:account-multiple",
+            "Home",
+            (
+                "Presence of the household the heating uses (for example several people home). "
+                "Off = rooms without their own presence use the absence temperature."
+            ),
+        ),
+        (
+            "long_away",
+            "mdi:bag-suitcase",
+            "Long absence",
+            (
+                "The household is away for long (weekend, holiday): all rooms have the away "
+                "temperature. The badge shows only then."
+            ),
         ),
         ("", "mdi:thermostat", "System", "Mode of the whole system: off, auto, or heat (manual)."),
         (
@@ -422,6 +506,15 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             ),
         ),
         ("", "mdi:play", "Boiler command", "Whether the integration lets the boiler heat."),
+        (
+            "feedback",
+            "mdi:fire",
+            "Boiler (actual state)",
+            (
+                "Whether the boiler really runs, by its feedback. With the command on it may "
+                "stand for a while when its water is hot. The Boiler badge on top shows it."
+            ),
+        ),
         ("", "mdi:fire-alert", "Heat demand", "Whether the rooms want heat."),
         (
             "",
@@ -457,6 +550,12 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
         (
             "windows",
             "mdi:window-open-variant",
+            "Windows",
+            "Rooms with an open window. The badge shows only when one is open.",
+        ),
+        (
+            "windows",
+            "mdi:window-open-variant",
             "Window block",
             "Open windows in several rooms stopped the boiler.",
         ),
@@ -474,9 +573,10 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:thermostat",
             "Temperature (room)",
             (
-                "Current temperature, room mode (auto, manual, off), target and preset. A manual "
-                "change stays; back to auto in one tap. The thermostat attributes and the "
-                "logbook tell why the room has its target."
+                "Current temperature, room mode (auto, manual, off), target and preset. -/+ on "
+                "the thermostat sets a manual target and switches the room to manual; back to "
+                "auto in one tap. The thermostat attributes and the logbook tell why the room "
+                "has its target."
             ),
         ),
         ("", "mdi:gauge", "Demand (room)", "How many percent of heat the room wants."),
@@ -485,6 +585,30 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:pipe-valve",
             "Valve",
             "Position of the radiator valve: open, opening, closing, closed.",
+        ),
+        (
+            "",
+            "mdi:sofa",
+            "Comfort",
+            (
+                "Lasting comfort temperature of the room for auto (schedule on, someone home). "
+                "Applies at once; the room stays in auto."
+            ),
+        ),
+        (
+            "",
+            "mdi:leaf",
+            "Eco",
+            (
+                "Lasting setback temperature for auto (schedule off, nobody home). Cannot be set "
+                "above comfort."
+            ),
+        ),
+        (
+            "away",
+            "mdi:home-export-outline",
+            "Away",
+            "Room temperature while the household is away for long or nobody is home.",
         ),
         (
             "own_schedule",
@@ -520,6 +644,9 @@ LIMIT = "purple"  # schedules, duty limit
 STATS = "teal"  # duty 24 h
 AUX = "blue-grey"  # starts today, long absence
 MISC = "grey"  # shadow, legend
+COMFORT = "orange"  # room temperature settings
+ECO = "teal"
+AWAY = AUX
 
 # Room icons by a part of the room name (slug), the first match wins.
 ROOM_ICONS = (
@@ -550,6 +677,7 @@ HALF = {"columns": 6}
 FULL = {"columns": "full"}
 LEGEND_PATH = "vysvetlivky"
 FLOW_ICON = "mdi:thermometer-water"
+BOILER_ICON = "mdi:fire"
 # Attributes of entities that stand for several people (groups, counts).
 AGGREGATE_ATTRS = ("entity_id", "people", "count")
 PRESENCE_CLASSES = ("presence", "occupancy")
@@ -641,10 +769,14 @@ class _Shown:
     """Configured features; tiles and legend rows of the others are left out."""
 
     flow: str | None
+    feedback: str | None
     duty: bool
     windows: bool
     house_schedule: str | None
     own_schedule: bool
+    house_presence: bool = False
+    long_away: bool = False
+    away: bool = False
     people: list[tuple[str, str]] = field(default_factory=list)
 
     @classmethod
@@ -653,10 +785,16 @@ class _Shown:
         return cls(
             # The real sensor also in the demo: the real boiler keeps running.
             flow=runtime.real_system_config().heat_source.flow_temp_entity,
+            # Not in the demo: there the boiler is virtual and has no feedback.
+            feedback=cfg.heat_source.feedback_entity,
             duty=cfg.duty_enabled,
             windows=any(room.cfg.windows for room in runtime.controller.rooms.values()),
             house_schedule=cfg.house_schedule_entity,
             own_schedule=any(room.schedule_entity for room in runtime.rooms),
+            house_presence=cfg.house_presence_entity is not None,
+            long_away=cfg.long_away_entity is not None,
+            # The away temperature only when absence leads to it (FR-SCH-02).
+            away=cfg.long_away_entity is not None or cfg.absence_preset == "away",
             people=_people(runtime),
         )
 
@@ -665,10 +803,14 @@ class _Shown:
         return {
             "": True,
             "flow": self.flow is not None,
+            "feedback": self.feedback is not None,
             "duty": self.duty,
             "windows": self.windows,
             "house_schedule": self.house_schedule is not None,
             "own_schedule": self.own_schedule,
+            "house_presence": self.house_presence,
+            "long_away": self.long_away,
+            "away": self.away,
             "people": bool(self.people),
         }[feature]
 
@@ -702,11 +844,21 @@ def _overview(
     state = sid("sensor", "state")
     badges = [
         _badge(state, text["state"], color=CONTROL),
-        _badge(sid("binary_sensor", "boiler_command"), text["boiler"], color=HEAT),
+        # The boiler: its actual state by the feedback, else the command.
+        _badge(shown.feedback, text["boiler"], color=HEAT, icon=BOILER_ICON)
+        if shown.feedback
+        else _badge(sid("binary_sensor", "boiler_command"), text["boiler"], color=HEAT),
     ]
     # Presence of the household, when configured (FR-SCH-02).
     if cfg.house_presence_entity:
-        badges.append(_badge(cfg.house_presence_entity, text["presence"], color=PEOPLE))
+        badges.append(
+            _badge(
+                cfg.house_presence_entity,
+                text["presence"],
+                color=PEOPLE,
+                icon="mdi:account-multiple",
+            )
+        )
     badges += [
         _badge(sid("sensor", "boiler_reason"), text["boiler_reason"], color=HEAT),
         _badge(hold, text["boiler_hold"], color=TIME, visibility=_when_known(hold)),
@@ -738,6 +890,7 @@ def _overview(
                 cfg.long_away_entity,
                 text["long_away"],
                 color=AUX,
+                icon="mdi:bag-suitcase",
                 visibility=_when_on(cfg.long_away_entity),
             )
         )
@@ -768,7 +921,7 @@ def _overview(
     else:
         sections.append(_shadow_section(shadow, text))
     sections.append(_divider(text["rooms_settings"], "mdi:home-thermometer-outline"))
-    sections.extend(_room_section(runtime, ids, text, room) for room in runtime.rooms)
+    sections.extend(_room_section(runtime, ids, text, room, shown) for room in runtime.rooms)
     return {
         "title": text["overview"],
         "path": "prehled",
@@ -953,6 +1106,10 @@ def _boiler_operation_section(ids: _Ids, text: dict[str, str], shown: _Shown) ->
     cards = [
         _heading(text["boiler_operation"], "mdi:chart-box-outline"),
         _half(sid("binary_sensor", "boiler_command"), text["boiler_command"], color=HEAT),
+    ]
+    if shown.feedback:
+        cards.append(_half(shown.feedback, text["boiler_actual"], color=HEAT, icon=BOILER_ICON))
+    cards += [
         _half(sid("binary_sensor", "heat_demand"), text["heat_demand"], color=TIME),
         _half(sid("sensor", "outdoor_mean_4h"), text["outdoor_mean_4h"], color=OUTDOOR_MEAN),
         _half(sid("binary_sensor", "problem"), text["problem"], color=PROBLEM),
@@ -1086,7 +1243,11 @@ def _demo_section(runtime: HydronicHeatingRuntime, text: dict[str, str]) -> dict
 
 
 def _room_section(
-    runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str], room: RoomConfig
+    runtime: HydronicHeatingRuntime,
+    ids: _Ids,
+    text: dict[str, str],
+    room: RoomConfig,
+    shown: _Shown,
 ) -> dict:
     window = ids.room("binary_sensor", room, "window")
     problem = ids.room("binary_sensor", room, "problem")
@@ -1132,6 +1293,8 @@ def _room_section(
                 {"type": "climate-preset-modes", "style": "dropdown", "preset_modes": PRESETS},
             ],
         ),
+    ]
+    cards += [
         # 2. Display only: the demand (the cause), then the valve (the result).
         _full(
             ids.room("sensor", room, "demand"),
@@ -1145,11 +1308,23 @@ def _room_section(
     # travel time, so "open" means open regardless of NO/NC heads.
     valve_name = text["valve"] if len(room.valves) == 1 else text["valves"]
     cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name, color=VALVE))
+    # 3. Lasting temperatures of the room for auto (ECO as the preset); -/+ on the
+    # thermostat is only a manual target.
+    settings = [("comfort", COMFORT), ("eco", ECO)] + ([("away", AWAY)] if shown.away else [])
+    cards.extend(
+        _half(
+            ids.room("number", room, key),
+            text[key],
+            color=color,
+            features=[{"type": "numeric-input", "style": "buttons"}],
+        )
+        for key, color in settings
+    )
     if demo is not None and layout is not None and layout.house:
         cards.append(_heading(text["simulation"], "mdi:test-tube", subtitle=True))
         cards.append(_half(demo.window.entity_id, text["window"], color=VALVE))
         cards.append(_half(demo.sensor_fault.entity_id, text["demo_sensor_fault"], color=PROBLEM))
-    # 3. The room's own schedule, editable; the house schedule is in the Heating block.
+    # 4. The room's own schedule, editable; the house schedule is in the Heating block.
     if room.schedule_entity:
         cards.append(
             _full(
@@ -1224,6 +1399,7 @@ def _history(
     boiler_entities: list[dict[str, str]] = [
         {"entity": sid("sensor", "boiler_reason"), "name": text["boiler_reason_timeline"]},
         {"entity": sid("binary_sensor", "boiler_command"), "name": text["boiler_command"]},
+        *([{"entity": shown.feedback, "name": text["boiler_actual"]}] if shown.feedback else []),
         {"entity": sid("binary_sensor", "heat_demand"), "name": text["heat_demand"]},
     ]
     if shown.windows:

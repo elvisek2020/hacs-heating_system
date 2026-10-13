@@ -5,6 +5,22 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.11.0 — 2026-10-13
+
+### ✨ Novinky
+
+- **Komfort a ECO přímo v kartě místnosti.** Pod ventilem jsou dvě pole s tlačítky −/+ pro trvalou komfortní a útlumovou teplotu. Místnost při jejich změně zůstává v automatice. −/+ na termostatu dál nastavuje jen ruční cíl a místnost přepne na ručně.
+- **Teplota Pryč:** nová entita `number.hh_<místnost>_away`. V kartě místnosti je jen tehdy, když se používá (dlouhodobá nepřítomnost, nebo předvolba nepřítomnosti Pryč).
+- Pole hlídají stejná pravidla jako nastavení místnosti: ECO nejde nad komfort, ECO ani Pryč nejdou na protimrazovou teplotu nebo pod ni.
+- **Skutečný stav kotle.** Se zpětnou vazbou je v Provozu kotle hned za povelem dlaždice „Kotel (skutečný stav)“. Odznak Kotel v horní liště ukazuje, jestli kotel opravdu běží, a v Grafech je skutečný stav jako čára pod povelem.
+
+### 🎨 Vzhled
+
+- Karta místnosti: termostat, požadavek, ventil, Komfort a ECO, vlastní rozvrh.
+- Vysvětlivky popisují i odznaky horní lišty (Doma, Dlouhodobě pryč, Okna). Ikony odznaků odpovídají legendě.
+
+Po aktualizaci dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.10.0 — 2026-10-13
 
 ### ✨ Novinky
