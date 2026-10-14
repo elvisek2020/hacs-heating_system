@@ -110,7 +110,7 @@ async def test_czech_preheat_text_and_dashboard_badges(hass: HomeAssistant) -> N
     # The badges of the top bar are explained too, with the same icons.
     assert badges["group.rodina"]["icon"] == "mdi:account-multiple"
     assert badges["binary_sensor.dlouho_pryc"]["icon"] == "mdi:bag-suitcase"
-    rows = dashboard["views"][3]["sections"][0]["cards"][1]["content"]
+    rows = dashboard["views"][3]["sections"][0]["cards"][1]["content"].replace("\u00a0", " ")
     assert "**Pryč**" not in rows
     assert '<ha-icon icon="mdi:account-multiple"></ha-icon> | **Doma**' in rows
     assert '<ha-icon icon="mdi:bag-suitcase"></ha-icon> | **Dlouhodobě pryč**' in rows
@@ -232,6 +232,18 @@ async def test_who_is_home_from_a_presence_integration(hass: HomeAssistant) -> N
     parents = sensor("rodice_home", "Rodiče", {"count": 1, "people": ["ElvisEK"]})
     elvisek = sensor("elvisek_home", "ElvisEK", {"friendly_name": "ElvisEK Doma"})
     adam = sensor("adam_home", "Adam", {"friendly_name": "Adam Doma"})
+    # ElvisEK has the real time of the last change as a timestamp sensor.
+    since = registry.async_get_or_create(
+        "sensor",
+        "household_presence",
+        "elvisek_since",
+        config_entry=module,
+        device_id=registry.async_get(elvisek).device_id,
+        has_entity_name=True,
+        original_device_class="timestamp",
+        translation_key="since",
+        suggested_object_id="hp_elvisek_since",
+    ).entity_id
     entry = await _setup(hass, **{CONF_HOUSE_PRESENCE_ENTITY: house})
     living = next(s for s in entry.subentries.values() if s.unique_id == "obyvak")
     hass.config_entries.async_update_subentry(
@@ -244,3 +256,9 @@ async def test_who_is_home_from_a_presence_integration(hass: HomeAssistant) -> N
     operation = dashboard["views"][0]["sections"][2]["cards"]
     people = [(c["entity"], c.get("name")) for c in operation if c.get("color") == "green"]
     assert people == [(elvisek, "ElvisEK"), (adam, "Adam")]
+    cards = {c.get("entity"): c for c in operation}
+    # With the real time of the change: the state and next to it the time.
+    assert cards[elvisek]["state_content"] == ["state"]
+    assert (cards[since]["name"], cards[since]["icon"]) == ("Changed", "mdi:clock-outline")
+    # Without it the time of the last state change in Home Assistant.
+    assert cards[adam]["state_content"] == ["state", "last_changed"]

@@ -39,8 +39,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "rooms_settings": "Místnosti – individuální nastavení",
         "season": "Topná sezóna",
         "outdoor_mean_4h": "Venku (průměr 4 h)",
-        "outdoor_mean_limit": "Venku – průměr 4 h (hranice {limit} °C)",
+        "outdoor_mean_chart": "Venku – průměr 4 h a hranice topné sezóny",
+        "mean_4h": "Průměr 4 h",
+        "heating_limit": "Hranice",
         "who_home": "Kdo je doma",
+        "since": "Změna",
         "legend": "Vysvětlivky",
         "outdoor": "Venku",
         "rooms": "Místnosti",
@@ -123,8 +126,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "rooms_settings": "Rooms – individual settings",
         "season": "Heating season",
         "outdoor_mean_4h": "Outdoor (4 h mean)",
-        "outdoor_mean_limit": "Outdoor – 4 h mean (limit {limit} °C)",
+        "outdoor_mean_chart": "Outdoor – 4 h mean and the heating season limit",
+        "mean_4h": "4 h mean",
+        "heating_limit": "Limit",
         "who_home": "Who is home",
+        "since": "Changed",
         "legend": "Legend",
         "outdoor": "Outdoor",
         "rooms": "Rooms",
@@ -273,7 +279,17 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Další změna",
             "Kdy skončí časové pravidlo (minimální běh, pauza, doběh). Jen když nějaké platí.",
         ),
-        ("", "mdi:gauge", "Celkový požadavek", "Vážený požadavek všech místností na teplo v %."),
+        (
+            "",
+            "mdi:gauge",
+            "Celkový požadavek",
+            (
+                "Vážený požadavek všech místností na teplo v %. Kotel zapne, když průměr "
+                "dosáhne {threshold} % {combine} když volají aspoň {rooms}. Běžící kotel drží "
+                "až do poklesu pod {off} % (hystereze). Pravidlo a počet volajících jsou "
+                "v dlaždici."
+            ),
+        ),
         (
             "flow",
             "mdi:thermometer-water",
@@ -301,7 +317,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Venku (průměr 4 h)",
             (
                 "Průměr venkovní teploty za 4 hodiny, podle něj začíná a končí topná sezóna. "
-                "Hranice je v názvu dlaždice."
+                "V grafu je hranice sezóny vodorovná čára."
             ),
         ),
         ("", "mdi:play", "Povel kotli", "Zda integrace kotli povoluje topit."),
@@ -364,7 +380,8 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Kdo je doma",
             (
                 "Osoby z přítomnosti, kterou topení používá, bez skupin. „Před 5 minutami“ "
-                "ukazuje, kdo právě odešel."
+                "ukazuje, kdo právě odešel. Když modul přítomnosti dává čas skutečné změny, "
+                "je vedle osoby dlaždice Změna, která platí i po restartu HA."
             ),
         ),
         (
@@ -378,7 +395,37 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
                 "atributy termostatu a deník."
             ),
         ),
-        ("", "mdi:gauge", "Požadavek (místnost)", "Kolik procent tepla místnost chce."),
+        (
+            "",
+            "mdi:thermostat",
+            "Činnost (místnost)",
+            (
+                "Za teplotou: Topí = místnost chce teplo, ventil je otevřený a kotel běží. "
+                "Předehřev = chce teplo, ale zatím netopí: kotel stojí (pravidlo startu, "
+                "minimální pauza, zavírání ventilů), nebo je ventil v cyklu PWM zrovna "
+                "zavřený. Není to předtápění. Nečinné = teplo nechce. Vypnuto = místnost "
+                "je vypnutá."
+            ),
+        ),
+        (
+            "",
+            "mdi:clock-start",
+            "Předtápění",
+            (
+                "Místnost začne topit dřív, aby měla komfort už na začátku rozvrhu nebo při "
+                "návratu. Důvod cíle Předtápění, v deníku „Předtápění: …“. Nezaměňovat "
+                "s Předehřevem."
+            ),
+        ),
+        (
+            "",
+            "mdi:gauge",
+            "Požadavek (místnost)",
+            (
+                "Kolik procent tepla místnost chce. Od {room} % se počítá jako volající "
+                "pro start kotle, v dlaždici je volá / nevolá."
+            ),
+        ),
         (
             "",
             "mdi:pipe-valve",
@@ -428,10 +475,10 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Vlastní plán místnosti, jen když ho místnost má. Úprava mění jen tuto místnost.",
         ),
         (
-            "",
+            "shadow",
             "mdi:ghost-outline",
             "Shadow",
-            "Řízení všechno počítá, ale kotel ani ventily nespíná.",
+            "Řízení všechno počítá, ale kotel ani ventily nespíná. Jen v shadow režimu.",
         ),
     ],
     "en": [
@@ -499,7 +546,17 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Next change",
             "When a time rule ends (minimum run, pause, overrun). Only while one applies.",
         ),
-        ("", "mdi:gauge", "Total demand", "Weighted heat demand of all rooms in %."),
+        (
+            "",
+            "mdi:gauge",
+            "Total demand",
+            (
+                "Weighted heat demand of all rooms in %. The boiler starts when the mean "
+                "reaches {threshold} % {combine} when at least {rooms} call. A running boiler "
+                "stays on until it drops below {off} % (hysteresis). The tile shows the rule "
+                "and the calling rooms."
+            ),
+        ),
         (
             "flow",
             "mdi:thermometer-water",
@@ -527,7 +584,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Outdoor (4 h mean)",
             (
                 "Mean outdoor temperature of 4 hours; the heating season starts and ends by it. "
-                "The limit is in the tile name."
+                "The chart shows the season limit as a horizontal line."
             ),
         ),
         ("", "mdi:play", "Boiler command", "Whether the integration lets the boiler heat."),
@@ -590,7 +647,8 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Who is home",
             (
                 'People of the presence the heating uses, without groups. "5 minutes ago" '
-                "shows who just left."
+                "shows who just left. When the presence module gives the real time of the "
+                "change, a Changed tile next to the person keeps it across restarts."
             ),
         ),
         (
@@ -604,7 +662,37 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
                 "tell why the room has its target."
             ),
         ),
-        ("", "mdi:gauge", "Demand (room)", "How many percent of heat the room wants."),
+        (
+            "",
+            "mdi:thermostat",
+            "Action (room)",
+            (
+                "After the temperature: Heating = the room wants heat, its valve is open and "
+                "the boiler runs. Preheating = it wants heat but does not heat yet: the boiler "
+                "stands (start rule, minimum pause, valves closing) or the valve is closed in "
+                "its PWM cycle. It is not the scheduled preheat. Idle = no heat wanted. Off = "
+                "the room is off."
+            ),
+        ),
+        (
+            "",
+            "mdi:clock-start",
+            "Scheduled preheat",
+            (
+                "The room starts heating early to have comfort at the start of the schedule "
+                'or at a return. Target reason Preheat, logbook "Preheating: …". Not the same '
+                "as the Preheating action."
+            ),
+        ),
+        (
+            "",
+            "mdi:gauge",
+            "Demand (room)",
+            (
+                "How many percent of heat the room wants. From {room} % it counts as calling "
+                "for the boiler start; the tile says calling or not."
+            ),
+        ),
         (
             "",
             "mdi:pipe-valve",
@@ -655,12 +743,12 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "The room's own schedule, only when it has one. Editing it changes only this room.",
         ),
         (
-            "",
+            "shadow",
             "mdi:ghost-outline",
             "Shadow",
             (
                 "The controller calculates everything but switches neither the boiler nor the "
-                "valves."
+                "valves. Only in shadow mode."
             ),
         ),
     ],
@@ -780,6 +868,19 @@ def _language(runtime: HydronicHeatingRuntime) -> str:
     return "cs" if (runtime.hass.config.language or "").startswith("cs") else "en"
 
 
+NBSP = "\u00a0"
+COMBINE_WORDS = {"cs": {"any": "nebo", "all": "a zároveň"}, "en": {"any": "or", "all": "and"}}
+
+
+def _rooms(count: int, lang: str) -> str:
+    """Count of calling rooms with the right word form."""
+    if lang == "cs":
+        word = "místnost" if count == 1 else "místnosti" if count < 5 else "místností"
+    else:
+        word = "room" if count == 1 else "rooms"
+    return f"{count} {word}"
+
+
 def _number(value: float, lang: str) -> str:
     text = f"{value:g}"
     return text.replace(".", ",") if lang == "cs" else text
@@ -816,9 +917,11 @@ class _Shown:
     house_schedule: str | None
     own_schedule: bool
     valve_temps: bool = False
+    shadow: bool = False
     house_presence: bool = False
     long_away: bool = False
-    people: list[tuple[str, str]] = field(default_factory=list)
+    # Person entity, name and an optional sensor with the time of the last change.
+    people: list[tuple[str, str, str | None]] = field(default_factory=list)
 
     @classmethod
     def of(cls, runtime: HydronicHeatingRuntime) -> _Shown:
@@ -831,6 +934,7 @@ class _Shown:
             duty=cfg.duty_enabled,
             windows=any(room.cfg.windows for room in runtime.controller.rooms.values()),
             valve_temps=any(v.temp_entity for room in runtime.rooms for v in room.valves),
+            shadow=cfg.shadow_mode,
             # Window contacts or airing detection (FR-WIN-06) in any room.
             airing=any(
                 room.cfg.windows or room.cfg.vent_detect
@@ -853,6 +957,7 @@ class _Shown:
             "windows": self.windows,
             "airing": self.airing,
             "valve_temps": self.valve_temps,
+            "shadow": self.shadow,
             "house_schedule": self.house_schedule is not None,
             "own_schedule": self.own_schedule,
             "house_presence": self.house_presence,
@@ -1098,7 +1203,6 @@ def _boiler_section(
     trend = {"type": "trend-graph", "hours_to_show": 24}
     reason = sid("sensor", "boiler_reason")
     hold = sid("sensor", "boiler_hold_ends_at")
-    limit = _number(runtime.controller.cfg.heating_limit, _language(runtime))
     cards: list[dict[str, Any]] = [
         _heading(text["boiler"], "mdi:water-boiler"),
         # Why the boiler is on or off, and when that changes (FR-SAFE-07).
@@ -1113,8 +1217,10 @@ def _boiler_section(
             sid("sensor", "demand_total"),
             text["demand_total"],
             color=DEMAND,
+            # The value with the start or stop rule and the rooms calling.
+            state_content=["state", "rule"],
             features=[{"type": "bar-gauge", "min": 0, "max": 100}],
-            features_position="inline",
+            features_position="bottom",
         ),
     ]
     if shown.flow:
@@ -1137,12 +1243,17 @@ def _boiler_section(
         _full(
             sid("sensor", "outdoor_temperature"), text["outdoor"], color=OUTDOOR, features=[trend]
         ),
-        _full(
-            sid("sensor", "outdoor_mean_4h"),
-            text["outdoor_mean_limit"].format(limit=limit),
-            color=OUTDOOR_MEAN,
-            features=[trend],
-        ),
+        # The 4-hour mean against the limit of the heating season as a line.
+        {
+            "type": "history-graph",
+            "title": text["outdoor_mean_chart"],
+            "hours_to_show": 48,
+            "entities": [
+                {"entity": sid("sensor", "outdoor_mean_4h"), "name": text["mean_4h"]},
+                {"entity": sid("sensor", "heating_limit"), "name": text["heating_limit"]},
+            ],
+            "grid_options": FULL,
+        },
     ]
     return {"type": "grid", "cards": cards}
 
@@ -1173,10 +1284,15 @@ def _boiler_operation_section(ids: _Ids, text: dict[str, str], shown: _Shown) ->
     if shown.people:
         # Person -> home or away; "Away · 5 minutes ago" shows who just left.
         cards.append(_heading(text["who_home"], "mdi:account-multiple", subtitle=True))
-        cards.extend(
-            _half(person, name, state_content=["state", "last_changed"], color=PEOPLE)
-            for person, name in shown.people
-        )
+        for person, name, since in shown.people:
+            if since is None:
+                cards.append(
+                    _half(person, name, state_content=["state", "last_changed"], color=PEOPLE)
+                )
+                continue
+            # The real time of the change survives a restart, unlike `last_changed`.
+            cards.append(_half(person, name, state_content=["state"], color=PEOPLE))
+            cards.append(_half(since, text["since"], icon="mdi:clock-outline", color=AUX))
     return {"type": "grid", "cards": cards}
 
 
@@ -1184,7 +1300,7 @@ def _is_aggregate(state: State) -> bool:
     return any(key in state.attributes for key in AGGREGATE_ATTRS)
 
 
-def _people(runtime: HydronicHeatingRuntime) -> list[tuple[str, str]]:
+def _people(runtime: HydronicHeatingRuntime) -> list[tuple[str, str, str | None]]:
     """People behind the presence entities the heating uses, with their names.
 
     The house first, then the rooms. Groups and counts are left out: an HA group
@@ -1221,7 +1337,31 @@ def _people(runtime: HydronicHeatingRuntime) -> list[tuple[str, str]]:
         else:
             for person in _integration_people(hass, registry, source):
                 add(person)
-    return [(entity_id, _person_name(hass, registry, entity_id)) for entity_id in found]
+    return [
+        (entity_id, _person_name(hass, registry, entity_id), _since_sensor(registry, entity_id))
+        for entity_id in found
+    ]
+
+
+def _since_sensor(registry: er.EntityRegistry, entity_id: str) -> str | None:
+    """Find a timestamp sensor `…_since` on the person's device: the real time of a change.
+
+    A presence module can keep it across restarts; `last_changed` restarts with HA.
+    """
+    entry = registry.async_get(entity_id)
+    if entry is None or entry.device_id is None:
+        return None
+    return next(
+        (
+            candidate.entity_id
+            for candidate in er.async_entries_for_device(registry, entry.device_id)
+            if candidate.domain == "sensor"
+            and candidate.disabled_by is None
+            and (candidate.device_class or candidate.original_device_class) == "timestamp"
+            and (candidate.translation_key == "since" or candidate.entity_id.endswith("_since"))
+        ),
+        None,
+    )
 
 
 def _integration_people(hass: HomeAssistant, registry: er.EntityRegistry, source: str) -> list[str]:
@@ -1347,8 +1487,10 @@ def _room_section(
             ids.room("sensor", room, "demand"),
             text["demand"],
             color=DEMAND,
+            # Whether the room counts as calling for the boiler, and from how much.
+            state_content=["state", "call"],
             features=[{"type": "bar-gauge", "min": 0, "max": 100}],
-            features_position="inline",
+            features_position="bottom",
         ),
     ]
     # The valve on the radiator: its position modelled from the head command and the
@@ -1471,10 +1613,23 @@ def _floors(runtime: HydronicHeatingRuntime, ids: _Ids) -> list[dict[str, Any]]:
 
 
 def _legend_view(runtime: HydronicHeatingRuntime, text: dict[str, str], shown: _Shown) -> dict:
-    """Explain each tile, with the same icon as on the dashboard (a subview)."""
+    """Explain each tile, with the same icon as on the dashboard (a subview).
+
+    Names keep together (no-break spaces); the rules show the values of the settings.
+    """
+    lang = _language(runtime)
+    cfg = runtime.controller.cfg
+    values = {
+        "threshold": _number(cfg.demand_threshold, lang),
+        "off": _number(cfg.demand_threshold - cfg.demand_hysteresis, lang),
+        "rooms": _rooms(cfg.min_rooms_calling, lang),
+        "room": _number(cfg.room_call_threshold, lang),
+        "combine": COMBINE_WORDS[lang][cfg.combine],
+    }
     rows = "\n".join(
-        f'| <ha-icon icon="{icon}"></ha-icon> | **{name}** | {meaning} |'
-        for feature, icon, name, meaning in LEGEND[_language(runtime)]
+        f'| <ha-icon icon="{icon}"></ha-icon> | **{name.replace(" ", NBSP)}** | '
+        f"{meaning.format_map(values) if '{' in meaning else meaning} |"
+        for feature, icon, name, meaning in LEGEND[lang]
         if shown.has(feature)
     )
     return {
@@ -1550,6 +1705,7 @@ def _history(
     temperatures = [
         {"entity": sid("sensor", "outdoor_temperature"), "name": text["outdoor"]},
         {"entity": sid("sensor", "outdoor_mean_4h"), "name": text["outdoor_mean_4h"]},
+        {"entity": sid("sensor", "heating_limit"), "name": text["heating_limit"]},
     ]
     if shown.flow:
         temperatures.append({"entity": shown.flow, "name": text["flow_temperature"]})

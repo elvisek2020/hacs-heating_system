@@ -5,6 +5,21 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.14.0 — 2026-10-14
+
+### ✨ Novinky
+
+- **Prahy na dashboardu.** Celkový požadavek ukazuje i pravidlo startu kotle, např. „22,4 % · start od 30 % nebo od 2 volajících místností · volá 1“, a při běžícím kotli kdy vypne (s hysterezí).
+- **Požadavek místnosti** ukazuje, jestli se místnost počítá jako volající: „75 % · volá (od 50 %)“.
+- **Hranice topné sezóny v grafu.** Nová entita `sensor.hh_heating_limit`. V bloku Kotel je graf 4h průměru venkovní teploty s hranicí jako vodorovnou čarou, hranice je i v Grafech.
+- **Kdo je doma:** když má osoba časovou entitu `…_since` (čas skutečné změny z modulu přítomnosti), je vedle ní dlaždice **Změna**, která platí i po restartu HA. Jinak zůstává čas poslední změny stavu.
+
+### 🎨 Vzhled
+
+- **Vysvětlivky:** názvy se nezalamují. Přibyla činnost termostatu (Topí, Předehřev, Nečinné) a Předtápění. Pravidla startu kotle a práh volající místnosti jsou s hodnotami z nastavení. Řádek Shadow je jen v shadow režimu.
+
+Po aktualizaci restartuj Home Assistant a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.13.0 — 2026-10-14
 
 ### ✨ Novinky

@@ -788,6 +788,9 @@
       "outdoor_mean_4h": {
         "name": "Venku (průměr 4 h)"
       },
+      "heating_limit": {
+        "name": "Hranice topné sezóny"
+      },
       "boiler_duty": {
         "name": "Střída kotle (24 h)"
       },

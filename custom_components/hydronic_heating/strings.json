@@ -788,6 +788,9 @@
       "outdoor_mean_4h": {
         "name": "Outdoor (4 h mean)"
       },
+      "heating_limit": {
+        "name": "Heating season limit"
+      },
       "boiler_duty": {
         "name": "Boiler duty (24 h)"
       },

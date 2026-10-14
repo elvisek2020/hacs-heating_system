@@ -291,7 +291,7 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
     }
     assert legend["subview"] is True
     assert legend["path"] == "vysvetlivky"
-    rows = legend["sections"][0]["cards"][1]["content"]
+    rows = legend["sections"][0]["cards"][1]["content"].replace("\u00a0", " ")
     assert '<ha-icon icon="mdi:pipe-valve"></ha-icon> | **Valve**' in rows
     assert "**Window block**" in rows  # the virtual house has windows
     assert "**Duty limit**" not in rows
@@ -377,12 +377,20 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     assert "visibility" in boiler[2]
     assert "state_attr('sensor.hh_boiler_reason', 'detail')" in boiler[3]["content"]
     # Without a flow sensor and the duty limit no water temperature; real outdoor values.
-    assert [c.get("entity") for c in boiler[4:]] == [
+    assert [c.get("entity") for c in boiler[4:6]] == [
         "sensor.hh_demand_total",
         "sensor.hh_outdoor_temperature",
-        "sensor.hh_outdoor_mean_4h",
     ]
-    assert boiler[-1]["name"] == "Outdoor – 4 h mean (limit 13 °C)"
+    # The demand shows its start rule; the 4-hour mean is a chart with the season limit.
+    assert boiler[4]["state_content"] == ["state", "rule"]
+    assert boiler[4]["features_position"] == "bottom"
+    chart = boiler[-1]
+    assert chart["type"] == "history-graph"
+    assert chart["title"] == "Outdoor – 4 h mean and the heating season limit"
+    assert [e["entity"] for e in chart["entities"]] == [
+        "sensor.hh_outdoor_mean_4h",
+        "sensor.hh_heating_limit",
+    ]
     # Boiler operation by priority, only configured features.
     operation = overview["sections"][2]["cards"]
     assert [c["entity"] for c in operation[1:]] == [
@@ -405,6 +413,7 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     assert [e["entity"] for e in outdoor["entities"]] == [
         "sensor.hh_outdoor_temperature",
         "sensor.hh_outdoor_mean_4h",
+        "sensor.hh_heating_limit",
     ]
 
 
@@ -424,11 +433,10 @@ async def test_dashboard_with_flow_sensor_and_duty_limit(hass: HomeAssistant) ->
     assert badges["sensor.stoupacka"]["icon"] == "mdi:thermometer-water"
     assert "sensor.hh_flow_setpoint" not in badges  # the measured value wins in the bar
     boiler = [c.get("entity") for c in overview["sections"][1]["cards"]]
-    assert boiler[5:] == [
+    assert boiler[5:8] == [
         "sensor.stoupacka",
         "sensor.hh_flow_setpoint",
         "sensor.hh_outdoor_temperature",
-        "sensor.hh_outdoor_mean_4h",
     ]
     operation = overview["sections"][2]["cards"]
     assert operation[-1]["entity"] == "sensor.hh_duty_limit"
@@ -436,11 +444,12 @@ async def test_dashboard_with_flow_sensor_and_duty_limit(hass: HomeAssistant) ->
     assert [e["entity"] for e in chart["entities"]] == [
         "sensor.hh_outdoor_temperature",
         "sensor.hh_outdoor_mean_4h",
+        "sensor.hh_heating_limit",
         "sensor.stoupacka",
         "sensor.hh_outdoor_temperature_damped",
         "sensor.hh_flow_setpoint",
     ]
-    rows = legend["sections"][0]["cards"][1]["content"]
+    rows = legend["sections"][0]["cards"][1]["content"].replace("\u00a0", " ")
     assert "**Flow temperature**" in rows
     assert "**Duty limit**" in rows
 
@@ -466,7 +475,7 @@ async def test_dashboard_shows_the_actual_boiler_state(hass: HomeAssistant) -> N
     assert operation[2]["name"] == "Boiler (actual state)"
     timeline = history["sections"][1]["cards"][2]["entities"]
     assert timeline[2] == {"entity": "binary_sensor.horak", "name": "Boiler (actual state)"}
-    assert "**Boiler (actual state)**" in legend["sections"][0]["cards"][1]["content"]
+    assert "**Boiler\u00a0(actual\u00a0state)**" in legend["sections"][0]["cards"][1]["content"]
 
 
 async def test_dashboard_shows_the_pipe_at_the_valve(hass: HomeAssistant) -> None:

@@ -135,13 +135,13 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 
 - **Nahoře jedna řada:**
   - Topení: systém, režim, topná sezóna, rozvrh domu, manuál.
-  - Kotel: proč, další změna, celkový požadavek, měřená teplota vody, venku a 4h průměr s hranicí topné sezóny.
+  - Kotel: proč, další změna, celkový požadavek s pravidlem startu („22,4 % · start od 30 % nebo od 2 volajících místností · volá 1“), měřená teplota vody, venku a graf 4h průměru s hranicí topné sezóny jako čarou.
   - Provoz kotle podle priority: povel kotli, skutečný stav kotle (se zpětnou vazbou), požadavek na teplo, venku (průměr 4 h), porucha, topná sezóna, starty dnes, střída 24 h, omezení střídy. Pod tím Kdo je doma.
 - **Odznak Kotel** v horní liště ukazuje se zpětnou vazbou skutečný stav kotle, bez ní povel.
 - **Pod řadou** upozornění na shadow režim přes celou šířku, v demu blok Demo.
 - **Místnosti – individuální nastavení:**
   - nahoře ovládání: tlačítka Automaticky a Vypnuto, cílová teplota, předvolba. Ruční režim se jmenuje **Ručně** a má ikonu ruky. Je vidět v textu stavu, zpět na automatiku jedním dotykem.
-  - pak požadavek (příčina) a ventil (následek). S čidlem trubky má ventil vedle sebe dlaždici Trubka a ukazuje výsledek kontroly.
+  - pak požadavek (příčina, s „volá / nevolá (od 50 %)“) a ventil (následek). S čidlem trubky má ventil vedle sebe dlaždici Trubka a ukazuje výsledek kontroly.
   - pod nimi **Komfort** a **ECO** s tlačítky −/+, tedy trvalé teploty místnosti pro automatiku. Teplota Pryč se nastavuje v nastavení místnosti. Pozor: −/+ na termostatu nastaví jen ruční cíl a místnost přepne na ručně.
   - dole vlastní rozvrh.
 - **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice a každý odznak se stejnou ikonou a jednou až dvěma větami, co znamená.
@@ -207,6 +207,7 @@ Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastn�
 | `sensor.hh_outdoor_temperature` | aktuální venkovní teplota (první platné čidlo, jinak počasí) |
 | `sensor.hh_outdoor_temperature_damped` | tlumená venkovní teplota pro topnou křivku (atributy: aktuální, předpověď, efektivní) |
 | `sensor.hh_outdoor_mean_4h` | průměr venkovní teploty za 4 h, podle něj se řídí topná sezóna |
+| `sensor.hh_heating_limit` | hranice topné sezóny z nastavení (v grafu jako čára) |
 | `sensor.hh_flow_setpoint` | teplota vody podle topné křivky (virtuální) |
 | `sensor.hh_duty_limit` | povolená střída kotle a doba běhu v cyklu |
 | `sensor.hh_boiler_duty`, `sensor.hh_boiler_starts_today` | střída kotle za 24 h a počet startů dnes |

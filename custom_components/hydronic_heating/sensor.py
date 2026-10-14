@@ -13,7 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -23,7 +23,7 @@ from .core.room import RoomController
 from .core.upcoming import upcoming
 from .demo import DemoRoom
 from .entity import DemoEntity, HydronicEntity
-from .explain import detail, now_lines, upcoming_items
+from .explain import demand_rule, detail, now_lines, room_call, upcoming_items
 from .runtime import HydronicConfigEntry, HydronicHeatingRuntime
 
 PARALLEL_UPDATES = 0
@@ -35,6 +35,8 @@ class SystemSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[HydronicController], Any]
     attrs_fn: Callable[[HydronicController], dict[str, Any]] | None = None
+    # Attributes with texts in the language of Home Assistant.
+    text_fn: Callable[[HomeAssistant, HydronicController], dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -43,6 +45,9 @@ class RoomSensorDescription(SensorEntityDescription):
 
     value_fn: Callable[[RoomController, datetime | None], Any]
     attrs_fn: Callable[[RoomController, HydronicController], dict[str, Any]] | None = None
+    text_fn: (
+        Callable[[HomeAssistant, RoomController, HydronicController], dict[str, Any]] | None
+    ) = None
 
 
 def _now(ctrl: HydronicController) -> datetime | None:
@@ -103,7 +108,15 @@ SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda ctrl: ctrl.arbitration.weighted,
-        attrs_fn=lambda ctrl: {"rooms_calling": ctrl.arbitration.calling},
+        attrs_fn=lambda ctrl: {
+            "rooms_calling": ctrl.arbitration.calling,
+            # The threshold that applies now: lower while the boiler is requested.
+            "threshold": ctrl.cfg.demand_threshold
+            - (ctrl.cfg.demand_hysteresis if ctrl.arbitration.request else 0),
+            "min_rooms_calling": ctrl.cfg.min_rooms_calling,
+            "combine": ctrl.cfg.combine,
+        },
+        text_fn=lambda hass, ctrl: {"rule": demand_rule(hass, ctrl)},
     ),
     SystemSensorDescription(
         key="outdoor_temperature",
@@ -136,6 +149,15 @@ SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
         suggested_display_precision=1,
         value_fn=lambda ctrl: ctrl.season.mean_4h,
         attrs_fn=lambda ctrl: {"limit": ctrl.cfg.heating_limit},
+    ),
+    SystemSensorDescription(
+        # The limit as a line next to the 4-hour mean in charts (FR-EQ-03).
+        key="heating_limit",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        suggested_display_precision=1,
+        value_fn=lambda ctrl: ctrl.cfg.heating_limit,
     ),
     SystemSensorDescription(
         key="flow_setpoint",
@@ -206,6 +228,8 @@ ROOM_SENSORS: tuple[RoomSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda room, now: room.demand,
+        attrs_fn=lambda room, ctrl: {"call_threshold": ctrl.cfg.room_call_threshold},
+        text_fn=lambda hass, room, ctrl: {"call": room_call(hass, room, ctrl)},
     ),
     RoomSensorDescription(
         key="valve_state",
@@ -243,6 +267,8 @@ class SystemSensor(HydronicEntity, SensorEntity):
     """Sensor of the heating system."""
 
     entity_description: SystemSensorDescription
+    # Readable texts of the thresholds; the numbers behind them are recorded.
+    _unrecorded_attributes = frozenset({"rule"})
 
     def __init__(self, runtime: HydronicHeatingRuntime, description: SystemSensorDescription):
         """Initialize."""
@@ -257,15 +283,20 @@ class SystemSensor(HydronicEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Extra attributes."""
-        if self.entity_description.attrs_fn is None:
+        description = self.entity_description
+        if description.attrs_fn is None and description.text_fn is None:
             return None
-        return self.entity_description.attrs_fn(self.controller)
+        attrs = description.attrs_fn(self.controller) if description.attrs_fn else {}
+        if description.text_fn is not None:
+            attrs |= description.text_fn(self.hass, self.controller)
+        return attrs
 
 
 class RoomSensor(HydronicEntity, SensorEntity):
     """Sensor of one room."""
 
     entity_description: RoomSensorDescription
+    _unrecorded_attributes = frozenset({"call"})
 
     def __init__(
         self, runtime: HydronicHeatingRuntime, description: RoomSensorDescription, room: Any
@@ -282,9 +313,13 @@ class RoomSensor(HydronicEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Extra attributes."""
-        if self.entity_description.attrs_fn is None:
+        description = self.entity_description
+        if description.attrs_fn is None and description.text_fn is None:
             return None
-        return self.entity_description.attrs_fn(self.room, self.controller)
+        attrs = description.attrs_fn(self.room, self.controller) if description.attrs_fn else {}
+        if description.text_fn is not None:
+            attrs |= description.text_fn(self.hass, self.room, self.controller)
+        return attrs
 
 
 class BoilerReasonSensor(HydronicEntity, SensorEntity):

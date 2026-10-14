@@ -761,3 +761,64 @@ def upcoming_items(hass: HomeAssistant, events: list[Any]) -> list[dict[str, Any
             {"at": event.at.isoformat(), "kind": kind, "rooms": list(event.rooms), "text": text}
         )
     return items
+
+
+# --- Thresholds of the demand (tile texts) -----------------------------------------
+
+RULES: dict[str, dict[str, str]] = {
+    "cs": {
+        "start": "start od {threshold} % {join} od {rooms} · volá {calling}",
+        "stop": "vypne pod {off} % {join} pod {rooms_below} · volá {calling}",
+        "rooms_1": "1 volající místnosti",
+        "rooms_n": "{n} volajících místností",
+        "below_1": "1 volající místností",
+        "below_n": "{n} volajícími místnostmi",
+        "or": "nebo",
+        "and": "a",
+        "calling": "volá (od {threshold} %)",
+        "not_calling": "nevolá (volá od {threshold} %)",
+    },
+    "en": {
+        "start": "starts from {threshold} % {join} from {rooms} · {calling} calling",
+        "stop": "stops below {off} % {join} below {rooms_below} · {calling} calling",
+        "rooms_1": "1 calling room",
+        "rooms_n": "{n} calling rooms",
+        "below_1": "1 calling room",
+        "below_n": "{n} calling rooms",
+        "or": "or",
+        "and": "and",
+        "calling": "calling (from {threshold} %)",
+        "not_calling": "not calling (calls from {threshold} %)",
+    },
+}
+
+
+def demand_rule(hass: HomeAssistant, ctrl: Any) -> str:
+    """When the boiler starts or stops by the demand (FR-ARB-01, FR-ARB-02).
+
+    Not requested: it starts from the threshold or the calling rooms. Requested:
+    it stops below the threshold minus the hysteresis and the calling rooms; with
+    `combine: all` both rules swap their joining word.
+    """
+    texts = RULES[language(hass)]
+    cfg = ctrl.cfg
+    n = cfg.min_rooms_calling
+    running = ctrl.arbitration.request
+    any_rule = cfg.combine == "any"
+    join = texts["or" if any_rule != running else "and"]
+    return texts["stop" if running else "start"].format(
+        threshold=number(hass, cfg.demand_threshold),
+        off=number(hass, cfg.demand_threshold - cfg.demand_hysteresis),
+        join=join,
+        rooms=texts["rooms_1"] if n == 1 else texts["rooms_n"].format(n=n),
+        rooms_below=texts["below_1"] if n == 1 else texts["below_n"].format(n=n),
+        calling=ctrl.arbitration.calling,
+    )
+
+
+def room_call(hass: HomeAssistant, room: Any, ctrl: Any) -> str:
+    """Whether the room counts as calling for the boiler start, with the threshold."""
+    texts = RULES[language(hass)]
+    threshold = ctrl.cfg.room_call_threshold
+    key = "calling" if room.demand >= threshold else "not_calling"
+    return texts[key].format(threshold=number(hass, threshold))

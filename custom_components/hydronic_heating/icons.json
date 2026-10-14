@@ -114,6 +114,9 @@
       },
       "outdoor_mean_4h": {
         "default": "mdi:thermometer-lines"
+      },
+      "heating_limit": {
+        "default": "mdi:thermometer-minus"
       }
     },
     "switch": {
