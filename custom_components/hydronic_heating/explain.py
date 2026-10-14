@@ -7,7 +7,8 @@ turns it into sentences for the `detail` attribute, the logbook and the log.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime
+import re
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -317,21 +318,81 @@ def language(hass: HomeAssistant) -> str:
     return "cs" if (hass.config.language or "").startswith("cs") else "en"
 
 
+# A time in a sentence carries its date between two marks; `_finish` turns it into
+# "v 5:30", "zítra v 5:30" or "ve čtvrtek do 5:30" once the sentence is complete,
+# because the day goes before the preposition.
+MARK = "\x1f"
+DAYS = {
+    "cs": ("v pondělí", "v úterý", "ve středu", "ve čtvrtek", "v pátek", "v sobotu", "v neděli"),
+    "en": (
+        "on Monday",
+        "on Tuesday",
+        "on Wednesday",
+        "on Thursday",
+        "on Friday",
+        "on Saturday",
+        "on Sunday",
+    ),
+}
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+PREPOSITIONS = {"cs": ("ve", "v", "od", "do"), "en": ("at", "from", "until", "by")}
+_TIME = {
+    lang: re.compile(
+        rf"(?:\b(?P<prep>{'|'.join(preps)}) )?{MARK}(?P<date>[0-9-]+){MARK}(?P<time>[0-9:]+)",
+        re.IGNORECASE,
+    )
+    for lang, preps in PREPOSITIONS.items()
+}
+
+
 def clock(value: Any) -> str:
-    """Local time of day, e.g. 00:55:12."""
-    if not isinstance(value, datetime):
-        return "?"
-    return dt_util.as_local(value).strftime("%H:%M:%S")
-
-
-def moment(value: Any) -> str:
-    """Time of day today ("v 15:00"), with the date on another day ("12. 10. v 15:00")."""
+    """Local time of day with seconds (5:32:38); the day is added by `_finish`."""
     if not isinstance(value, datetime):
         return "?"
     local = dt_util.as_local(value)
-    if local.date() == dt_util.now().date():
-        return local.strftime("%H:%M")
-    return f"{local.day}. {local.month}. {local:%H:%M}"
+    return f"{MARK}{local.date().isoformat()}{MARK}{local.hour}:{local:%M:%S}"
+
+
+def moment(value: Any) -> str:
+    """Local time of day (5:30); the day is added by `_finish`."""
+    if not isinstance(value, datetime):
+        return "?"
+    local = dt_util.as_local(value)
+    return f"{MARK}{local.date().isoformat()}{MARK}{local.hour}:{local:%M}"
+
+
+def _day(lang: str, day: date) -> str:
+    """Today is no word; tomorrow, the days of the next week, else the date."""
+    delta = (day - dt_util.now().date()).days
+    if delta == 0:
+        return ""
+    if delta == 1:
+        return "zítra" if lang == "cs" else "tomorrow"
+    if delta == -1:
+        return "včera" if lang == "cs" else "yesterday"
+    if 1 < delta < 7:
+        return DAYS[lang][day.weekday()]
+    return f"{day.day}. {day.month}." if lang == "cs" else f"on {MONTHS[day.month - 1]} {day.day}"
+
+
+def finish(hass: HomeAssistant, text: str) -> str:
+    """Put the day of each time into the sentence: "zítra v 5:30", "at 5:30 tomorrow"."""
+    lang = language(hass)
+
+    def place(match: re.Match[str]) -> str:
+        prep, clock_time = match["prep"], match["time"]
+        day = _day(lang, date.fromisoformat(match["date"]))
+        if lang == "en":
+            phrase = f"{prep or 'at'} {clock_time}"
+            return f"{phrase} {day}" if day else phrase
+        if prep is None:
+            return f"{day} v {clock_time}" if day else f"v {clock_time}"
+        if not day:
+            return f"{prep} {clock_time}"
+        phrase = f"{day} {prep.lower()} {clock_time}"
+        return phrase[:1].upper() + phrase[1:] if prep[:1].isupper() else phrase
+
+    return _TIME[lang].sub(place, text)
 
 
 def number(hass: HomeAssistant, value: Any) -> str:
@@ -367,7 +428,7 @@ def detail(hass: HomeAssistant, status: BoilerStatus) -> str:
     text = texts[key].format_map(_Defaults(values))
     if status.reason.value.startswith("firing_") and status.until is not None:
         text += texts["duty_stop"].format_map(_Defaults(values))
-    return text
+    return finish(hass, text)
 
 
 def valve_reason(hass: HomeAssistant, reason: str) -> str:
@@ -451,7 +512,7 @@ def decision_text(
         message = texts["shadow"] + message
     if demo:
         message = texts["demo"] + message
-    return message
+    return finish(hass, message)
 
 
 def _reverted_text(
@@ -616,7 +677,7 @@ def room_detail(hass: HomeAssistant, room: Any) -> str:
     text = texts[key].format_map(_Defaults(values))
     if reason in ("absent", "long_away") and room.target_until is not None:
         text += texts["return"].format_map(_Defaults(values))
-    return text
+    return finish(hass, text)
 
 
 def room_target_text(hass: HomeAssistant, params: Mapping[str, Any]) -> str:
@@ -642,7 +703,7 @@ def room_target_text(hass: HomeAssistant, params: Mapping[str, Any]) -> str:
         key = "log_schedule_until" if params.get("target_until") else "log_schedule"
     else:
         key = "log_comfort"
-    return texts[key].format_map(_Defaults(values))
+    return finish(hass, texts[key].format_map(_Defaults(values)))
 
 
 # --- Now and next, for the animated scheme (FR-UI-25) ---------------------------
@@ -754,8 +815,13 @@ def upcoming_items(hass: HomeAssistant, events: list[Any]) -> list[dict[str, Any
         key = f"valves_idle_{event.params.get('policy')}" if kind == "valves_idle" else kind
         rooms = texts["all_rooms"] if event.params.get("all_rooms") else _names(hass, event.rooms)
         at = clock(event.at) if kind in BOILER_KINDS else moment(event.at)
-        text = texts[key].format_map(
-            _Defaults({"at": at, "rooms": rooms, "target": moment(event.params.get("target_at"))})
+        text = finish(
+            hass,
+            texts[key].format_map(
+                _Defaults(
+                    {"at": at, "rooms": rooms, "target": moment(event.params.get("target_at"))}
+                )
+            ),
         )
         items.append(
             {"at": event.at.isoformat(), "kind": kind, "rooms": list(event.rooms), "text": text}
@@ -767,58 +833,50 @@ def upcoming_items(hass: HomeAssistant, events: list[Any]) -> list[dict[str, Any
 
 RULES: dict[str, dict[str, str]] = {
     "cs": {
-        "start": "start od {threshold} % {join} od {rooms} · volá {calling}",
-        "stop": "vypne pod {off} % {join} pod {rooms_below} · volá {calling}",
-        "rooms_1": "1 volající místnosti",
-        "rooms_n": "{n} volajících místností",
-        "below_1": "1 volající místností",
-        "below_n": "{n} volajícími místnostmi",
+        "start": "{value} % z {threshold} % {join} {calling} z {rooms}",
+        "stop": "{value} % z {off} % (vypnutí) {join} {calling} z {rooms}",
+        "rooms_1": "1 místnosti",
+        "rooms_n": "{n} místností",
         "or": "nebo",
         "and": "a",
-        "calling": "volá (od {threshold} %)",
-        "not_calling": "nevolá (volá od {threshold} %)",
+        "room": "{value} % z {threshold} %",
     },
     "en": {
-        "start": "starts from {threshold} % {join} from {rooms} · {calling} calling",
-        "stop": "stops below {off} % {join} below {rooms_below} · {calling} calling",
-        "rooms_1": "1 calling room",
-        "rooms_n": "{n} calling rooms",
-        "below_1": "1 calling room",
-        "below_n": "{n} calling rooms",
+        "start": "{value} % of {threshold} % {join} {calling} of {rooms}",
+        "stop": "{value} % of {off} % (off) {join} {calling} of {rooms}",
+        "rooms_1": "1 room",
+        "rooms_n": "{n} rooms",
         "or": "or",
         "and": "and",
-        "calling": "calling (from {threshold} %)",
-        "not_calling": "not calling (calls from {threshold} %)",
+        "room": "{value} % of {threshold} %",
     },
 }
 
 
 def demand_rule(hass: HomeAssistant, ctrl: Any) -> str:
-    """When the boiler starts or stops by the demand (FR-ARB-01, FR-ARB-02).
+    """Compare the demand with its thresholds (FR-ARB-01, FR-ARB-02).
 
-    Not requested: it starts from the threshold or the calling rooms. Requested:
-    it stops below the threshold minus the hysteresis and the calling rooms; with
-    `combine: all` both rules swap their joining word.
+    "0,6 % z 30 % nebo 0 z 2 místností": the boiler starts when the weighted demand
+    reaches the threshold or enough rooms call (`combine: all`: both). While it is
+    requested the lower threshold of the hysteresis applies, marked as the stop.
     """
     texts = RULES[language(hass)]
     cfg = ctrl.cfg
     n = cfg.min_rooms_calling
     running = ctrl.arbitration.request
-    any_rule = cfg.combine == "any"
-    join = texts["or" if any_rule != running else "and"]
     return texts["stop" if running else "start"].format(
+        value=number(hass, round(ctrl.arbitration.weighted, 1)),
         threshold=number(hass, cfg.demand_threshold),
         off=number(hass, cfg.demand_threshold - cfg.demand_hysteresis),
-        join=join,
-        rooms=texts["rooms_1"] if n == 1 else texts["rooms_n"].format(n=n),
-        rooms_below=texts["below_1"] if n == 1 else texts["below_n"].format(n=n),
+        join=texts["or" if cfg.combine == "any" else "and"],
         calling=ctrl.arbitration.calling,
+        rooms=texts["rooms_1"] if n == 1 else texts["rooms_n"].format(n=n),
     )
 
 
 def room_call(hass: HomeAssistant, room: Any, ctrl: Any) -> str:
-    """Whether the room counts as calling for the boiler start, with the threshold."""
-    texts = RULES[language(hass)]
-    threshold = ctrl.cfg.room_call_threshold
-    key = "calling" if room.demand >= threshold else "not_calling"
-    return texts[key].format(threshold=number(hass, threshold))
+    """Compare the room demand with the threshold from which it calls: "75 % z 50 %"."""
+    return RULES[language(hass)]["room"].format(
+        value=number(hass, round(room.demand, 1)),
+        threshold=number(hass, ctrl.cfg.room_call_threshold),
+    )

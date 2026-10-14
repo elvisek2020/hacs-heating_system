@@ -383,6 +383,7 @@
           "title": "Room",
           "data": {
             "name": "Room name",
+            "order": "Order",
             "comfort_temp": "Comfort temperature",
             "eco_temp": "Eco temperature",
             "away_temp": "Away temperature",
@@ -392,7 +393,8 @@
           },
           "data_description": {
             "area_m2": "0 = not specified.",
-            "weight": "Weight of the room in the boiler decision."
+            "weight": "Weight of the room in the boiler decision.",
+            "order": "Order on the dashboard and in the scheme, 1 = first. Rooms with 0 come after the others by name."
           }
         },
         "sensors": {

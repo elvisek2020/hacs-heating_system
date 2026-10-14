@@ -12,7 +12,7 @@ from custom_components.hydronic_heating.explain import demand_rule, room_call
 from .test_runtime import _setup
 
 
-def _ctrl(*, request: bool, combine: str = "any", rooms: int = 2, calling: int = 1):
+def _ctrl(*, request: bool, combine: str = "any", rooms: int = 2, calling: int = 1, value=0.6):
     cfg = SimpleNamespace(
         demand_threshold=30.0,
         demand_hysteresis=10.0,
@@ -20,28 +20,25 @@ def _ctrl(*, request: bool, combine: str = "any", rooms: int = 2, calling: int =
         combine=combine,
         room_call_threshold=50.0,
     )
-    return SimpleNamespace(cfg=cfg, arbitration=SimpleNamespace(request=request, calling=calling))
+    arbitration = SimpleNamespace(request=request, calling=calling, weighted=value)
+    return SimpleNamespace(cfg=cfg, arbitration=arbitration)
 
 
 async def test_demand_rule_sentences(hass: HomeAssistant) -> None:
     hass.config.language = "cs"
-    assert demand_rule(hass, _ctrl(request=False)) == (
-        "start od 30 % nebo od 2 volajících místností · volá 1"
+    assert demand_rule(hass, _ctrl(request=False, calling=0)) == "0,6 % z 30 % nebo 0 z 2 místností"
+    # Running: the lower threshold of the hysteresis is the one to stop at.
+    assert demand_rule(hass, _ctrl(request=True, value=25.0, calling=2)) == (
+        "25 % z 20 % (vypnutí) nebo 2 z 2 místností"
     )
-    assert demand_rule(hass, _ctrl(request=True)) == (
-        "vypne pod 20 % a pod 2 volajícími místnostmi · volá 1"
-    )
-    # Both rules together swap the joining words.
+    # Both rules together.
     assert demand_rule(hass, _ctrl(request=False, combine="all", rooms=1)) == (
-        "start od 30 % a od 1 volající místnosti · volá 1"
-    )
-    assert demand_rule(hass, _ctrl(request=True, combine="all", rooms=1)) == (
-        "vypne pod 20 % nebo pod 1 volající místností · volá 1"
+        "0,6 % z 30 % a 1 z 1 místnosti"
     )
     room = SimpleNamespace(demand=49.6)
-    assert room_call(hass, room, _ctrl(request=False)) == "nevolá (volá od 50 %)"
-    room.demand = 75.0
-    assert room_call(hass, room, _ctrl(request=False)) == "volá (od 50 %)"
+    assert room_call(hass, room, _ctrl(request=False)) == "49,6 % z 50 %"
+    room.demand = 0.0
+    assert room_call(hass, room, _ctrl(request=False)) == "0 % z 50 %"
 
 
 async def test_threshold_attributes_and_season_limit(hass: HomeAssistant) -> None:
@@ -49,9 +46,9 @@ async def test_threshold_attributes_and_season_limit(hass: HomeAssistant) -> Non
     # The living room wants heat: the boiler is requested, the lower threshold applies.
     total = hass.states.get("sensor.hh_demand_total").attributes
     assert (total["threshold"], total["min_rooms_calling"], total["combine"]) == (20, 1, "any")
-    assert total["rule"] == "stops below 20 % and below 1 calling room · 1 calling"
-    assert hass.states.get("sensor.hh_obyvak_demand").attributes["call"].startswith("calling")
-    assert hass.states.get("sensor.hh_loznice_demand").attributes["call"].startswith("not")
+    # Living room 100 %, bedroom 0 %: the mean is 50 %, one room calls.
+    assert total["rule"] == "50 % of 20 % (off) or 1 of 1 room"
+    assert hass.states.get("sensor.hh_loznice_demand").attributes["call"] == "0 % of 50 %"
     assert hass.states.get("sensor.hh_heating_limit").state == "13.0"
 
 

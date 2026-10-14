@@ -25,6 +25,7 @@ from custom_components.hydronic_heating.const import (
     CONF_HEAT_SOURCE_ENTITY,
     CONF_MIRROR_TIMER_ENTITY,
     CONF_ROOM_NAME,
+    CONF_ROOM_ORDER,
     CONF_SENSORS,
     CONF_SHADOW_MODE,
     CONF_VALVES,
@@ -40,11 +41,12 @@ from custom_components.hydronic_heating.diagnostics import (
 CELSIUS = {"unit_of_measurement": "°C", "device_class": "temperature"}
 
 
-def _room(name: str, slug: str) -> ConfigSubentryData:
+def _room(name: str, slug: str, order: int = 0) -> ConfigSubentryData:
     return ConfigSubentryData(
         data={
             **DEFAULT_ROOM,
             CONF_ROOM_NAME: name,
+            CONF_ROOM_ORDER: order,
             CONF_SENSORS: [f"sensor.{slug}"],
             CONF_VALVES: [
                 {
@@ -80,7 +82,7 @@ async def _setup(hass: HomeAssistant, **options: Any) -> MockConfigEntry:
             CONF_HAS_BYPASS: True,
             **options,
         },
-        subentries_data=[_room("Obývák", "obyvak"), _room("Ložnice", "loznice")],
+        subentries_data=[_room("Obývák", "obyvak", 1), _room("Ložnice", "loznice", 2)],
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -301,6 +303,27 @@ async def test_room_temperatures_keep_their_order(hass: HomeAssistant) -> None:
     )
     await _settle(hass)
     assert hass.states.get("number.hh_obyvak_away").state == "12.0"
+
+
+async def test_rooms_follow_their_order_then_the_name(hass: HomeAssistant) -> None:
+    """The order of the rooms on the dashboard; changing it needs no reload."""
+    entry = await _setup(hass)
+    runtime = entry.runtime_data
+    assert [r.name for r in runtime.rooms] == ["Obývák", "Ložnice"]
+    living = next(s for s in entry.subentries.values() if s.unique_id == "obyvak")
+    hass.config_entries.async_update_subentry(
+        entry, living, data={**living.data, CONF_ROOM_ORDER: 0}
+    )
+    await _settle(hass)
+    assert entry.runtime_data is runtime  # no reload
+    # Ložnice keeps its order 2; a room without one comes after it.
+    assert [r.name for r in runtime.rooms] == ["Ložnice", "Obývák"]
+    bedroom = next(s for s in entry.subentries.values() if s.unique_id == "loznice")
+    hass.config_entries.async_update_subentry(
+        entry, bedroom, data={**bedroom.data, CONF_ROOM_ORDER: 0}
+    )
+    await _settle(hass)
+    assert [r.name for r in runtime.rooms] == ["Ložnice", "Obývák"]  # by name
 
 
 async def test_new_room_reloads_with_new_entities(hass: HomeAssistant) -> None:

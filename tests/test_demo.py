@@ -382,15 +382,13 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
         "sensor.hh_outdoor_temperature",
     ]
     # The demand shows its start rule; the 4-hour mean is a chart with the season limit.
-    assert boiler[4]["state_content"] == ["state", "rule"]
+    assert boiler[4]["state_content"] == ["rule"]
     assert boiler[4]["features_position"] == "bottom"
-    chart = boiler[-1]
-    assert chart["type"] == "history-graph"
-    assert chart["title"] == "Outdoor – 4 h mean and the heating season limit"
-    assert [e["entity"] for e in chart["entities"]] == [
-        "sensor.hh_outdoor_mean_4h",
-        "sensor.hh_heating_limit",
-    ]
+    # The 4-hour mean is a tile with the limit in its name (the line is in History).
+    mean = boiler[-1]
+    assert (mean["type"], mean["entity"]) == ("tile", "sensor.hh_outdoor_mean_4h")
+    assert mean["name"] == "Outdoor – 4 h mean (limit 13 °C)"
+    assert (mean["color"], mean["grid_options"]) == ("blue", {"columns": "full"})
     # Boiler operation by priority, only configured features.
     operation = overview["sections"][2]["cards"]
     assert [c["entity"] for c in operation[1:]] == [

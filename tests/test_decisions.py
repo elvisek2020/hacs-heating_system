@@ -68,7 +68,8 @@ async def test_manual_then_stop_shows_min_on_hold(
     assert reason.attributes["until"] == ends.isoformat()
     assert reason.attributes["remaining_s"] == 584
     assert reason.attributes["rule"] == "boiler_min_on = 10 min"
-    clock = dt_util.as_local(ends).strftime("%H:%M:%S")
+    local = dt_util.as_local(ends)
+    clock = f"{local.hour}:{local:%M:%S}"  # no leading zero
     assert clock in reason.attributes["detail"]
     hold = hass.states.get("sensor.hh_boiler_hold_ends_at")
     assert dt_util.parse_datetime(hold.state) == ends

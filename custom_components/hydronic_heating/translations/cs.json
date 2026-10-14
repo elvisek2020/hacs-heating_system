@@ -383,6 +383,7 @@
           "title": "Místnost",
           "data": {
             "name": "Název místnosti",
+            "order": "Pořadí",
             "comfort_temp": "Komfortní teplota",
             "eco_temp": "Útlumová teplota (eco)",
             "away_temp": "Teplota při nepřítomnosti",
@@ -392,7 +393,8 @@
           },
           "data_description": {
             "area_m2": "0 = nevyplněno.",
-            "weight": "Váha místnosti při rozhodování o kotli."
+            "weight": "Váha místnosti při rozhodování o kotli.",
+            "order": "Pořadí na dashboardu a ve schématu, 1 = první. Místnosti s 0 jsou za ostatními podle názvu."
           }
         },
         "sensors": {

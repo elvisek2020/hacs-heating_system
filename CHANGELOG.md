@@ -5,6 +5,21 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.15.0 — 2026-10-14
+
+### ✨ Novinky
+
+- **Pořadí místností.** V nastavení místnosti (Překonfigurovat → Základní) je pole **Pořadí**. Místnosti s pořadím jsou na dashboardu a ve schématu první, ostatní (0) za nimi podle názvu.
+- **Časy ve větách po lidsku.** Důvod kotle, texty Teď a Pak, vysvětlení cíle místnosti i logbook píšou „v 5:30“, „zítra v 5:30“, „ve čtvrtek do 5:30“ nebo „24. 10. v 5:30“, hodiny bez úvodní nuly.
+
+### 🎨 Vzhled
+
+- **Celkový požadavek** v kratší podobě: „0,6 % z 30 % nebo 0 z 2 místností“. Při běžícím kotli s prahem vypnutí: „25 % z 20 % (vypnutí) nebo 2 z 2 místností“.
+- **Požadavek místnosti:** „75 % z 50 %“.
+- V bloku Kotel je zpět dlaždice **Venku – průměr 4 h** s hranicí v názvu. Hranice jako čára zůstává v Grafech.
+
+Po aktualizaci nastav pořadí místností a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.14.0 — 2026-10-14
 
 ### ✨ Novinky

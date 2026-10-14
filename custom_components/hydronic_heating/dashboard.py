@@ -39,9 +39,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "rooms_settings": "Místnosti – individuální nastavení",
         "season": "Topná sezóna",
         "outdoor_mean_4h": "Venku (průměr 4 h)",
-        "outdoor_mean_chart": "Venku – průměr 4 h a hranice topné sezóny",
-        "mean_4h": "Průměr 4 h",
-        "heating_limit": "Hranice",
+        "outdoor_mean_limit": "Venku – průměr 4 h (hranice {limit} °C)",
+        "heating_limit": "Hranice topné sezóny",
         "who_home": "Kdo je doma",
         "since": "Změna",
         "legend": "Vysvětlivky",
@@ -126,9 +125,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "rooms_settings": "Rooms – individual settings",
         "season": "Heating season",
         "outdoor_mean_4h": "Outdoor (4 h mean)",
-        "outdoor_mean_chart": "Outdoor – 4 h mean and the heating season limit",
-        "mean_4h": "4 h mean",
-        "heating_limit": "Limit",
+        "outdoor_mean_limit": "Outdoor – 4 h mean (limit {limit} °C)",
+        "heating_limit": "Heating season limit",
         "who_home": "Who is home",
         "since": "Changed",
         "legend": "Legend",
@@ -286,8 +284,8 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             (
                 "Vážený požadavek všech místností na teplo v %. Kotel zapne, když průměr "
                 "dosáhne {threshold} % {combine} když volají aspoň {rooms}. Běžící kotel drží "
-                "až do poklesu pod {off} % (hystereze). Pravidlo a počet volajících jsou "
-                "v dlaždici."
+                "až do poklesu pod {off} % (hystereze). Dlaždice ukazuje průměr proti prahu "
+                "a počet volajících místností."
             ),
         ),
         (
@@ -317,7 +315,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Venku (průměr 4 h)",
             (
                 "Průměr venkovní teploty za 4 hodiny, podle něj začíná a končí topná sezóna. "
-                "V grafu je hranice sezóny vodorovná čára."
+                "Hranice je v názvu dlaždice, v Grafech jako vodorovná čára."
             ),
         ),
         ("", "mdi:play", "Povel kotli", "Zda integrace kotli povoluje topit."),
@@ -423,7 +421,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Požadavek (místnost)",
             (
                 "Kolik procent tepla místnost chce. Od {room} % se počítá jako volající "
-                "pro start kotle, v dlaždici je volá / nevolá."
+                "pro start kotle, v dlaždici „75 % z {room} %“."
             ),
         ),
         (
@@ -584,7 +582,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Outdoor (4 h mean)",
             (
                 "Mean outdoor temperature of 4 hours; the heating season starts and ends by it. "
-                "The chart shows the season limit as a horizontal line."
+                "The limit is in the tile name, in History as a horizontal line."
             ),
         ),
         ("", "mdi:play", "Boiler command", "Whether the integration lets the boiler heat."),
@@ -690,7 +688,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Demand (room)",
             (
                 "How many percent of heat the room wants. From {room} % it counts as calling "
-                "for the boiler start; the tile says calling or not."
+                'for the boiler start; the tile shows "75 % of {room} %".'
             ),
         ),
         (
@@ -1201,6 +1199,7 @@ def _boiler_section(
 ) -> dict:
     sid = ids.system
     trend = {"type": "trend-graph", "hours_to_show": 24}
+    limit = _number(runtime.controller.cfg.heating_limit, _language(runtime))
     reason = sid("sensor", "boiler_reason")
     hold = sid("sensor", "boiler_hold_ends_at")
     cards: list[dict[str, Any]] = [
@@ -1217,8 +1216,8 @@ def _boiler_section(
             sid("sensor", "demand_total"),
             text["demand_total"],
             color=DEMAND,
-            # The value with the start or stop rule and the rooms calling.
-            state_content=["state", "rule"],
+            # "0,6 % z 30 % nebo 0 z 2 místností": the value against both start rules.
+            state_content=["rule"],
             features=[{"type": "bar-gauge", "min": 0, "max": 100}],
             features_position="bottom",
         ),
@@ -1243,17 +1242,13 @@ def _boiler_section(
         _full(
             sid("sensor", "outdoor_temperature"), text["outdoor"], color=OUTDOOR, features=[trend]
         ),
-        # The 4-hour mean against the limit of the heating season as a line.
-        {
-            "type": "history-graph",
-            "title": text["outdoor_mean_chart"],
-            "hours_to_show": 48,
-            "entities": [
-                {"entity": sid("sensor", "outdoor_mean_4h"), "name": text["mean_4h"]},
-                {"entity": sid("sensor", "heating_limit"), "name": text["heating_limit"]},
-            ],
-            "grid_options": FULL,
-        },
+        # The limit is in the name; as a line next to the mean it is in the History view.
+        _full(
+            sid("sensor", "outdoor_mean_4h"),
+            text["outdoor_mean_limit"].format(limit=limit),
+            color=OUTDOOR_MEAN,
+            features=[trend],
+        ),
     ]
     return {"type": "grid", "cards": cards}
 
@@ -1487,8 +1482,8 @@ def _room_section(
             ids.room("sensor", room, "demand"),
             text["demand"],
             color=DEMAND,
-            # Whether the room counts as calling for the boiler, and from how much.
-            state_content=["state", "call"],
+            # "75 % z 50 %": the demand against the threshold from which the room calls.
+            state_content=["call"],
             features=[{"type": "bar-gauge", "min": 0, "max": 100}],
             features_position="bottom",
         ),

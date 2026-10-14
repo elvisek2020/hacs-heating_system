@@ -43,7 +43,7 @@ Zkopíruj `custom_components/hydronic_heating` z posledního [release](https://g
 ## Konfigurace
 
 1. Přidejte integraci. **Režim shadow** nechte zapnutý: integrace všechno počítá, ale nic nespíná.
-2. V integraci přidejte místnosti tlačítkem **Přidat místnost** (čidla, ventily, okna, rozvrh).
+2. V integraci přidejte místnosti tlačítkem **Přidat místnost** (čidla, ventily, okna, rozvrh). Pole **Pořadí** určuje pořadí místností na dashboardu a ve schématu (0 = podle názvu za ostatními).
 3. Nechte systém běžet vedle stávající regulace. Na `climate.hh_system` ukazují atributy `would_command_boiler` a `would_command_valves`, co by integrace udělala.
 4. Až rozhodnutí sedí, vypněte `switch.hh_shadow_mode`. Od té chvíle integrace spíná kotel a hlavice.
 
@@ -135,13 +135,13 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 
 - **Nahoře jedna řada:**
   - Topení: systém, režim, topná sezóna, rozvrh domu, manuál.
-  - Kotel: proč, další změna, celkový požadavek s pravidlem startu („22,4 % · start od 30 % nebo od 2 volajících místností · volá 1“), měřená teplota vody, venku a graf 4h průměru s hranicí topné sezóny jako čarou.
+  - Kotel: proč, další změna, celkový požadavek proti pravidlům startu („0,6 % z 30 % nebo 0 z 2 místností“, při běžícím kotli s prahem vypnutí), měřená teplota vody, venku a 4h průměr s hranicí topné sezóny v názvu (jako čára v Grafech).
   - Provoz kotle podle priority: povel kotli, skutečný stav kotle (se zpětnou vazbou), požadavek na teplo, venku (průměr 4 h), porucha, topná sezóna, starty dnes, střída 24 h, omezení střídy. Pod tím Kdo je doma.
 - **Odznak Kotel** v horní liště ukazuje se zpětnou vazbou skutečný stav kotle, bez ní povel.
 - **Pod řadou** upozornění na shadow režim přes celou šířku, v demu blok Demo.
 - **Místnosti – individuální nastavení:**
   - nahoře ovládání: tlačítka Automaticky a Vypnuto, cílová teplota, předvolba. Ruční režim se jmenuje **Ručně** a má ikonu ruky. Je vidět v textu stavu, zpět na automatiku jedním dotykem.
-  - pak požadavek (příčina, s „volá / nevolá (od 50 %)“) a ventil (následek). S čidlem trubky má ventil vedle sebe dlaždici Trubka a ukazuje výsledek kontroly.
+  - pak požadavek (příčina, „75 % z 50 %“ = od 50 % místnost volá) a ventil (následek). S čidlem trubky má ventil vedle sebe dlaždici Trubka a ukazuje výsledek kontroly.
   - pod nimi **Komfort** a **ECO** s tlačítky −/+, tedy trvalé teploty místnosti pro automatiku. Teplota Pryč se nastavuje v nastavení místnosti. Pozor: −/+ na termostatu nastaví jen ruční cíl a místnost přepne na ručně.
   - dole vlastní rozvrh.
 - **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice a každý odznak se stejnou ikonou a jednou až dvěma větami, co znamená.

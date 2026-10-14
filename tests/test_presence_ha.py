@@ -81,7 +81,11 @@ async def test_long_absence_sets_away_state(hass: HomeAssistant) -> None:
     assert messages == ["[Shadow] Long absence: the whole house uses the away temperatures."]
 
 
-async def test_czech_preheat_text_and_dashboard_badges(hass: HomeAssistant) -> None:
+async def test_czech_preheat_text_and_dashboard_badges(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    # Noon, so the return in an hour is today (a time after midnight says "zítra").
+    freezer.move_to("2026-01-15 11:00:00+00:00")
     hass.config.language = "cs"
     hass.states.async_set("group.rodina", "not_home")
     hass.states.async_set("binary_sensor.dlouho_pryc", "off")
@@ -91,7 +95,8 @@ async def test_czech_preheat_text_and_dashboard_badges(hass: HomeAssistant) -> N
     hass.states.async_set("sensor.navrat", back.isoformat(), {"device_class": "timestamp"})
     await _settle(hass)
     preheat = [e.data["message"] for e in events if e.data["kind"] == "preheat"]
-    clock = dt_util.as_local(back).strftime("%H:%M")
+    local = dt_util.as_local(back)
+    clock = f"{local.hour}:{local:%M}"
     assert preheat == [
         f"[Shadow] Předtápění: Obývák na 21 °C do {clock} (očekávaný návrat), "
         "rychlost ohřevu 0,5 K/h."

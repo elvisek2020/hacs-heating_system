@@ -162,6 +162,8 @@ ABSENCE_PRESETS: Final = ["eco", "away"]
 
 # --- Room subentry (FR-ROOM, FR-SCH, FR-WIN, chapter 10.2) ---------------
 CONF_ROOM_NAME: Final = "name"
+# Order of the room on the dashboard and in the scheme; 0 = by name after the others.
+CONF_ROOM_ORDER: Final = "order"
 CONF_COMFORT_TEMP: Final = "comfort_temp"
 CONF_ECO_TEMP: Final = "eco_temp"
 CONF_AWAY_TEMP: Final = "away_temp"
@@ -291,6 +293,7 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
 }
 
 DEFAULT_ROOM: Final[dict[str, Any]] = {
+    CONF_ROOM_ORDER: 0,
     CONF_COMFORT_TEMP: 21.0,
     CONF_ECO_TEMP: 19.0,
     CONF_AWAY_TEMP: 15.0,

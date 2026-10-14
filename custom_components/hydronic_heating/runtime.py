@@ -12,7 +12,7 @@ import logging
 from typing import Any
 
 from homeassistant.components import persistent_notification
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import Context, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er, issue_registry as ir
 from homeassistant.helpers.event import (
@@ -27,6 +27,7 @@ from .const import (
     CONF_BOILER_FIXED_FLOW_TEMP,
     CONF_DEMO_MODE,
     CONF_MANUAL_DURATIONS,
+    CONF_ROOM_ORDER,
     CONF_SHADOW_MODE,
     CONF_VALVES,
     DEFAULT_OPTIONS,
@@ -88,11 +89,19 @@ def structure_of(entry: ConfigEntry) -> tuple[Any, ...]:
 
 
 def room_configs(entry: ConfigEntry) -> list[RoomConfig]:
-    """Room configurations from the config subentries."""
+    """Room configurations from the config subentries, in the order set by the user.
+
+    Rooms with an order come first by it; the others (order 0) and ties by name.
+    """
+    subs = [sub for sub in entry.subentries.values() if sub.subentry_type == SUBENTRY_ROOM]
+
+    def key(sub: ConfigSubentry) -> tuple[int, str]:
+        order = int(sub.data.get(CONF_ROOM_ORDER) or 0)
+        return (order if order > 0 else 10_000, sub.title.casefold())
+
     return [
         RoomConfig.from_data(sub.subentry_id, sub.unique_id or slugify(sub.title), sub.data)
-        for sub in entry.subentries.values()
-        if sub.subentry_type == SUBENTRY_ROOM
+        for sub in sorted(subs, key=key)
     ]
 
 

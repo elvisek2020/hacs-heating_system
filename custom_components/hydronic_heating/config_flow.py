@@ -114,6 +114,7 @@ from .const import (
     CONF_REFERENCE_ROOM_TEMP,
     CONF_ROOM_CALL_THRESHOLD,
     CONF_ROOM_NAME,
+    CONF_ROOM_ORDER,
     CONF_SCHEDULE_ENTITY,
     CONF_SCHEDULE_MODE,
     CONF_SENSOR_FALLBACK,
@@ -514,6 +515,7 @@ def _room_basics_schema(values: Mapping[str, Any]) -> vol.Schema:
     return vol.Schema(
         {
             _required(CONF_ROOM_NAME, values): _TEXT,
+            _required(CONF_ROOM_ORDER, values): _number(0, 99),
             _required(CONF_COMFORT_TEMP, values): _number(5, 30, 0.5, _CELSIUS),
             _required(CONF_ECO_TEMP, values): _number(5, 30, 0.5, _CELSIUS),
             _required(CONF_AWAY_TEMP, values): _number(5, 25, 0.5, _CELSIUS),
