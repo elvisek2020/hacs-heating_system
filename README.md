@@ -148,6 +148,17 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 - **Jen nastavené funkce.** Okna, blokace okny, omezení střídy, žádaná teplota z křivky, teplota vody ani rozvrh domu se negenerují, když je nepoužíváte. Po změně nastavení dashboard přegenerujte.
 - **Barvy podle významu:** kotel oranžově, požadavky a sezóna jantarově, voda a porucha červeně, venek modře, ventily a okna tyrkysově, osoby zeleně. Dvoustavové dlaždice svítí jen v aktivním stavu, termostaty mají barvy HA.
 
+## Schéma topení
+
+Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpátečkou a radiátory po patrech.
+
+- Voda proudí jen tam, kam opravdu teče, v doběhu pomaleji. Kotel při běhu svítí a hoří, hlavice v pohybu bliká a radiátor je teplý, jen když jím teče voda.
+- Pod schématem je pruh fází **Klid → Ventily → Kotel topí → Doběh** s odpočtem („kotel zapne za 1:12“, „doběh ještě 2:10“) a se štítkem, když kotel něco drží (minimální pauza, mimo sezónu, porucha…).
+- **Teď** říká, proč je to tak (kdo chce teplo, které ventily se zavírají). **Pak** vypisuje příští události s časy: start a vypnutí kotle, konec doběhu, předtápění, změny rozvrhu.
+- Klepnutím na místnost se otevře její termostat, klepnutím na kotel důvod jeho stavu.
+- **Patra** se berou z oblastí Home Assistantu. Přiřaďte zařízení místnosti oblast s patrem, nebo pojmenujte oblast stejně jako místnost. Bez pater jsou všechny místnosti v jedné řadě.
+- Kartu `custom:hydronic-heating-flow-card` přináší integrace, nic dalšího se neinstaluje. Po aktualizaci integrace stačí obnovit stránku.
+
 ## Teplota vody a kontrola topení
 
 Volitelné čidlo **Teplota vody** (Konfigurovat → Zdroj tepla), například na stoupačce od kotle:

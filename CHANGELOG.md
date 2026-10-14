@@ -5,6 +5,21 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.13.0 — 2026-10-14
+
+### ✨ Novinky
+
+- **Animované schéma topení.** Nový pohled **Schéma** v dashboardu: kotel, přívod a zpátečka a radiátory po patrech.
+  - Voda proudí jen tam, kam opravdu teče, v doběhu pomaleji. Kotel při běhu svítí a hoří, hlavice v pohybu bliká, radiátor je teplý, jen když jím teče voda.
+  - Pruh fází **Klid → Ventily → Kotel topí → Doběh** s odpočtem („kotel zapne za 1:12“) a štítkem, když kotel něco drží.
+  - **Teď** vysvětluje, proč je to tak, **Pak** vypisuje příští události s časy (start a vypnutí kotle, konec doběhu, předtápění, změny rozvrhu).
+  - Klepnutím na místnost se otevře termostat, klepnutím na kotel důvod jeho stavu. Na mobilu se radiátory zalomí do více řad.
+  - Kartu přináší integrace, přes HACS se nic dalšího neinstaluje.
+- **Patra** místností se berou z oblastí Home Assistantu: oblast zařízení místnosti, nebo oblast se stejným názvem jako místnost.
+- `sensor.hh_boiler_reason` má nové atributy `now` a `upcoming` (co se děje teď a co se stane dál). Do historie se neukládají.
+
+Po aktualizaci restartuj Home Assistant, obnov stránku v prohlížeči a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.12.0 — 2026-10-14
 
 ### ✨ Novinky

@@ -110,7 +110,7 @@ async def test_czech_preheat_text_and_dashboard_badges(hass: HomeAssistant) -> N
     # The badges of the top bar are explained too, with the same icons.
     assert badges["group.rodina"]["icon"] == "mdi:account-multiple"
     assert badges["binary_sensor.dlouho_pryc"]["icon"] == "mdi:bag-suitcase"
-    rows = dashboard["views"][2]["sections"][0]["cards"][1]["content"]
+    rows = dashboard["views"][3]["sections"][0]["cards"][1]["content"]
     assert "**Pryč**" not in rows
     assert '<ha-icon icon="mdi:account-multiple"></ha-icon> | **Doma**' in rows
     assert '<ha-icon icon="mdi:bag-suitcase"></ha-icon> | **Dlouhodobě pryč**' in rows

@@ -11,8 +11,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+    floor_registry as fr,
+)
 
+from .card import CARD_TYPE
 from .const import DOMAIN, ENTITY_PREFIX
 
 if TYPE_CHECKING:
@@ -26,6 +32,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "title": "Topení",
         "overview": "Přehled",
         "history": "Grafy",
+        "scheme": "Schéma",
         "heating": "Topení",
         "boiler": "Kotel",
         "boiler_operation": "Provoz kotle",
@@ -109,6 +116,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "title": "Heating",
         "overview": "Overview",
         "history": "History",
+        "scheme": "Scheme",
         "heating": "Heating",
         "boiler": "Boiler",
         "boiler_operation": "Boiler operation",
@@ -862,6 +870,7 @@ def build_dashboard(runtime: HydronicHeatingRuntime) -> dict[str, Any]:
         "title": text["title"],
         "views": [
             _overview(runtime, ids, text, shown),
+            _scheme_view(runtime, ids, text, shown),
             _history(runtime, ids, text, shown),
             _legend_view(runtime, text, shown),
         ],
@@ -1387,6 +1396,75 @@ def _room_section(
             )
         )
     return {"type": "grid", "cards": cards}
+
+
+# --- Scheme (FR-UI-25) ----------------------------------------------------------
+
+
+def _scheme_view(
+    runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str], shown: _Shown
+) -> dict:
+    """Animated scheme of the boiler, pipes, valves and radiators, by floor."""
+    sid = ids.system
+    card: dict[str, Any] = {
+        "type": CARD_TYPE,
+        "boiler": sid("binary_sensor", "boiler_command"),
+        "reason": sid("sensor", "boiler_reason"),
+        "outdoor": sid("sensor", "outdoor_temperature"),
+    }
+    if shown.flow:
+        card["flow"] = shown.flow
+    if shown.feedback:
+        card["actual"] = shown.feedback
+    card["floors"] = _floors(runtime, ids)
+    return {
+        "title": text["scheme"],
+        "path": "schema",
+        "icon": "mdi:pipe-valve",
+        "type": "sections",
+        "max_columns": 2,
+        "sections": [{"type": "grid", "column_span": 2, "cards": [{**card, "grid_options": FULL}]}],
+    }
+
+
+def _floors(runtime: HydronicHeatingRuntime, ids: _Ids) -> list[dict[str, Any]]:
+    """Rooms by the floor of their area, the highest floor first.
+
+    The area is the one of the room's device (or entity), else an area with the
+    room's name. Rooms without a floor come last, without a heading.
+    """
+    hass = runtime.hass
+    devices, areas, floors = dr.async_get(hass), ar.async_get(hass), fr.async_get(hass)
+    grouped: dict[str | None, list[dict[str, Any]]] = {}
+    for room in runtime.rooms:
+        climate = ids.room("climate", room, "")
+        entry = ids.registry.async_get(climate)
+        area_id = entry.area_id if entry else None
+        if area_id is None and entry is not None and entry.device_id:
+            device = devices.async_get(entry.device_id)
+            area_id = device.area_id if device else None
+        area = areas.async_get_area(area_id) if area_id else areas.async_get_area_by_name(room.name)
+        item: dict[str, Any] = {
+            "name": room.name,
+            "climate": climate,
+            "demand": ids.room("sensor", room, "demand"),
+            "valve": ids.room("sensor", room, "valve_state"),
+        }
+        if pipe := next((v.temp_entity for v in room.valves if v.temp_entity), None):
+            item["pipe"] = pipe
+        grouped.setdefault(area.floor_id if area else None, []).append(item)
+
+    def level(floor_id: str | None) -> tuple[int, int]:
+        floor = floors.async_get_floor(floor_id) if floor_id else None
+        if floor is None:
+            return (1, 0)
+        return (0, -(floor.level if floor.level is not None else 0))
+
+    result = []
+    for floor_id in sorted(grouped, key=level):
+        floor = floors.async_get_floor(floor_id) if floor_id else None
+        result.append({"name": floor.name if floor else "", "rooms": grouped[floor_id]})
+    return result
 
 
 # --- Legend -------------------------------------------------------------------

@@ -13,6 +13,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 import voluptuous as vol
 
+from .card import async_register_card
 from .const import (
     ATTR_DURATION,
     DOMAIN,
@@ -54,7 +55,7 @@ def _runtime(hass: HomeAssistant) -> HydronicHeatingRuntime:
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Register the services (FR-MAN-01, FR-MAN-03)."""
+    """Register the services (FR-MAN-01, FR-MAN-03) and the scheme card (FR-UI-25)."""
 
     async def start_manual(call: ServiceCall) -> None:
         _runtime(hass).start_manual(call.data[ATTR_DURATION])
@@ -74,6 +75,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         generate_dashboard,
         supports_response=SupportsResponse.ONLY,
     )
+    await async_register_card(hass)
     return True
 
 

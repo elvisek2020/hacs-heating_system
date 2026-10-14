@@ -166,6 +166,8 @@ class RoomController:
         self.preheat_until: datetime | None = None
         self.preheat_source: str | None = None
         self.preheat_planned: datetime | None = None
+        # When the planned preheat should reach comfort (the scheme shows it).
+        self.preheat_planned_for: datetime | None = None
         # Why the room has its target, which presence entity it follows and until when.
         self.target_reason = TargetReason.COMFORT
         self.target_until: datetime | None = None
@@ -357,7 +359,7 @@ class RoomController:
     def _update_preheat(self, ctx: RoomContext, base: float | None) -> None:
         """Start heating to comfort early enough for the next comfort period."""
         now = ctx.now
-        self.preheat_planned = None
+        self.preheat_planned = self.preheat_planned_for = None
         if (
             not ctx.preheat_enabled
             or ctx.away
@@ -392,7 +394,7 @@ class RoomController:
             self.preheat_until, self.preheat_source = when, source
         else:
             self.preheat_until = self.preheat_source = None
-            self.preheat_planned = start
+            self.preheat_planned, self.preheat_planned_for = start, when
 
     def update(self, snap: Snapshot, ctx: RoomContext) -> None:
         """Read inputs and compute target and demand."""

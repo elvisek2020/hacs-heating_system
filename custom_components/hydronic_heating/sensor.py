@@ -20,9 +20,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .core.controller import HydronicController
 from .core.model import BoilerReason, SystemState, ValvePhysical, ValveStatus
 from .core.room import RoomController
+from .core.upcoming import upcoming
 from .demo import DemoRoom
 from .entity import DemoEntity, HydronicEntity
-from .explain import detail
+from .explain import detail, now_lines, upcoming_items
 from .runtime import HydronicConfigEntry, HydronicHeatingRuntime
 
 PARALLEL_UPDATES = 0
@@ -291,8 +292,8 @@ class BoilerReasonSensor(HydronicEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [r.value for r in BoilerReason]
-    # The countdown changes on every step; keep it out of the history.
-    _unrecorded_attributes = frozenset({"remaining_s"})
+    # The countdown and the scheme texts change on every step; keep them out of the history.
+    _unrecorded_attributes = frozenset({"remaining_s", "now", "upcoming"})
 
     def __init__(self, runtime: HydronicHeatingRuntime) -> None:
         """Initialize."""
@@ -318,6 +319,11 @@ class BoilerReasonSensor(HydronicEntity, SensorEntity):
             "remaining_s": remaining,
             "rule": status.rule,
             "detail": detail(self.hass, status),
+            # FR-UI-25: what happens now and next, for the animated scheme.
+            "now": now_lines(self.hass, self.controller),
+            "upcoming": upcoming_items(self.hass, upcoming(self.controller, now))
+            if now is not None
+            else [],
         }
 
 

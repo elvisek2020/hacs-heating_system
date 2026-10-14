@@ -193,7 +193,12 @@ async def test_generate_dashboard(hass: HomeAssistant) -> None:
         "button.hh_manual_60",
     ):
         assert entity_id in text, entity_id
-    assert [view["path"] for view in dashboard["views"]] == ["prehled", "grafy", "vysvetlivky"]
+    assert [view["path"] for view in dashboard["views"]] == [
+        "prehled",
+        "schema",
+        "grafy",
+        "vysvetlivky",
+    ]
 
 
 async def test_dashboard_without_demo(hass: HomeAssistant) -> None:
@@ -268,7 +273,7 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history, legend = dashboard["views"]
+    overview, _scheme, history, legend = dashboard["views"]
     assert overview["type"] == "sections"
     badges = [b["entity"] for b in overview["badges"]]
     assert set(badges) >= {
@@ -355,7 +360,7 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history, _legend = dashboard["views"]
+    overview, _scheme, history, _legend = dashboard["views"]
     badges = {b["entity"]: b for b in overview["badges"]}
     assert "sensor.hh_boiler_reason" in badges
     assert badges["sensor.hh_boiler_reason"]["color"] == "deep-orange"
@@ -413,7 +418,7 @@ async def test_dashboard_with_flow_sensor_and_duty_limit(hass: HomeAssistant) ->
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history, legend = dashboard["views"]
+    overview, _scheme, history, legend = dashboard["views"]
     badges = {b["entity"]: b for b in overview["badges"]}
     assert badges["sensor.stoupacka"]["name"] == "Flow temperature"
     assert badges["sensor.stoupacka"]["icon"] == "mdi:thermometer-water"
@@ -447,7 +452,7 @@ async def test_dashboard_shows_the_actual_boiler_state(hass: HomeAssistant) -> N
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history, legend = dashboard["views"]
+    overview, _scheme, history, legend = dashboard["views"]
     boiler_badge = overview["badges"][1]
     assert boiler_badge["entity"] == "binary_sensor.horak"
     assert boiler_badge["name"] == "Boiler"
@@ -474,7 +479,7 @@ async def test_dashboard_shows_the_pipe_at_the_valve(hass: HomeAssistant) -> Non
     dashboard = await hass.services.async_call(
         DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
     )
-    overview, history, legend = dashboard["views"]
+    overview, _scheme, history, legend = dashboard["views"]
     rooms = {s["cards"][0].get("heading"): s["cards"] for s in overview["sections"]}
     cards = {c.get("entity"): c for c in rooms["Obývák"]}
     valve = cards["sensor.hh_obyvak_valve_state"]
@@ -526,7 +531,7 @@ async def test_dashboard_room_shows_the_valve_not_the_heads(hass: HomeAssistant)
         valve = next(c for c in rooms["Obývák"] if c.get("entity", "").endswith("valve_state"))
         assert valve["entity"] == "sensor.hh_obyvak_valve_state"
         assert valve["name"] == "Valve"  # test instance runs in English
-        timeline = dashboard["views"][1]["sections"][2]["cards"][-1]["entities"]
+        timeline = dashboard["views"][2]["sections"][2]["cards"][-1]["entities"]
         assert timeline == [
             {"entity": "sensor.hh_obyvak_valve_state", "name": "Obývák"},
             {"entity": "sensor.hh_loznice_valve_state", "name": "Ložnice"},

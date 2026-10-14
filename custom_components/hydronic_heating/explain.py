@@ -643,3 +643,121 @@ def room_target_text(hass: HomeAssistant, params: Mapping[str, Any]) -> str:
     else:
         key = "log_comfort"
     return texts[key].format_map(_Defaults(values))
+
+
+# --- Now and next, for the animated scheme (FR-UI-25) ---------------------------
+
+SCHEME: dict[str, dict[str, str]] = {
+    "cs": {
+        "demand": "Teplo chtějí: {rooms}.",
+        "no_demand": "Teplo teď nechce žádná místnost.",
+        "closing": "Zavírají se ventily: {rooms}.",
+        "opening": "Otevírají se ventily: {rooms}.",
+        "airing": "Větrá se: {rooms}.",
+        "frost": "Protimrazová ochrana: {rooms}.",
+        "and": " a ",
+        "all_rooms": "všechny místnosti",
+        "boiler_start": "Kotel zapne v {at}.",
+        "boiler_may_start": "Kotel může zapnout nejdřív v {at}.",
+        "boiler_off": "Kotel vypne v {at}.",
+        "min_on_end": "Minimální běh do {at}, pak kotel vypne, jakmile místnosti dosáhnou cíle.",
+        "duty_stop": "Podle omezení střídy kotel vypne v {at}.",
+        "valves_idle_deenergize": "Doběh skončí v {at}, pak jsou hlavice bez proudu.",
+        "valves_idle_open": "Doběh skončí v {at}, pak jsou ventily otevřené.",
+        "valves_idle_closed": "Doběh skončí v {at}, pak jsou ventily zavřené.",
+        "fault_recovery": "Návrat z poruchy v {at}, pokud kotel zůstane v pořádku.",
+        "manual_end": "Manuál skončí v {at}.",
+        "preheat": "Od {at} předtápění: {rooms} (komfort v {target}).",
+        "schedule_comfort": "V {at} komfort podle rozvrhu: {rooms}.",
+        "schedule_eco": "V {at} útlum podle rozvrhu: {rooms}.",
+        "return": "Očekávaný návrat v {at}: {rooms}.",
+        "ventilation_end": "Po větrání topí zase nejdřív v {at}: {rooms}.",
+    },
+    "en": {
+        "demand": "Heat wanted by: {rooms}.",
+        "no_demand": "No room wants heat now.",
+        "closing": "Valves closing: {rooms}.",
+        "opening": "Valves opening: {rooms}.",
+        "airing": "Airing: {rooms}.",
+        "frost": "Frost protection: {rooms}.",
+        "and": " and ",
+        "all_rooms": "all rooms",
+        "boiler_start": "The boiler starts at {at}.",
+        "boiler_may_start": "The boiler may start at {at} at the earliest.",
+        "boiler_off": "The boiler stops at {at}.",
+        "min_on_end": "Minimum run until {at}, then the boiler stops once the rooms reach their "
+        "target.",
+        "duty_stop": "By the duty limit the boiler stops at {at}.",
+        "valves_idle_deenergize": "The overrun ends at {at}, then the heads are without current.",
+        "valves_idle_open": "The overrun ends at {at}, then the valves are open.",
+        "valves_idle_closed": "The overrun ends at {at}, then the valves are closed.",
+        "fault_recovery": "Back from the fault at {at} if the boiler stays fine.",
+        "manual_end": "Manual heating ends at {at}.",
+        "preheat": "Preheating from {at}: {rooms} (comfort at {target}).",
+        "schedule_comfort": "At {at} comfort by schedule: {rooms}.",
+        "schedule_eco": "At {at} setback by schedule: {rooms}.",
+        "return": "Expected return at {at}: {rooms}.",
+        "ventilation_end": "After airing the room heats again at {at} at the earliest: {rooms}.",
+    },
+}
+# Boiler events need seconds ("05:32:38"), room events only the time of day.
+BOILER_KINDS = frozenset(
+    {
+        "boiler_start",
+        "boiler_may_start",
+        "boiler_off",
+        "min_on_end",
+        "duty_stop",
+        "valves_idle",
+        "fault_recovery",
+    }
+)
+
+
+def _names(hass: HomeAssistant, names: list[str] | tuple[str, ...]) -> str:
+    texts = SCHEME[language(hass)]
+    if len(names) <= 1:
+        return "".join(names)
+    return ", ".join(names[:-1]) + texts["and"] + names[-1]
+
+
+def now_lines(hass: HomeAssistant, ctrl: Any) -> list[str]:
+    """Describe the present: the boiler, who wants heat, moving valves, airing."""
+    texts = SCHEME[language(hass)]
+    now = ctrl.last_step
+    lines = [detail(hass, ctrl.boiler_status)]
+    rooms = list(ctrl.rooms.values())
+    calling = sorted((r for r in rooms if r.demand > 0), key=lambda r: -r.demand)
+    if calling:
+        named = [f"{r.cfg.name} ({number(hass, round(r.demand))} %)" for r in calling]
+        lines.append(texts["demand"].format(rooms=_names(hass, named)))
+    else:
+        lines.append(texts["no_demand"])
+    if now is not None:
+        for state in ("closing", "opening"):
+            moving = [r.cfg.name for r in rooms if r.valve_summary(now) == state]
+            if moving:
+                lines.append(texts[state].format(rooms=_names(hass, moving)))
+    if airing := [r.cfg.name for r in rooms if r.vent.active]:
+        lines.append(texts["airing"].format(rooms=_names(hass, airing)))
+    if frost := [r.cfg.name for r in rooms if r.frost_active]:
+        lines.append(texts["frost"].format(rooms=_names(hass, frost)))
+    return lines
+
+
+def upcoming_items(hass: HomeAssistant, events: list[Any]) -> list[dict[str, Any]]:
+    """Next events with their sentences (attribute `upcoming`)."""
+    texts = SCHEME[language(hass)]
+    items = []
+    for event in events:
+        kind = event.kind
+        key = f"valves_idle_{event.params.get('policy')}" if kind == "valves_idle" else kind
+        rooms = texts["all_rooms"] if event.params.get("all_rooms") else _names(hass, event.rooms)
+        at = clock(event.at) if kind in BOILER_KINDS else moment(event.at)
+        text = texts[key].format_map(
+            _Defaults({"at": at, "rooms": rooms, "target": moment(event.params.get("target_at"))})
+        )
+        items.append(
+            {"at": event.at.isoformat(), "kind": kind, "rooms": list(event.rooms), "text": text}
+        )
+    return items
