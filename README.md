@@ -76,6 +76,10 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 - **Ventily v klidu:** když kotel stojí a nikdo nechce teplo, jdou všechny hlavice do klidové polohy (výchozí bez proudu, u NO hlavic otevřeno). Hlavice tak nehřejí a neberou proud zbytečně celé hodiny. Proud dostanou jen hlavice místností bez požadavku, a jen během běhu kotle a doběhu.
 - **Priority:** porucha > protimrazová ochrana > manuál > blokace okny > mimo topnou sezónu > zvolený režim (vypnuto, pryč, automaticky).
 - **Okna:** po zpoždění zavřou ventily místnosti. Při otevření oken ve více místnostech (globální práh) se zastaví kotel, kromě manuálu.
+- **Větrání bez kontaktů:** když teplota místnosti rychle klesne (výchozí 1 K za 5 min), místnost se chová jako s otevřeným oknem: netopí a ventil je zavřený.
+  - Topí zase nejdřív po 20 min, až teplota začne stoupat, nejpozději po 45 min.
+  - Do blokace celého kotle se větrání nepočítá.
+  - Nastavení je v místnosti, krok Okna. Začátek i konec se zapíšou do deníku.
 - **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a mimo topnou sezónu. Tuto ochranu nejde vypnout.
 - **Topná sezóna:**
   - Řídí se průměrem venkovní teploty za poslední 4 hodiny (`sensor.hh_outdoor_mean_4h`), ne denním průměrem, který by schoval studené večery po slunečném dni.
@@ -136,9 +140,9 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 - **Odznak Kotel** v horní liště ukazuje se zpětnou vazbou skutečný stav kotle, bez ní povel.
 - **Pod řadou** upozornění na shadow režim přes celou šířku, v demu blok Demo.
 - **Místnosti – individuální nastavení:**
-  - nahoře ovládání (režim místnosti automaticky / ručně / vypnuto, cílová teplota, předvolba),
-  - pak požadavek (příčina) a ventil (následek),
-  - pod nimi **Komfort** a **ECO** s tlačítky −/+, tedy trvalé teploty místnosti pro automatiku. **Pryč** jen tehdy, když se používá (dlouhodobá nepřítomnost, nebo předvolba nepřítomnosti Pryč). Pozor: −/+ na termostatu nastaví jen ruční cíl a místnost přepne na ručně.
+  - nahoře ovládání: tlačítka Automaticky a Vypnuto, cílová teplota, předvolba. Ruční režim se jmenuje **Ručně** a má ikonu ruky. Je vidět v textu stavu, zpět na automatiku jedním dotykem.
+  - pak požadavek (příčina) a ventil (následek). S čidlem trubky má ventil vedle sebe dlaždici Trubka a ukazuje výsledek kontroly.
+  - pod nimi **Komfort** a **ECO** s tlačítky −/+, tedy trvalé teploty místnosti pro automatiku. Teplota Pryč se nastavuje v nastavení místnosti. Pozor: −/+ na termostatu nastaví jen ruční cíl a místnost přepne na ručně.
   - dole vlastní rozvrh.
 - **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice a každý odznak se stejnou ikonou a jednou až dvěma větami, co znamená.
 - **Jen nastavené funkce.** Okna, blokace okny, omezení střídy, žádaná teplota z křivky, teplota vody ani rozvrh domu se negenerují, když je nepoužíváte. Po změně nastavení dashboard přegenerujte.
@@ -154,6 +158,16 @@ Volitelné čidlo **Teplota vody** (Konfigurovat → Zdroj tepla), například n
   - Se zpětnou vazbou hořáku se počítá jen doba, kdy hořák opravdu běží. Ve shadow režimu a v demu se nekontroluje.
   - Kotel se kvůli tomu nevypíná. Porucha zmizí sama, až teplota vody při běhu kotle zase stoupne.
   - Stav kontroly ukazuje atribut `flow_check` u `binary_sensor.hh_boiler_command`.
+
+## Kontrola ventilů podle trubky
+
+Termoelektrické hlavice neříkají, jestli ventil opravdu otevřely. Čidlo teploty na trubce u ventilu (např. DS18B20 na 1-Wire sběrnici Loxone) to pozná. Nastavuje se u každého ventilu (Překonfigurovat místnost → ventil), prahy v Konfigurovat → Ventily.
+
+- Kontroluje se jen, když kotel topí a voda je teplá (měřená voda aspoň 40 °C, bez čidla vody po 5 min topení), a jen u ventilu, který je celý otevřený nebo celý zavřený.
+- **Otevřený ventil** musí trubku do 10 min ohřát aspoň o 5 K (nebo nad 40 °C). Jinak porucha „Ventil asi neotvírá“.
+- **Zavřený ventil** nesmí trubku ohřát o víc než 3 K. Jinak „Ventil asi nezavírá“.
+- Je to jen hlášení (oznámení, Opravy, deník). Řízení se nemění a hlášení zmizí samo, až kontrola projde.
+- Výsledek je v atributech `valve_check` a `valve_temp` termostatu místnosti a na dashboardu u Ventilu. Ve shadow režimu a v demu se nekontroluje.
 
 ## Proč kotel topí nebo stojí
 
@@ -191,7 +205,7 @@ Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastn�
 | `climate.hh_<místnost>` | termostat místnosti s presety komfort, eco, pryč a ruční teplota |
 | `sensor.hh_<místnost>_temperature`, `_demand`, `_valve_state` | teplota, požadavek, stav ventilů |
 | `number.hh_<místnost>_comfort`, `_eco`, `_away` | komfortní, útlumová a teplota Pryč (útlum nejde nad komfort, útlum a Pryč nejdou na protimrazovou teplotu nebo pod ni) |
-| `binary_sensor.hh_<místnost>_window`, `_problem` | blokace oknem, porucha místnosti |
+| `binary_sensor.hh_<místnost>_window`, `_problem` | otevřené okno nebo větrání (atribut `state` = `open_detected`), porucha místnosti |
 
 Ruční změna teploty nebo presetu místnosti v režimu automaticky platí trvale: místnost přejde do režimu topit a rozvrh se ignoruje, dokud ji nevrátíte na automaticky. Atribut `override_active` ukazuje, kde rozvrh neběží.
 

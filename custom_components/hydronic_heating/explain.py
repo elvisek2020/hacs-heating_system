@@ -170,6 +170,16 @@ DECISION: dict[str, dict[str, str]] = {
         "rychlost ohřevu {rate} K/h.",
         "source_schedule": "začátek komfortu podle rozvrhu",
         "source_return": "očekávaný návrat",
+        "ventilation_started": (
+            "{room}: rychlý pokles teploty o {drop} °C, asi se větrá – topení pozastaveno "
+            "do {pause_until}."
+        ),
+        "ventilation_ended": "{room}: větrání skončilo, místnost zase topí podle cíle.",
+        "valve_not_opening": (
+            "{room}: ventil asi neotvírá – trubka se za {minutes} min ohřála jen o {rise} °C."
+        ),
+        "valve_not_closing": "{room}: ventil asi nezavírá – trubka se ohřála o {rise} °C.",
+        "valve_ok": "{room}: ventil zase funguje, kontrola podle trubky prošla.",
         "trigger_stop": "Stop",
         "trigger_mode": "Režim {mode}",
         "shadow": "[Shadow] ",
@@ -234,6 +244,19 @@ DECISION: dict[str, dict[str, str]] = {
         "heat-up rate {rate} K/h.",
         "source_schedule": "comfort starts by schedule",
         "source_return": "expected return",
+        "ventilation_started": (
+            "{room}: fast temperature drop by {drop} °C, probably airing – heating paused "
+            "until {pause_until}."
+        ),
+        "ventilation_ended": "{room}: airing is over, the room heats to its target again.",
+        "valve_not_opening": (
+            "{room}: the valve does not seem to open – the pipe warmed only by {rise} °C "
+            "in {minutes} min."
+        ),
+        "valve_not_closing": (
+            "{room}: the valve does not seem to close – the pipe warmed by {rise} °C."
+        ),
+        "valve_ok": "{room}: the valve works again, the pipe check passed.",
         "trigger_stop": "Stop",
         "trigger_mode": "Mode {mode}",
         "shadow": "[Shadow] ",
@@ -247,6 +270,7 @@ VALVE_REASONS: dict[str, dict[str, str]] = {
         "fault_safe": "porucha",
         "frost": "protimrazová ochrana",
         "window": "otevřené okno",
+        "ventilation": "větrání (rychlý pokles teploty)",
         "manual": "manuální topení",
         "manual_excluded": "manuál se místnosti netýká",
         "idle_policy": "klidová poloha, topení neběží",
@@ -263,6 +287,7 @@ VALVE_REASONS: dict[str, dict[str, str]] = {
         "fault_safe": "fault",
         "frost": "frost protection",
         "window": "open window",
+        "ventilation": "airing (fast temperature drop)",
         "manual": "manual heating",
         "manual_excluded": "manual heating does not cover the room",
         "idle_policy": "idle position, heating is off",
@@ -403,6 +428,16 @@ def decision_text(
         message = texts[key].format_map(fill)
     elif decision.kind == "room_target":
         message = room_target_text(hass, decision.params)
+    elif decision.kind == "ventilation":
+        params = decision.params
+        fill["drop"] = number(hass, params.get("drop")) if params.get("drop") is not None else "?"
+        fill["pause_until"] = moment(params.get("pause_until"))
+        message = texts[f"ventilation_{params.get('event')}"].format_map(fill)
+    elif decision.kind == "valve_check":
+        params = decision.params
+        fill["rise"] = number(hass, params.get("rise")) if params.get("rise") is not None else "?"
+        fill["minutes"] = number(hass, params.get("minutes"))
+        message = texts[f"valve_{params.get('result')}"].format_map(fill)
     elif decision.kind == "preheat":
         fill["source_word"] = texts.get(f"source_{decision.params.get('source')}", "")
         message = texts["preheat"].format_map(fill)
@@ -464,6 +499,10 @@ ROOM: dict[str, dict[str, str]] = {
     "cs": {
         "frost": "Protimrazová ochrana: místnost je pod {frost} °C, topí naplno.",
         "window": "Otevřené okno: ventil je zavřený.",
+        "ventilation": (
+            "Větrá se (rychlý pokles teploty): ventil je zavřený nejméně do {until}, pak "
+            "dokud teplota zase nezačne stoupat."
+        ),
         "manual": "Manuální topení: ventil je otevřený, dokud manuál běží.",
         "room_off": "Místnost je vypnutá.",
         "summer": "Mimo topnou sezónu: netopí se.",
@@ -494,6 +533,10 @@ ROOM: dict[str, dict[str, str]] = {
     "en": {
         "frost": "Frost protection: the room is below {frost} °C and heats at full power.",
         "window": "Open window: the valve is closed.",
+        "ventilation": (
+            "Airing (fast temperature drop): the valve is closed at least until {until}, then "
+            "until the temperature rises again."
+        ),
         "manual": "Manual heating: the valve is open while manual heating runs.",
         "room_off": "The room is off.",
         "summer": "Off the heating season: no heating.",

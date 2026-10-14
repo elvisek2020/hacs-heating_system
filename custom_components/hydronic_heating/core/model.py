@@ -129,6 +129,7 @@ class ValveReason(StrEnum):
     FAULT_SAFE = "fault_safe"
     FROST = "frost"
     WINDOW = "window"
+    VENTILATION = "ventilation"
     MANUAL = "manual"
     MANUAL_EXCLUDED = "manual_excluded"
     IDLE_POLICY = "idle_policy"
@@ -146,6 +147,7 @@ class TargetReason(StrEnum):
 
     FROST = "frost"
     WINDOW = "window"
+    VENTILATION = "ventilation"
     MANUAL = "manual"
     ROOM_OFF = "room_off"
     SUMMER = "summer"
@@ -188,6 +190,7 @@ class ValveConfig:
     normally_open: bool
     open_time_s: float
     close_time_s: float
+    temp_entity: str | None = None
 
     @property
     def is_valve_domain(self) -> bool:
@@ -210,6 +213,7 @@ class ValveConfig:
             else bool(_get(data, c.DEFAULT_VALVE, c.CONF_NORMALLY_OPEN)),
             open_time_s=float(_get(data, c.DEFAULT_VALVE, c.CONF_VALVE_OPEN_TIME)),
             close_time_s=float(_get(data, c.DEFAULT_VALVE, c.CONF_VALVE_CLOSE_TIME)),
+            temp_entity=data.get(c.CONF_VALVE_TEMP_ENTITY),
         )
 
 
@@ -237,6 +241,11 @@ class RoomConfig:
     valves: tuple[ValveConfig, ...]
     windows: tuple[str, ...]
     window_invert: bool
+    vent_detect: bool
+    vent_drop_k: float
+    vent_window_s: float
+    vent_hold_s: float
+    vent_max_s: float
     schedule_entity: str | None
     presence_entity: str | None
     expected_return_entity: str | None
@@ -277,6 +286,11 @@ class RoomConfig:
             valves=tuple(ValveConfig.from_data(v) for v in data.get(c.CONF_VALVES, ())),
             windows=tuple(data.get(c.CONF_WINDOWS, ())),
             window_invert=bool(_get(data, d, c.CONF_WINDOW_INVERT)),
+            vent_detect=bool(_get(data, d, c.CONF_VENT_DETECT)),
+            vent_drop_k=num(c.CONF_VENT_DROP),
+            vent_window_s=num(c.CONF_VENT_TIME) * 60,
+            vent_hold_s=num(c.CONF_VENT_PAUSE) * 60,
+            vent_max_s=num(c.CONF_VENT_MAX) * 60,
             # An own schedule only when chosen; before 0.9 a filled entity meant own.
             schedule_entity=data.get(c.CONF_SCHEDULE_ENTITY)
             if data.get(c.CONF_SCHEDULE_MODE, "own") == "own"
@@ -402,6 +416,10 @@ class SystemConfig:
     use_forecast: bool = False
     flow_check_s: float = 15 * 60
     flow_check_rise: float = 5.0
+    valve_check_s: float = 10 * 60
+    valve_check_rise: float = 5.0
+    valve_check_closed_rise: float = 3.0
+    valve_check_hot: float = 40.0
     house_schedule_entity: str | None = None
     house_presence_entity: str | None = None
     long_away_entity: str | None = None
@@ -496,6 +514,10 @@ class SystemConfig:
             use_forecast=bool(opt(c.CONF_USE_FORECAST)),
             flow_check_s=num(c.CONF_FLOW_CHECK_TIME) * 60,
             flow_check_rise=num(c.CONF_FLOW_CHECK_RISE),
+            valve_check_s=num(c.CONF_VALVE_CHECK_TIME) * 60,
+            valve_check_rise=num(c.CONF_VALVE_CHECK_RISE),
+            valve_check_closed_rise=num(c.CONF_VALVE_CHECK_CLOSED_RISE),
+            valve_check_hot=num(c.CONF_VALVE_CHECK_HOT),
             house_schedule_entity=options.get(c.CONF_HOUSE_SCHEDULE_ENTITY),
             house_presence_entity=options.get(c.CONF_HOUSE_PRESENCE_ENTITY),
             long_away_entity=options.get(c.CONF_LONG_AWAY_ENTITY),

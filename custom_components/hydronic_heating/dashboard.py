@@ -73,6 +73,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "demand": "Požadavek",
         "valve": "Ventil",
         "valves": "Ventily",
+        "pipe": "Trubka",
         "comfort": "Komfort",
         "eco": "ECO",
         "away": "Pryč",
@@ -156,6 +157,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "demand": "Demand",
         "valve": "Valve",
         "valves": "Valves",
+        "pipe": "Pipe",
         "comfort": "Comfort",
         "eco": "Eco",
         "away": "Away",
@@ -334,10 +336,13 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Kolik procent cyklu smí kotel běžet podle topné křivky.",
         ),
         (
-            "windows",
+            "airing",
             "mdi:window-open-variant",
             "Okna",
-            "Počet místností s otevřeným oknem. Odznak se ukáže, jen když je nějaké otevřené.",
+            (
+                "Počet místností s otevřeným oknem nebo s větráním. Odznak se ukáže, jen když "
+                "nějaké je."
+            ),
         ),
         (
             "windows",
@@ -359,9 +364,9 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:thermostat",
             "Teplota (místnost)",
             (
-                "Aktuální teplota, režim místnosti (automaticky, ručně, vypnuto), cíl a "
-                "předvolba. −/+ na termostatu nastaví ruční cíl a přepne místnost na ručně, "
-                "zpět na automatiku jedním dotykem. Proč má místnost svůj cíl, ukazují "
+                "Aktuální teplota, režim místnosti, cíl a předvolba. Ručně (ikona ruky) = "
+                "pevný cíl bez rozvrhu a přítomnosti; nastaví ho −/+ na termostatu nebo výběr "
+                "předvolby, zpět tlačítkem Automaticky. Proč má místnost svůj cíl, ukazují "
                 "atributy termostatu a deník."
             ),
         ),
@@ -371,6 +376,24 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:pipe-valve",
             "Ventil",
             "Poloha ventilu radiátoru: otevřeno, otevírá se, zavírá se, zavřeno.",
+        ),
+        (
+            "valve_temps",
+            "mdi:pipe",
+            "Trubka",
+            (
+                "Teplota trubky u ventilu. Když kotel topí, otevřený ventil trubku ohřeje a "
+                "zavřený ne. U Ventilu je pak výsledek kontroly: funguje, neotvírá, nezavírá."
+            ),
+        ),
+        (
+            "airing",
+            "mdi:window-open",
+            "Okno (u místnosti)",
+            (
+                "Otevřené okno podle kontaktu, nebo větrání poznané podle rychlého poklesu "
+                "teploty. Místnost netopí a ventil je zavřený."
+            ),
         ),
         (
             "",
@@ -389,12 +412,6 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
                 "Trvalá útlumová teplota (předvolba ECO) pro automatiku (rozvrh vypnuto, "
                 "nikdo doma). Nejde nastavit nad komfort."
             ),
-        ),
-        (
-            "away",
-            "mdi:home-export-outline",
-            "Pryč",
-            "Teplota místnosti, když je celá domácnost dlouhodobě pryč nebo nikdo doma.",
         ),
         (
             "own_schedule",
@@ -548,10 +565,10 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "How many percent of a cycle the boiler may run by the curve.",
         ),
         (
-            "windows",
+            "airing",
             "mdi:window-open-variant",
             "Windows",
-            "Rooms with an open window. The badge shows only when one is open.",
+            "Rooms with an open window or airing. The badge shows only when there is one.",
         ),
         (
             "windows",
@@ -573,10 +590,10 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:thermostat",
             "Temperature (room)",
             (
-                "Current temperature, room mode (auto, manual, off), target and preset. -/+ on "
-                "the thermostat sets a manual target and switches the room to manual; back to "
-                "auto in one tap. The thermostat attributes and the logbook tell why the room "
-                "has its target."
+                "Current temperature, room mode, target and preset. Manual (hand icon) = a fixed "
+                "target without schedule and presence; set by -/+ on the thermostat or by a "
+                "preset, back with the Auto button. The thermostat attributes and the logbook "
+                "tell why the room has its target."
             ),
         ),
         ("", "mdi:gauge", "Demand (room)", "How many percent of heat the room wants."),
@@ -585,6 +602,25 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:pipe-valve",
             "Valve",
             "Position of the radiator valve: open, opening, closing, closed.",
+        ),
+        (
+            "valve_temps",
+            "mdi:pipe",
+            "Pipe",
+            (
+                "Temperature of the pipe at the valve. While the boiler heats, an open valve "
+                "warms its pipe and a closed one does not. The Valve tile then shows the check: "
+                "works, does not open, does not close."
+            ),
+        ),
+        (
+            "airing",
+            "mdi:window-open",
+            "Window (room)",
+            (
+                "An open window by its contact, or airing noticed by a fast temperature drop. "
+                "The room does not heat and its valve is closed."
+            ),
         ),
         (
             "",
@@ -603,12 +639,6 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
                 "Lasting setback temperature for auto (schedule off, nobody home). Cannot be set "
                 "above comfort."
             ),
-        ),
-        (
-            "away",
-            "mdi:home-export-outline",
-            "Away",
-            "Room temperature while the household is away for long or nobody is home.",
         ),
         (
             "own_schedule",
@@ -646,7 +676,6 @@ AUX = "blue-grey"  # starts today, long absence
 MISC = "grey"  # shadow, legend
 COMFORT = "orange"  # room temperature settings
 ECO = "teal"
-AWAY = AUX
 
 # Room icons by a part of the room name (slug), the first match wins.
 ROOM_ICONS = (
@@ -672,12 +701,15 @@ ROOM_ICONS = (
 )
 ROOM_ICON_DEFAULT = "mdi:home-thermometer-outline"
 PRESETS = ["comfort", "eco", "away", "none"]
-ROOM_HVAC_MODES = ["auto", "heat", "off"]
+# The frontend draws a flame for `heat`, which reads as "heating now". The room's
+# manual mode ("Manual", hand icon) shows in the state; one tap goes back to auto.
+ROOM_HVAC_MODES = ["auto", "off"]
 HALF = {"columns": 6}
 FULL = {"columns": "full"}
 LEGEND_PATH = "vysvetlivky"
 FLOW_ICON = "mdi:thermometer-water"
 BOILER_ICON = "mdi:fire"
+PIPE_ICON = "mdi:pipe"
 # Attributes of entities that stand for several people (groups, counts).
 AGGREGATE_ATTRS = ("entity_id", "people", "count")
 PRESENCE_CLASSES = ("presence", "occupancy")
@@ -772,11 +804,12 @@ class _Shown:
     feedback: str | None
     duty: bool
     windows: bool
+    airing: bool
     house_schedule: str | None
     own_schedule: bool
+    valve_temps: bool = False
     house_presence: bool = False
     long_away: bool = False
-    away: bool = False
     people: list[tuple[str, str]] = field(default_factory=list)
 
     @classmethod
@@ -789,12 +822,16 @@ class _Shown:
             feedback=cfg.heat_source.feedback_entity,
             duty=cfg.duty_enabled,
             windows=any(room.cfg.windows for room in runtime.controller.rooms.values()),
+            valve_temps=any(v.temp_entity for room in runtime.rooms for v in room.valves),
+            # Window contacts or airing detection (FR-WIN-06) in any room.
+            airing=any(
+                room.cfg.windows or room.cfg.vent_detect
+                for room in runtime.controller.rooms.values()
+            ),
             house_schedule=cfg.house_schedule_entity,
             own_schedule=any(room.schedule_entity for room in runtime.rooms),
             house_presence=cfg.house_presence_entity is not None,
             long_away=cfg.long_away_entity is not None,
-            # The away temperature only when absence leads to it (FR-SCH-02).
-            away=cfg.long_away_entity is not None or cfg.absence_preset == "away",
             people=_people(runtime),
         )
 
@@ -806,11 +843,12 @@ class _Shown:
             "feedback": self.feedback is not None,
             "duty": self.duty,
             "windows": self.windows,
+            "airing": self.airing,
+            "valve_temps": self.valve_temps,
             "house_schedule": self.house_schedule is not None,
             "own_schedule": self.own_schedule,
             "house_presence": self.house_presence,
             "long_away": self.long_away,
-            "away": self.away,
             "people": bool(self.people),
         }[feature]
 
@@ -870,7 +908,7 @@ def _overview(
     elif shown.duty:
         badges.append(_badge(sid("sensor", "flow_setpoint"), text["flow_setpoint"], color=WATER))
     badges.append(_badge(sid("sensor", "demand_total"), text["demand_total"], color=DEMAND))
-    if shown.windows:
+    if shown.airing:
         windows = sid("sensor", "open_windows")
         badges.append(
             _badge(
@@ -1260,7 +1298,7 @@ def _room_section(
     )
     controlled = runtime.controller.rooms.get(room.room_id)
     badges: list[dict[str, Any]] = []
-    if controlled is not None and controlled.cfg.windows:
+    if controlled is not None and (controlled.cfg.windows or controlled.cfg.vent_detect):
         badges.append(
             {
                 "type": "entity",
@@ -1286,7 +1324,7 @@ def _room_section(
         _full(
             climate,
             text["temperature"],
-            state_content=["current_temperature", "hvac_action"],
+            state_content=["current_temperature", "state", "hvac_action"],
             features=[
                 {"type": "climate-hvac-modes", "style": "icons", "hvac_modes": ROOM_HVAC_MODES},
                 {"type": "target-temperature"},
@@ -1307,10 +1345,24 @@ def _room_section(
     # The valve on the radiator: its position modelled from the head command and the
     # travel time, so "open" means open regardless of NO/NC heads.
     valve_name = text["valve"] if len(room.valves) == 1 else text["valves"]
-    cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name, color=VALVE))
+    pipes = [valve.temp_entity for valve in room.valves if valve.temp_entity]
+    if pipes:
+        # FR-SAFE-09: the valve with the result of its pipe check, the pipe next to it.
+        cards.append(
+            _half(
+                ids.room("sensor", room, "valve_state"),
+                valve_name,
+                color=VALVE,
+                state_content=["state", "check"],
+            )
+        )
+        cards.extend(_half(pipe, text["pipe"], color=WATER, icon=PIPE_ICON) for pipe in pipes)
+    else:
+        cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name, color=VALVE))
     # 3. Lasting temperatures of the room for auto (ECO as the preset); -/+ on the
     # thermostat is only a manual target.
-    settings = [("comfort", COMFORT), ("eco", ECO)] + ([("away", AWAY)] if shown.away else [])
+    # The away temperature stays in the room settings (FR-SCH-02).
+    settings = [("comfort", COMFORT), ("eco", ECO)]
     cards.extend(
         _half(
             ids.room("number", room, key),
@@ -1481,6 +1533,13 @@ def _history(
 
     valve_entities = [
         {"entity": ids.room("sensor", room, "valve_state"), "name": room.name} for room in rooms
+    ]
+    # The pipe at each valve against the valve position (FR-SAFE-09).
+    valve_entities += [
+        {"entity": valve.temp_entity, "name": room.name}
+        for room in rooms
+        for valve in room.valves
+        if valve.temp_entity
     ]
     valve_cards = [
         _heading(text["valves_timeline"], "mdi:pipe-valve"),

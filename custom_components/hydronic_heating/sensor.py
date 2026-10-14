@@ -67,6 +67,9 @@ def _valve_attrs(room: RoomController, ctrl: HydronicController) -> dict[str, An
         return {}
     first = next(iter(found.values()))
     attrs: dict[str, Any] = {"reason": first.reason.value, "until": _iso(first.until)}
+    # FR-SAFE-09: result of the pipe check; the pipe temperature is its own sensor.
+    if (check := ctrl.room_valve_check(room)[0]) is not None:
+        attrs["check"] = check
     if len(found) > 1:
         attrs["valves"] = {
             entity_id: {"reason": status.reason.value, "until": _iso(status.until)}

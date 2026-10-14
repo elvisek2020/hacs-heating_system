@@ -38,6 +38,17 @@ MESSAGES: dict[str, dict[str, tuple[str, str]]] = {
             "Ventil nereaguje: {room}",
             "Ventil {entity} v místnosti {room} nereaguje na povel ani po opakování.",
         ),
+        "valve_not_opening": (
+            "Ventil asi neotvírá: {room}",
+            "Ventil {entity} v místnosti {room} má být otevřený a kotel topí, ale trubka "
+            "u ventilu se neohřála. Zkontrolujte hlavici a ventil. Hlášení zmizí samo, "
+            "až kontrola projde.",
+        ),
+        "valve_not_closing": (
+            "Ventil asi nezavírá: {room}",
+            "Ventil {entity} v místnosti {room} má být zavřený, ale trubka u ventilu se "
+            "ohřívá. Zkontrolujte hlavici a ventil. Hlášení zmizí samo, až kontrola projde.",
+        ),
     },
     "en": {
         "fault_safe": (
@@ -69,6 +80,17 @@ MESSAGES: dict[str, dict[str, tuple[str, str]]] = {
         "valve_command": (
             "Valve not responding: {room}",
             "Valve {entity} in {room} does not follow commands, even after retries.",
+        ),
+        "valve_not_opening": (
+            "Valve does not seem to open: {room}",
+            "Valve {entity} in {room} should be open and the boiler heats, but the pipe at "
+            "the valve did not warm up. Check the head and the valve. The message clears "
+            "when the check passes.",
+        ),
+        "valve_not_closing": (
+            "Valve does not seem to close: {room}",
+            "Valve {entity} in {room} should be closed, but the pipe at the valve warms up. "
+            "Check the head and the valve. The message clears when the check passes.",
         ),
     },
 }

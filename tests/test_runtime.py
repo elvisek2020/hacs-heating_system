@@ -142,6 +142,11 @@ async def test_entities_follow_prd_naming(hass: HomeAssistant) -> None:
     ]
     for entity_id in expected:
         assert hass.states.get(entity_id) is not None, entity_id
+    # The manual mode of a room is translated as "Manual", of the system as manual heating.
+    registry = er.async_get(hass)
+    assert registry.async_get("climate.hh_obyvak").translation_key == "room"
+    assert registry.async_get("climate.hh_system").translation_key == "system"
+    assert hass.states.get("climate.hh_obyvak").name == "Obývák"
     registry = er.async_get(hass)
     room_entry = registry.async_get("sensor.hh_obyvak_temperature")
     assert room_entry.config_subentry_id == _room_id(entry, "obyvak")

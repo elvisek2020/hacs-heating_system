@@ -247,12 +247,20 @@
           "exercise_interval_days": "Exercise interval",
           "exercise_duration": "Exercise duration",
           "exercise_time": "Exercise time",
-          "exercise_parallel": "Valves exercised at once"
+          "exercise_parallel": "Valves exercised at once",
+          "valve_check_time": "Valve check: time",
+          "valve_check_rise": "Valve check: warming of an open valve",
+          "valve_check_closed_rise": "Valve check: warming of a closed valve at most",
+          "valve_check_hot": "Valve check: hot water from"
         },
         "data_description": {
           "idle_valve_policy": "When the boiler stands and nobody wants heat, and off the heating season. De-energized means that NO valve heads are open and draw no power. While the boiler runs, only the valves of rooms that want heat stay open.",
           "exercise_interval_days": "0 = off.",
-          "exercise_duration": "At least the valve travel time + 60 s."
+          "exercise_duration": "At least the valve travel time + 60 s.",
+          "valve_check_time": "Only valves with a pipe temperature sensor. Checked only while the boiler heats and the water is hot. 0 = off.",
+          "valve_check_rise": "How much the pipe of an open valve must warm up. A pipe warmer than the hot-water limit is enough too.",
+          "valve_check_closed_rise": "When the pipe of a closed valve warms up more, the valve does not seem to close.",
+          "valve_check_hot": "Measured water temperature from which valves are checked. Without a flow sensor after 5 minutes of firing."
         }
       },
       "windows": {
@@ -418,21 +426,33 @@
           "data": {
             "normally_open": "Normally open (NO)",
             "valve_open_time": "Opening time",
-            "valve_close_time": "Closing time"
+            "valve_close_time": "Closing time",
+            "valve_temp_entity": "Pipe temperature at the valve (optional)"
           },
           "data_description": {
-            "normally_open": "On = head energized = valve closed."
+            "normally_open": "On = head energized = valve closed.",
+            "valve_temp_entity": "Sensor on the pipe at the valve, for example a DS18B20. Used to check that the valve really opens and closes."
           }
         },
         "windows": {
           "title": "Windows",
-          "description": "Leave empty when the room has no contacts. You can add them later.",
+          "description": "Leave the contacts empty when the room has none. It then notices an open window by a fast temperature drop.",
           "data": {
             "windows": "Window contacts (optional)",
-            "window_invert": "Invert contacts"
+            "window_invert": "Invert contacts",
+            "vent_detect": "Notice airing by a temperature drop",
+            "vent_drop": "Temperature drop",
+            "vent_time": "Within at most",
+            "vent_pause": "Pause heating at least for",
+            "vent_max": "Pause heating at most for"
           },
           "data_description": {
-            "window_invert": "Use when a contact reports on for a closed window."
+            "window_invert": "Use when a contact reports on for a closed window.",
+            "vent_detect": "When the room temperature drops fast, the room behaves as with an open window: no heating, the valve is closed. Works without window contacts too.",
+            "vent_drop": "How much the temperature must drop to count as airing.",
+            "vent_time": "Within how long the drop must happen.",
+            "vent_pause": "Then the room heats again once the temperature rises.",
+            "vent_max": "Then the room heats again in any case."
           }
         },
         "schedule": {
@@ -478,7 +498,8 @@
         "sensor_range": "The lowest value must be below the highest.",
         "valves_required": "Select at least one valve.",
         "min_state_too_short": "Must be at least the valve travel time ({valve_time} s).",
-        "schedule_required": "Choose the room's own schedule."
+        "schedule_required": "Choose the room's own schedule.",
+        "vent_max_below_pause": "Must be at least the shortest pause."
       }
     }
   },
@@ -806,6 +827,7 @@
               "fault_safe": "Fault",
               "frost": "Frost protection",
               "window": "Open window",
+              "ventilation": "Airing",
               "manual": "Manual heating",
               "manual_excluded": "Not covered by manual",
               "idle_policy": "Idle position",
@@ -823,6 +845,18 @@
           },
           "valves": {
             "name": "Valves"
+          },
+          "check": {
+            "name": "Check",
+            "state": {
+              "ok": "Works",
+              "not_opening": "Does not open",
+              "not_closing": "Does not close",
+              "unknown": "Not checked"
+            }
+          },
+          "pipe_temp": {
+            "name": "Pipe temperature"
           }
         }
       },
@@ -846,6 +880,18 @@
       "demo_sensor_fault": {
         "name": "Demo sensor fault"
       }
+    },
+    "climate": {
+      "system": {
+        "state": {
+          "heat": "Manual"
+        }
+      },
+      "room": {
+        "state": {
+          "heat": "Manual"
+        }
+      }
     }
   },
   "issues": {
@@ -860,6 +906,14 @@
     "no_heat": {
       "title": "Boiler runs but does not heat",
       "description": "The boiler has run for {minutes} min but the water temperature has not risen by {rise} °C. Check the boiler (fault, water pressure), a closed circuit or air in the system. The issue clears by itself when the water warms up again while the boiler runs."
+    },
+    "valve_not_opening": {
+      "title": "Valve does not seem to open: {room}",
+      "description": "Valve {entity} in {room} should be open and the boiler heats, but the pipe at the valve did not warm up. Check the head and the valve. The issue clears when the check passes."
+    },
+    "valve_not_closing": {
+      "title": "Valve does not seem to close: {room}",
+      "description": "Valve {entity} in {room} should be closed, but the pipe at the valve warms up. Check the head and the valve. The issue clears when the check passes."
     }
   },
   "services": {

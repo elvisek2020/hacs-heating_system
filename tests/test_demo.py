@@ -334,7 +334,9 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
         "target-temperature",
         "climate-preset-modes",
     ]
-    assert living[1]["features"][0]["hvac_modes"] == ["auto", "heat", "off"]
+    # No `heat` button (HA draws a flame); manual shows as "Manual" in the state.
+    assert living[1]["features"][0]["hvac_modes"] == ["auto", "off"]
+    assert living[1]["state_content"] == ["current_temperature", "state", "hvac_action"]
     # Manual buttons press the button entity directly.
     system = overview["sections"][0]["cards"]
     manual = [c for c in system if c.get("entity", "").startswith("button.hh_manual_")]
@@ -359,8 +361,9 @@ async def test_dashboard_explains_the_boiler(hass: HomeAssistant) -> None:
     assert badges["sensor.hh_boiler_reason"]["color"] == "deep-orange"
     # Without feedback the Boiler badge shows the command.
     assert overview["badges"][1]["entity"] == "binary_sensor.hh_boiler_command"
-    # No windows in the rooms: no window tiles.
-    assert "sensor.hh_open_windows" not in badges
+    # No window contacts, but airing detection (on by default) can open a window:
+    # the Windows badge stays, the window block of the whole boiler does not.
+    assert "sensor.hh_open_windows" in badges
     hold_badge = badges["sensor.hh_boiler_hold_ends_at"]
     assert hold_badge["visibility"][0]["state_not"] == ["unknown", "unavailable"]
     boiler = overview["sections"][1]["cards"]
@@ -459,6 +462,34 @@ async def test_dashboard_shows_the_actual_boiler_state(hass: HomeAssistant) -> N
     timeline = history["sections"][1]["cards"][2]["entities"]
     assert timeline[2] == {"entity": "binary_sensor.horak", "name": "Boiler (actual state)"}
     assert "**Boiler (actual state)**" in legend["sections"][0]["cards"][1]["content"]
+
+
+async def test_dashboard_shows_the_pipe_at_the_valve(hass: HomeAssistant) -> None:
+    """A pipe sensor: valve with its check, the pipe next to it and in charts (FR-SAFE-09)."""
+    entry = await _setup(hass)
+    living = next(sub for sub in entry.subentries.values() if sub.unique_id == "obyvak")
+    valves = [{**living.data["valves"][0], "valve_temp_entity": "sensor.trubka_obyvak"}]
+    hass.config_entries.async_update_subentry(entry, living, data={**living.data, "valves": valves})
+    await hass.async_block_till_done(wait_background_tasks=True)
+    dashboard = await hass.services.async_call(
+        DOMAIN, "generate_dashboard", {}, blocking=True, return_response=True
+    )
+    overview, history, legend = dashboard["views"]
+    rooms = {s["cards"][0].get("heading"): s["cards"] for s in overview["sections"]}
+    cards = {c.get("entity"): c for c in rooms["Obývák"]}
+    valve = cards["sensor.hh_obyvak_valve_state"]
+    assert valve["state_content"] == ["state", "check"]
+    assert valve["grid_options"] == {"columns": 6}
+    pipe = cards["sensor.trubka_obyvak"]
+    assert (pipe["name"], pipe["icon"]) == ("Pipe", "mdi:pipe")
+    # A room without a pipe sensor keeps the full valve tile.
+    bedroom = {c.get("entity"): c for c in rooms["Ložnice"]}
+    assert "state_content" not in bedroom["sensor.hh_loznice_valve_state"]
+    valves_chart = history["sections"][2]["cards"][-1]["entities"]
+    assert {"entity": "sensor.trubka_obyvak", "name": "Obývák"} in valves_chart
+    assert "**Pipe**" in legend["sections"][0]["cards"][1]["content"]
+    climate = hass.states.get("climate.hh_obyvak").attributes
+    assert climate["valve_check"] == "unknown"
 
 
 async def test_dashboard_shadow_banner(hass: HomeAssistant) -> None:

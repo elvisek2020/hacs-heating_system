@@ -5,6 +5,27 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.12.0 — 2026-10-14
+
+### ✨ Novinky
+
+- **Větrání bez okenních kontaktů.** Když teplota místnosti rychle klesne (výchozí 1 K za 5 min), místnost se chová jako s otevřeným oknem: netopí a ventil je zavřený.
+  - Topí zase nejdřív po 20 min, až teplota začne stoupat, nejpozději po 45 min.
+  - Do blokace celého kotle se větrání nepočítá. Začátek i konec se zapíšou do logbooku.
+  - Zapnuté je u všech místností. Citlivost a doby jdou nastavit v místnosti, krok Okna.
+- **Kontrola ventilů podle teploty trubky.** U každého ventilu jde nastavit čidlo na trubce (např. DS18B20).
+  - Když kotel topí a voda je teplá, otevřený ventil musí trubku ohřát a zavřený ne. Jinak přijde hlášení „Ventil asi neotvírá“ nebo „Ventil asi nezavírá“ (oznámení, Opravy, logbook).
+  - Řízení se nemění, hlášení zmizí samo, až kontrola projde. Prahy jsou v Konfigurovat → Ventily.
+  - Na dashboardu ukazuje Ventil výsledek kontroly a vedle něj je teplota trubky. V Grafech jsou trubky proti poloze ventilů.
+
+### 🎨 Vzhled
+
+- **Ruční režim místnosti se jmenuje „Ručně“** a má ikonu ruky místo plamene. V kartě místnosti jsou tlačítka jen Automaticky a Vypnuto, protože plamen u tlačítka kreslí Home Assistant napevno. Ruční režim je vidět v textu stavu.
+- Systémový termostat ukazuje ruční topení jako „Manuál“.
+- Dlaždice **Pryč** z karty místnosti zmizela. Teplota Pryč se nastavuje v nastavení místnosti.
+
+Po aktualizaci restartuj Home Assistant a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.11.0 — 2026-10-13
 
 ### ✨ Novinky

@@ -54,7 +54,8 @@ class SystemClimate(HydronicEntity, ClimateEntity):
     def __init__(self, runtime: Any) -> None:
         """Initialize."""
         super().__init__(runtime, "climate", "system")
-        self._attr_translation_key = None
+        # Translates `heat` as manual heating of the whole system.
+        self._attr_translation_key = "system"
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -157,6 +158,8 @@ class RoomClimate(HydronicEntity, ClimateEntity):
     def __init__(self, runtime: Any, room: Any) -> None:
         """Initialize."""
         super().__init__(runtime, "climate", "", room)
+        # Translates `heat` as the manual mode of the room ("Manual", not "Heat").
+        self._attr_translation_key = "room"
 
     @property
     def current_temperature(self) -> float | None:
@@ -215,8 +218,12 @@ class RoomClimate(HydronicEntity, ClimateEntity):
             }
             if now
             else {},
-            "window_state": room.window.state.value,
-            "window_since": _iso(room.window.since),
+            "valve_temp": self.controller.room_valve_check(room)[1],
+            "valve_check": self.controller.room_valve_check(room)[0],
+            "window_state": room.window_state,
+            "window_since": _iso(
+                room.vent.since if room.window_state == "open_detected" else room.window.since
+            ),
             "frost_active": room.frost_active,
             "schedule_entity": room.schedule_entity,
             "schedule_state": room.schedule_on,

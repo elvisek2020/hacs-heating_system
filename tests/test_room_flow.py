@@ -82,6 +82,23 @@ async def test_create_room(hass: HomeAssistant, config_entry: MockConfigEntry) -
     ]
 
 
+async def test_valve_with_pipe_sensor(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:
+    """A pipe temperature sensor is stored with its valve (FR-SAFE-09)."""
+    result = await hass.config_entries.subentries.async_init(
+        (config_entry.entry_id, SUBENTRY_ROOM), context={"source": SOURCE_USER}
+    )
+    result = await _configure(hass, result, "basics", name="Pracovna")
+    result = await _configure(hass, result, "sensors", sensors=["sensor.obyvak_teplota"])
+    result = await _configure(hass, result, "valves", valves=["switch.hlavice_obyvak"])
+    result = await _configure(hass, result, "valve", valve_temp_entity="sensor.trubka_pracovna")
+    result = await _configure(hass, result, "windows")
+    result = await _configure(hass, result, "schedule")
+    result = await _configure(hass, result, "control")
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    valve = _room(config_entry, "Pracovna").data[CONF_VALVES][0]
+    assert valve["valve_temp_entity"] == "sensor.trubka_pracovna"
+
+
 async def test_valve_step_hides_normally_open_for_valve_domain(
     hass: HomeAssistant, config_entry: MockConfigEntry
 ) -> None:
@@ -147,6 +164,33 @@ async def test_min_state_time_follows_valve_time(
     assert result["description_placeholders"] == {"valve_time": "400"}
     result = await _configure(hass, result, "control", valve_min_state_time=7)
     assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_airing_detection_settings(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Airing detection is on by default; the longest pause covers the shortest (FR-WIN-06)."""
+    result = await hass.config_entries.subentries.async_init(
+        (config_entry.entry_id, SUBENTRY_ROOM), context={"source": SOURCE_USER}
+    )
+    result = await _configure(hass, result, "basics", name="Kuchyň")
+    result = await _configure(hass, result, "sensors", sensors=["sensor.obyvak_teplota"])
+    result = await _configure(hass, result, "valves", valves=["switch.hlavice_obyvak"])
+    result = await _configure(hass, result, "valve")
+    result = await _configure(hass, result, "windows", vent_pause=30, vent_max=20)
+    assert result["errors"] == {"vent_max": "vent_max_below_pause"}
+    result = await _configure(hass, result, "windows", vent_drop=0.5, vent_pause=30, vent_max=60)
+    result = await _configure(hass, result, "schedule")
+    result = await _configure(hass, result, "control")
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    data = _room(config_entry, "Kuchyň").data
+    assert data["vent_detect"] is True
+    assert (data["vent_drop"], data["vent_time"], data["vent_pause"], data["vent_max"]) == (
+        0.5,
+        5,
+        30,
+        60,
+    )
 
 
 async def test_reconfigure_room(hass: HomeAssistant, config_entry: MockConfigEntry) -> None:

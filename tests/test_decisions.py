@@ -19,6 +19,8 @@ from custom_components.hydronic_heating.const import (
     DOMAIN,
     EVENT_DECISION,
 )
+from custom_components.hydronic_heating.core.model import BoilerReason, BoilerStatus, Decision
+from custom_components.hydronic_heating.explain import decision_text
 
 from .test_runtime import CELSIUS, _settle, _setup, _wait
 
@@ -194,6 +196,46 @@ async def test_czech_texts(hass: HomeAssistant, freezer: FrozenDateTimeFactory) 
     on = [e.data for e in events if e.data["kind"] == "boiler_on"]
     assert on[0]["message"].startswith("Kotel zapnut: požadavek místností (celkem ")
     assert _reason(hass).attributes["detail"].startswith("Kotel topí na požadavek místností")
+
+
+async def test_airing_is_logged_at_the_room(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """A fast drop pauses the room and says so in the logbook (FR-WIN-06)."""
+    freezer.move_to("2026-01-15 11:00:00+00:00")
+    hass.config.language = "cs"
+    await _setup(hass)
+    await _wait(hass, freezer, 120)
+    events = async_capture_events(hass, EVENT_DECISION)
+    for step in range(8):  # 19.0 -> 17.0 °C in 4 min
+        hass.states.async_set("sensor.obyvak", str(18.75 - step * 0.25), CELSIUS)
+        await _wait(hass, freezer, 30)
+    airing = [e.data for e in events if e.data["kind"] == "ventilation"]
+    assert airing[0]["entity_id"] == "climate.hh_obyvak"
+    assert airing[0]["message"].startswith(
+        "[Shadow] Obývák: rychlý pokles teploty o 1 °C, asi se větrá – topení pozastaveno do "
+    )
+    living = hass.states.get("climate.hh_obyvak").attributes
+    assert living["window_state"] == "open_detected"
+    assert living["target_reason"] == "ventilation"
+    assert living["target_detail"].startswith("Větrá se (rychlý pokles teploty)")
+    assert hass.states.get("binary_sensor.hh_obyvak_window").state == "on"
+
+
+async def test_valve_check_sentences(hass: HomeAssistant) -> None:
+    """Logbook sentences of the pipe check (FR-SAFE-09)."""
+    hass.config.language = "cs"
+    status = BoilerStatus(BoilerReason.FIRING_DEMAND)
+    params = {"room": "Ložnice", "rise": 0.8, "minutes": 10.0}
+    texts = [
+        decision_text(hass, Decision("valve_check", status, {**params, "result": result}))
+        for result in ("not_opening", "not_closing", "ok")
+    ]
+    assert texts == [
+        "Ložnice: ventil asi neotvírá – trubka se za 10 min ohřála jen o 0,8 °C.",
+        "Ložnice: ventil asi nezavírá – trubka se ohřála o 0,8 °C.",
+        "Ložnice: ventil zase funguje, kontrola podle trubky prošla.",
+    ]
 
 
 async def test_valve_state_explains_the_position(hass: HomeAssistant) -> None:

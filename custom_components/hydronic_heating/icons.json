@@ -132,6 +132,14 @@
       "demo_sensor_fault": {
         "default": "mdi:thermometer-off"
       }
+    },
+    "climate": {
+      "room": {
+        "default": "mdi:thermostat",
+        "state": {
+          "heat": "mdi:hand-back-right"
+        }
+      }
     }
   },
   "services": {

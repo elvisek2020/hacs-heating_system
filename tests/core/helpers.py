@@ -40,12 +40,14 @@ def valve(entity_id: str, **overrides: Any) -> dict[str, Any]:
 
 
 def room(slug: str, **overrides: Any) -> RoomConfig:
-    """Room with one temperature sensor and one NO valve."""
+    """Room with one temperature sensor and one NO valve, without airing detection."""
     data = {
         **c.DEFAULT_ROOM,
         c.CONF_ROOM_NAME: slug.capitalize(),
         c.CONF_SENSORS: [f"sensor.{slug}"],
         c.CONF_VALVES: [valve(f"switch.hlavice_{slug}")],
+        # Tests change temperatures in jumps; airing detection only where tested.
+        c.CONF_VENT_DETECT: False,
         **overrides,
     }
     return RoomConfig.from_data(f"id_{slug}", slug, data)

@@ -128,12 +128,22 @@ from .const import (
     CONF_TPI_COEF_EXT,
     CONF_TPI_COEF_INT,
     CONF_USE_FORECAST,
+    CONF_VALVE_CHECK_CLOSED_RISE,
+    CONF_VALVE_CHECK_HOT,
+    CONF_VALVE_CHECK_RISE,
+    CONF_VALVE_CHECK_TIME,
     CONF_VALVE_CLOSE_TIME,
     CONF_VALVE_ENTITY,
     CONF_VALVE_MIN_STATE_TIME,
     CONF_VALVE_OPEN_TIME,
     CONF_VALVE_PWM_PERIOD,
+    CONF_VALVE_TEMP_ENTITY,
     CONF_VALVES,
+    CONF_VENT_DETECT,
+    CONF_VENT_DROP,
+    CONF_VENT_MAX,
+    CONF_VENT_PAUSE,
+    CONF_VENT_TIME,
     CONF_WEATHER_ENTITY,
     CONF_WEIGHT,
     CONF_WINDOW_CLOSE_DELAY,
@@ -397,6 +407,11 @@ def _valves_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_EXERCISE_DURATION, values): _number(60, 1800, unit="s"),
             _required(CONF_EXERCISE_TIME, values): selector.TimeSelector(),
             _required(CONF_EXERCISE_PARALLEL, values): _number(1, 10),
+            # FR-SAFE-09: check of the valves by the pipe temperature.
+            _required(CONF_VALVE_CHECK_TIME, values): _number(0, 60, unit="min"),
+            _required(CONF_VALVE_CHECK_RISE, values): _number(1, 20, step=0.5, unit="K"),
+            _required(CONF_VALVE_CHECK_CLOSED_RISE, values): _number(1, 20, step=0.5, unit="K"),
+            _required(CONF_VALVE_CHECK_HOT, values): _number(25, 70, unit=_CELSIUS),
         }
     )
 
@@ -539,6 +554,7 @@ def _valve_schema(entity_id: str, values: Mapping[str, Any]) -> vol.Schema:
         fields[_required(CONF_NORMALLY_OPEN, values)] = _BOOL
     fields[_required(CONF_VALVE_OPEN_TIME, values)] = _number(0, 900, unit="s")
     fields[_required(CONF_VALVE_CLOSE_TIME, values)] = _number(0, 900, unit="s")
+    fields[_optional(CONF_VALVE_TEMP_ENTITY, values)] = _entity("sensor")
     return vol.Schema(fields)
 
 
@@ -549,6 +565,12 @@ def _room_windows_schema(values: Mapping[str, Any]) -> vol.Schema:
                 ["binary_sensor", "input_boolean"], multiple=True
             ),
             _required(CONF_WINDOW_INVERT, values): _BOOL,
+            # FR-WIN-06: airing noticed by a fast temperature drop.
+            _required(CONF_VENT_DETECT, values): _BOOL,
+            _required(CONF_VENT_DROP, values): _number(0.3, 5, step=0.1, unit="K"),
+            _required(CONF_VENT_TIME, values): _number(1, 30, unit="min"),
+            _required(CONF_VENT_PAUSE, values): _number(5, 120, unit="min"),
+            _required(CONF_VENT_MAX, values): _number(10, 240, unit="min"),
         }
     )
 
@@ -1091,12 +1113,17 @@ class RoomSubentryFlowHandler(ConfigSubentryFlow):
     async def async_step_windows(
         self, user_input: dict[str, Any] | None = None
     ) -> SubentryFlowResult:
-        """Window contacts, optional (FR-WIN-01)."""
+        """Window contacts, optional (FR-WIN-01), and airing detection (FR-WIN-06)."""
         schema = _room_windows_schema(self._data)
+        errors: Errors = {}
         if user_input is not None:
-            self._data = _apply(self._data, schema, user_input)
-            return await self.async_step_schedule()
-        return self.async_show_form(step_id="windows", data_schema=schema)
+            if user_input[CONF_VENT_MAX] < user_input[CONF_VENT_PAUSE]:
+                errors[CONF_VENT_MAX] = "vent_max_below_pause"
+            else:
+                self._data = _apply(self._data, schema, user_input)
+                return await self.async_step_schedule()
+            schema = self.add_suggested_values_to_schema(schema, user_input)
+        return self.async_show_form(step_id="windows", data_schema=schema, errors=errors)
 
     async def async_step_schedule(
         self, user_input: dict[str, Any] | None = None

@@ -394,7 +394,7 @@ class HydronicHeatingRuntime:
                 entity_id = self.system_entity_id("climate", "system")
             elif decision.kind == "season":
                 entity_id = self.system_entity_id("binary_sensor", "heating_season")
-            elif decision.kind in ("preheat", "room_target"):
+            elif decision.kind in ("preheat", "room_target", "ventilation", "valve_check"):
                 entity_id = registry.async_get_entity_id(
                     "climate",
                     DOMAIN,
@@ -509,7 +509,11 @@ class HydronicHeatingRuntime:
         keys = {"fault_safe", "no_heat"}
         for room in [*self.rooms, *(r.cfg for r in self.controller.rooms.values())]:
             keys.update(f"{kind}_{room.slug}" for kind in ROOM_PROBLEM_KINDS)
-            keys.update(f"valve_command_{valve.entity_id}" for valve in room.valves)
+            keys.update(
+                f"{kind}_{valve.entity_id}"
+                for valve in room.valves
+                for kind in ("valve_command", "valve_not_opening", "valve_not_closing")
+            )
         return keys
 
     @callback

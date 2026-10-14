@@ -247,12 +247,20 @@
           "exercise_interval_days": "Interval protáčení",
           "exercise_duration": "Délka protáčení",
           "exercise_time": "Čas protáčení",
-          "exercise_parallel": "Současně protáčené ventily"
+          "exercise_parallel": "Současně protáčené ventily",
+          "valve_check_time": "Kontrola ventilů: doba",
+          "valve_check_rise": "Kontrola ventilů: ohřátí otevřeného",
+          "valve_check_closed_rise": "Kontrola ventilů: ohřátí zavřeného nejvýš",
+          "valve_check_hot": "Kontrola ventilů: teplá voda od"
         },
         "data_description": {
           "idle_valve_policy": "Když kotel stojí a nikdo nechce teplo, a mimo topnou sezónu. Bez proudu znamená, že NO hlavice jsou otevřené a nic neodebírají. Když kotel topí, zůstanou otevřené jen ventily místností, které teplo chtějí.",
           "exercise_interval_days": "0 = vypnuto.",
-          "exercise_duration": "Aspoň doba přestavení ventilu + 60 s."
+          "exercise_duration": "Aspoň doba přestavení ventilu + 60 s.",
+          "valve_check_time": "Jen u ventilů s čidlem teploty trubky. Kontroluje se, jen když kotel topí a voda je teplá. 0 = vypnuto.",
+          "valve_check_rise": "O kolik se musí trubka otevřeného ventilu ohřát. Stačí i trubka teplejší než hranice teplé vody.",
+          "valve_check_closed_rise": "Když se trubka zavřeného ventilu ohřeje víc, ventil asi nezavírá.",
+          "valve_check_hot": "Měřená teplota vody, od které se kontroluje. Bez čidla vody se kontroluje po 5 minutách topení."
         }
       },
       "windows": {
@@ -418,21 +426,33 @@
           "data": {
             "normally_open": "Bez proudu otevřeno (NO)",
             "valve_open_time": "Doba otevření",
-            "valve_close_time": "Doba zavření"
+            "valve_close_time": "Doba zavření",
+            "valve_temp_entity": "Teplota trubky u ventilu (volitelné)"
           },
           "data_description": {
-            "normally_open": "Zapnuto = hlavice pod proudem = ventil zavřený."
+            "normally_open": "Zapnuto = hlavice pod proudem = ventil zavřený.",
+            "valve_temp_entity": "Čidlo na trubce u ventilu, například DS18B20. Podle něj se ověří, že ventil opravdu otvírá a zavírá."
           }
         },
         "windows": {
           "title": "Okna",
-          "description": "Nechte prázdné, když místnost nemá kontakty. Přidat je můžete později.",
+          "description": "Kontakty nechte prázdné, když je místnost nemá. Otevřené okno pak pozná podle rychlého poklesu teploty.",
           "data": {
             "windows": "Okenní kontakty (volitelné)",
-            "window_invert": "Obrátit kontakty"
+            "window_invert": "Obrátit kontakty",
+            "vent_detect": "Poznat větrání podle poklesu teploty",
+            "vent_drop": "Pokles teploty",
+            "vent_time": "Za dobu nejvýš",
+            "vent_pause": "Pozastavit topení nejméně na",
+            "vent_max": "Pozastavit topení nejvýš na"
           },
           "data_description": {
-            "window_invert": "Použijte, když kontakt hlásí zapnuto pro zavřené okno."
+            "window_invert": "Použijte, když kontakt hlásí zapnuto pro zavřené okno.",
+            "vent_detect": "Když teplota místnosti rychle klesne, místnost se chová jako s otevřeným oknem: netopí a ventil je zavřený. Funguje i bez okenních kontaktů.",
+            "vent_drop": "O kolik musí teplota klesnout, aby se to bralo jako větrání.",
+            "vent_time": "Za jak dlouho nejvýš musí pokles nastat.",
+            "vent_pause": "Potom místnost topí zase, až teplota začne stoupat.",
+            "vent_max": "Pak místnost topí zase v každém případě."
           }
         },
         "schedule": {
@@ -478,7 +498,8 @@
         "sensor_range": "Nejnižší hodnota musí být menší než nejvyšší.",
         "valves_required": "Vyberte aspoň jeden ventil.",
         "min_state_too_short": "Musí být aspoň doba přestavení ventilu ({valve_time} s).",
-        "schedule_required": "Vyberte vlastní rozvrh místnosti."
+        "schedule_required": "Vyberte vlastní rozvrh místnosti.",
+        "vent_max_below_pause": "Musí být aspoň tolik, kolik je nejkratší pozastavení."
       }
     }
   },
@@ -806,6 +827,7 @@
               "fault_safe": "Porucha",
               "frost": "Protimrazová ochrana",
               "window": "Otevřené okno",
+              "ventilation": "Větrání",
               "manual": "Manuální topení",
               "manual_excluded": "Mimo manuál",
               "idle_policy": "Klidová poloha",
@@ -823,6 +845,18 @@
           },
           "valves": {
             "name": "Ventily"
+          },
+          "check": {
+            "name": "Kontrola",
+            "state": {
+              "ok": "Funguje",
+              "not_opening": "Neotvírá",
+              "not_closing": "Nezavírá",
+              "unknown": "Neověřeno"
+            }
+          },
+          "pipe_temp": {
+            "name": "Teplota trubky"
           }
         }
       },
@@ -846,6 +880,18 @@
       "demo_sensor_fault": {
         "name": "Demo výpadek čidla"
       }
+    },
+    "climate": {
+      "system": {
+        "state": {
+          "heat": "Manuál"
+        }
+      },
+      "room": {
+        "state": {
+          "heat": "Ručně"
+        }
+      }
     }
   },
   "issues": {
@@ -860,6 +906,14 @@
     "no_heat": {
       "title": "Kotel běží, ale netopí",
       "description": "Kotel běží {minutes} min, ale teplota vody nestoupla ani o {rise} °C. Zkontrolujte kotel (porucha, tlak vody), zavřený okruh nebo vzduch v systému. Hlášení zmizí samo, až teplota vody při běhu kotle zase stoupne."
+    },
+    "valve_not_opening": {
+      "title": "Ventil asi neotvírá: {room}",
+      "description": "Ventil {entity} v místnosti {room} má být otevřený a kotel topí, ale trubka u ventilu se neohřála. Zkontrolujte hlavici a ventil. Hlášení zmizí samo, až kontrola projde."
+    },
+    "valve_not_closing": {
+      "title": "Ventil asi nezavírá: {room}",
+      "description": "Ventil {entity} v místnosti {room} má být zavřený, ale trubka u ventilu se ohřívá. Zkontrolujte hlavici a ventil. Hlášení zmizí samo, až kontrola projde."
     }
   },
   "services": {

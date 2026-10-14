@@ -94,6 +94,10 @@ CONF_FLOW_CHECK_RISE: Final = "flow_check_rise"
 
 # --- Valves, system level (FR-VAL-06, FR-VAL-07) -------------------------
 CONF_IDLE_VALVE_POLICY: Final = "idle_valve_policy"
+CONF_VALVE_CHECK_TIME: Final = "valve_check_time"
+CONF_VALVE_CHECK_RISE: Final = "valve_check_rise"
+CONF_VALVE_CHECK_CLOSED_RISE: Final = "valve_check_closed_rise"
+CONF_VALVE_CHECK_HOT: Final = "valve_check_hot"
 CONF_EXERCISE_INTERVAL_DAYS: Final = "exercise_interval_days"
 CONF_EXERCISE_DURATION: Final = "exercise_duration"
 CONF_EXERCISE_TIME: Final = "exercise_time"
@@ -181,9 +185,17 @@ CONF_VALVE_ENTITY: Final = "entity_id"
 CONF_NORMALLY_OPEN: Final = "normally_open"
 CONF_VALVE_OPEN_TIME: Final = "valve_open_time"
 CONF_VALVE_CLOSE_TIME: Final = "valve_close_time"
+# Temperature of the pipe at the valve (FR-SAFE-09).
+CONF_VALVE_TEMP_ENTITY: Final = "valve_temp_entity"
 
 CONF_WINDOWS: Final = "windows"
 CONF_WINDOW_INVERT: Final = "window_invert"
+# Airing detected by a fast temperature drop (FR-WIN-06).
+CONF_VENT_DETECT: Final = "vent_detect"
+CONF_VENT_DROP: Final = "vent_drop"
+CONF_VENT_TIME: Final = "vent_time"
+CONF_VENT_PAUSE: Final = "vent_pause"
+CONF_VENT_MAX: Final = "vent_max"
 
 CONF_SCHEDULE_ENTITY: Final = "schedule_entity"
 # "house" = the house schedule, "own" = the room's own schedule_entity.
@@ -230,6 +242,10 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_FLOW_CHECK_RISE: 5,
     # Valves (system)
     CONF_IDLE_VALVE_POLICY: "deenergize",
+    CONF_VALVE_CHECK_TIME: 10,
+    CONF_VALVE_CHECK_RISE: 5,
+    CONF_VALVE_CHECK_CLOSED_RISE: 3,
+    CONF_VALVE_CHECK_HOT: 40,
     CONF_EXERCISE_INTERVAL_DAYS: 7,
     CONF_EXERCISE_DURATION: 600,
     CONF_EXERCISE_TIME: "10:00:00",
@@ -292,6 +308,11 @@ DEFAULT_ROOM: Final[dict[str, Any]] = {
     CONF_VALVES: [],
     CONF_WINDOWS: [],
     CONF_WINDOW_INVERT: False,
+    CONF_VENT_DETECT: True,
+    CONF_VENT_DROP: 1.0,
+    CONF_VENT_TIME: 5,
+    CONF_VENT_PAUSE: 20,
+    CONF_VENT_MAX: 45,
     CONF_CONTROL_ALGORITHM: "tpi",
     CONF_COLD_TOLERANCE: 0.3,
     CONF_HOT_TOLERANCE: 0.2,

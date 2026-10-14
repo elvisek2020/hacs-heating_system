@@ -31,6 +31,7 @@ from .presence import (
     read_presence,
 )
 from .valve import ValveState, pwm_open
+from .ventilation import VentDetector
 
 FROST_HYSTERESIS_K = 2.0
 NOT_REACHED_DEFICIT_K = 1.5
@@ -171,6 +172,8 @@ class RoomController:
         self.presence_entity: str | None = None
         self.presence_source = "none"
         self.window = WindowMachine()
+        self.vent = VentDetector()
+        self.vent_event: str | None = None
         self.valves: dict[str, ValveState] = {v.entity_id: ValveState() for v in cfg.valves}
         self.valve_open_cmd: bool | None = None
         self.valve_switched_at: datetime | None = None
@@ -224,6 +227,25 @@ class RoomController:
         if self.hvac_mode is RoomHvacMode.HEAT:
             return self.preset
         return self.auto_preset
+
+    @property
+    def window_open(self) -> bool:
+        """An open window by its contact, or airing noticed by a fast drop (FR-WIN-06)."""
+        return self.window.effective_open or self.vent.active
+
+    @property
+    def window_state(self) -> str:
+        """State of the window machine, `open_detected` while airing is noticed."""
+        if self.vent.active and not self.window.effective_open:
+            return "open_detected"
+        return self.window.state.value
+
+    @property
+    def vent_pause_until(self) -> datetime | None:
+        """Earliest end of the airing pause; later only while the room keeps cooling."""
+        if self.vent.since is None:
+            return None
+        return self.vent.since + timedelta(seconds=self.cfg.vent_hold_s)
 
     @property
     def preheating(self) -> bool:
@@ -343,7 +365,7 @@ class RoomController:
             or self.hvac_mode is not RoomHvacMode.AUTO
             or base >= self.cfg.comfort_temp
             or self.temperature is None
-            or self.window.effective_open
+            or self.window_open
         ):
             self.preheat_until = self.preheat_source = None
             return
@@ -396,6 +418,18 @@ class RoomController:
             or ctx.outdoor_now < self.temperature
         )
         self.window.update(self._read_windows(snap), condition_ok, ctx)
+        # FR-WIN-06: airing noticed by a fast drop, also without window contacts.
+        cfg = self.cfg
+        self.vent_event = self.vent.update(
+            ctx.now,
+            None if self.sensor_failure else self.temperature,
+            tuple(self.valid_sources),
+            enabled=cfg.vent_detect and ctx.heating_allowed and not self.window.effective_open,
+            drop_k=cfg.vent_drop_k,
+            window_s=cfg.vent_window_s,
+            hold_s=cfg.vent_hold_s,
+            max_s=cfg.vent_max_s,
+        )
         base = self.target_temp(ctx)
         self._update_preheat(ctx, base)
         if self.preheating:
@@ -421,6 +455,8 @@ class RoomController:
             return TargetReason.FROST, None
         if self.window.effective_open:
             return TargetReason.WINDOW, None
+        if self.vent.active:
+            return TargetReason.VENTILATION, self.vent_pause_until
         if ctx.manual:
             return TargetReason.MANUAL, None
         if self.hvac_mode is RoomHvacMode.OFF:
@@ -457,7 +493,7 @@ class RoomController:
         if self.frost_active:
             return 100.0
         # 2) No heating into an open window, not even on sensor failure.
-        if self.window.effective_open:
+        if self.window_open:
             return 0.0
         target = self.target
         if target is None:

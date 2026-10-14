@@ -89,8 +89,8 @@ ROOM_BINARY: tuple[RoomBinaryDescription, ...] = (
     RoomBinaryDescription(
         key="window",
         device_class=BinarySensorDeviceClass.WINDOW,
-        is_on_fn=lambda ctrl, room: room.window.effective_open,
-        attrs_fn=lambda ctrl, room: {"state": room.window.state.value},
+        is_on_fn=lambda ctrl, room: room.window_open,
+        attrs_fn=lambda ctrl, room: {"state": room.window_state},
     ),
     RoomBinaryDescription(
         key="problem",

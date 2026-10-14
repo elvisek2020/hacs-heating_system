@@ -144,7 +144,8 @@ def remap(
     remapped = []
     for room, demo in zip(rooms, layout.rooms, strict=True):
         valves = tuple(
-            replace(valve, entity_id=dv.ids.entity_id)
+            # The real pipes do not follow the virtual heads (FR-SAFE-09).
+            replace(valve, entity_id=dv.ids.entity_id, temp_entity=None)
             for valve, dv in zip(room.valves, demo.valves, strict=True)
         )
         new = replace(room, valves=valves)

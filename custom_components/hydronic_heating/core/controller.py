@@ -40,9 +40,12 @@ from .room import RoomContext, RoomController
 from .safety import OutputTracker
 from .season import HeatingSeason
 from .valve import deenergized_open, observed_open, pwm_on_time
+from .valve_check import FAILURES, OK, ValveCheck
 
 BOILER_KEY = "boiler"
 CIRCULATION_S = 10 * 60
+# Without a flow sensor the water counts as hot after this long of firing (FR-SAFE-09).
+VALVE_CHECK_WARMUP_S = 5 * 60
 STORAGE_FORMAT = 1
 
 
@@ -83,6 +86,10 @@ class HydronicController:
         # FR-SAFE-08: measured flow temperature and the check that the boiler heats.
         self.flow_temperature: float | None = None
         self.flow_check = FlowCheck()
+        # FR-SAFE-09: pipe temperature checks of the valves, by valve entity.
+        self.valve_checks: dict[str, ValveCheck] = {}
+        self._firing_since: datetime | None = None
+        self._valve_check_changes: list[tuple[RoomController, ValveConfig, str, str]] = []
         self.valve_desired: dict[str, bool] = {}
         self.exercising: set[str] = set()
         self.problems: dict[str, Problem] = {}
@@ -111,6 +118,7 @@ class HydronicController:
                 room.frost_active = previous.frost_active
                 room.calling = previous.calling
                 room.window = previous.window
+                room.vent = previous.vent
                 room.valve_open_cmd = previous.valve_open_cmd
                 room.valve_switched_at = previous.valve_switched_at
                 room.valve_forced = previous.valve_forced
@@ -141,6 +149,7 @@ class HydronicController:
             found.update(rc.sensors)
             found.update(rc.windows)
             found.update(v.entity_id for v in rc.valves)
+            found.update(v.temp_entity for v in rc.valves if v.temp_entity)
             for entity in (rc.schedule_entity, rc.presence_entity, rc.expected_return_entity):
                 if entity:
                     found.add(entity)
@@ -287,6 +296,7 @@ class HydronicController:
         self.state = self._system_state(mode)
         self.blocked_by = self._blocked_by(now, blocked, flow_ok)
         self._update_flow_check(snap, boiler_on)
+        self._update_valve_checks(snap, boiler_on)
         self._collect_problems(now)
         previous = self.boiler_status if self.last_step is not None else None
         self.boiler_status = self._boiler_status(
@@ -303,6 +313,8 @@ class HydronicController:
             self.decisions += self._presence_decisions(presence_before, preheating_before)
             self.decisions += self._room_target_decisions(reasons_before)
             self.decisions += self._season_decisions()
+            self.decisions += self._ventilation_decisions()
+            self.decisions += self._valve_check_decisions()
         self._season_logged = self.season.active
         self._learn_heat_rates(now)
         self.last_step = now
@@ -317,6 +329,50 @@ class HydronicController:
         return plan
 
     # --- Step helpers -----------------------------------------------------
+
+    def _update_valve_checks(self, snap: Snapshot, boiler_on: bool) -> None:
+        """Valve position by the pipe temperature, while hot water flows (FR-SAFE-09)."""
+        cfg = self.cfg
+        now = snap.now
+        firing = (
+            boiler_on
+            and not self.simulating
+            and self.sequencer.phase is BoilerPhase.FIRING
+            and self.burner_running is not False
+        )
+        self._firing_since = (self._firing_since or now) if firing else None
+        if cfg.heat_source.flow_temp_entity:
+            hot = self.flow_temperature is not None and self.flow_temperature >= cfg.valve_check_hot
+        else:
+            # Without a flow sensor the water counts as hot after a while of firing.
+            hot = (
+                self._firing_since is not None
+                and (now - self._firing_since).total_seconds() >= VALVE_CHECK_WARMUP_S
+            )
+        ready = firing and hot
+        self._valve_check_changes = []
+        for room, valve in self.valve_configs:
+            check = self.valve_checks.setdefault(valve.entity_id, ValveCheck())
+            if valve.temp_entity is None or cfg.valve_check_s <= 0:
+                check.disable()
+                continue
+            reading = snap.get(valve.temp_entity)
+            physical = room.valves[valve.entity_id].physical(valve, now)
+            change = check.update(
+                now,
+                expected_open={ValvePhysical.OPEN: True, ValvePhysical.CLOSED: False}.get(physical),
+                temperature=reading.value if reading.available else None,
+                ready=ready,
+                check_s=cfg.valve_check_s,
+                rise=cfg.valve_check_rise,
+                closed_rise=cfg.valve_check_closed_rise,
+                hot=cfg.valve_check_hot,
+            )
+            if change is not None:
+                self._valve_check_changes.append((room, valve, *change))
+        known = {valve.entity_id for _, valve in self.valve_configs}
+        for entity_id in set(self.valve_checks) - known:
+            del self.valve_checks[entity_id]
 
     def _update_flow_check(self, snap: Snapshot, boiler_on: bool) -> None:
         """Measured flow temperature and the check that the boiler heats (FR-SAFE-08)."""
@@ -395,7 +451,7 @@ class HydronicController:
                 temperature=room.temperature,
                 target=room.target,
                 heating=room.demand > 0
-                and not room.window.effective_open
+                and not room.window_open
                 and not self.window_block
                 and not self.fault_safe,
                 outdoor=self.outdoor.damped,
@@ -558,8 +614,11 @@ class HydronicController:
             elif boiler_idle:
                 # Boiler off and no heat wanted: no head draws current (FR-VAL-07).
                 want, reason = None, ValveReason.IDLE_POLICY
-            elif room.window.effective_open:
-                want, reason = False, ValveReason.WINDOW
+            elif room.window_open:
+                want = False
+                reason = (
+                    ValveReason.WINDOW if room.window.effective_open else ValveReason.VENTILATION
+                )
             elif manual:
                 want = room.hvac_mode is not RoomHvacMode.OFF and (
                     cfg.manual_scope == "all_rooms" or room.demand > 0
@@ -614,7 +673,7 @@ class HydronicController:
         """Whether the room's valves stay open once the boiler runs (without hold times)."""
         if room.frost_active:
             return True
-        if room.window.effective_open or room.hvac_mode is RoomHvacMode.OFF:
+        if room.window_open or room.hvac_mode is RoomHvacMode.OFF:
             return False
         if manual:
             return self.cfg.manual_scope == "all_rooms" or room.demand > 0
@@ -669,7 +728,7 @@ class HydronicController:
                 and not self.fault_safe
                 and room.demand == 0
                 and not room.frost_active
-                and not room.window.effective_open,
+                and not room.window_open,
             )
             for room, valve in self.valve_configs
         ]
@@ -692,7 +751,7 @@ class HydronicController:
                 if room.temperature is not None and room.target is not None
                 else float("inf")
             )
-            return (int(room.window.effective_open), int(not already_open), gap)
+            return (int(room.window_open), int(not already_open), gap)
 
         for _room, valve in sorted(self.valve_configs, key=rank):
             if needed <= 0:
@@ -945,6 +1004,43 @@ class HydronicController:
             )
         ]
 
+    def _valve_check_decisions(self) -> list[Decision]:
+        """Log a valve that fails its pipe check, and when it works again (FR-SAFE-09)."""
+        return [
+            Decision(
+                "valve_check",
+                self.boiler_status,
+                {
+                    "room": room.cfg.name,
+                    "room_id": room.cfg.room_id,
+                    "entity_id": valve.entity_id,
+                    "result": new,
+                    "rise": self.valve_checks[valve.entity_id].rise,
+                    "minutes": self.cfg.valve_check_s / 60,
+                },
+            )
+            for room, valve, previous, new in self._valve_check_changes
+            if new in FAILURES or (previous in FAILURES and new == OK)
+        ]
+
+    def _ventilation_decisions(self) -> list[Decision]:
+        """Log the start and the end of airing noticed by a fast drop (FR-WIN-06)."""
+        return [
+            Decision(
+                "ventilation",
+                self.boiler_status,
+                {
+                    "room": room.cfg.name,
+                    "room_id": room_id,
+                    "event": room.vent_event,
+                    "drop": room.vent.drop,
+                    "pause_until": room.vent_pause_until,
+                },
+            )
+            for room_id, room in self.rooms.items()
+            if room.vent_event is not None
+        ]
+
     def _room_target_decisions(self, reasons_before: dict[str, TargetReason]) -> list[Decision]:
         """Log rooms whose target changed because of presence or the schedule."""
         decisions: list[Decision] = []
@@ -1053,6 +1149,15 @@ class HydronicController:
                     key = f"not_reached_{room.cfg.slug}"
                     problems[key] = Problem(key, "not_reached", name)
             for room, valve in self.valve_configs:
+                check = self.valve_checks.get(valve.entity_id)
+                if check is not None and check.failed:
+                    key = f"valve_{check.result}_{valve.entity_id}"
+                    problems[key] = Problem(
+                        key,
+                        f"valve_{check.result}",
+                        {"room": room.cfg.name, "entity": valve.entity_id},
+                        repair=True,
+                    )
                 if self.tracker.failed(valve.entity_id):
                     key = f"valve_command_{valve.entity_id}"
                     problems[key] = Problem(
@@ -1134,9 +1239,30 @@ class HydronicController:
 
     # --- Status for entities ----------------------------------------------
 
+    def room_valve_check(self, room: RoomController) -> tuple[str | None, float | None]:
+        """Pipe check of a room (worst valve first) and its pipe temperature (FR-SAFE-09).
+
+        None when no valve of the room has a pipe sensor.
+        """
+        checks = [
+            check
+            for valve in room.cfg.valves
+            if valve.temp_entity and (check := self.valve_checks.get(valve.entity_id))
+        ]
+        if not checks:
+            return None, None
+        results = [check.result for check in checks]
+        order = (*FAILURES, "unknown", OK)
+        result = next((r for r in order if r in results), "unknown")
+        return result, checks[0].temperature
+
     def window_rooms(self) -> int:
-        """Return the number of rooms with an open window (any state except closed)."""
-        return sum(1 for r in self.rooms.values() if r.window.state is not WindowState.CLOSED)
+        """Return the number of rooms with an open window or airing (FR-WIN-06)."""
+        return sum(
+            1
+            for r in self.rooms.values()
+            if r.window.state is not WindowState.CLOSED or r.vent.active
+        )
 
     def would_command(self) -> dict[str, Any]:
         """Return the outputs the controller wants, shown in shadow mode (FR-SAFE-05)."""
