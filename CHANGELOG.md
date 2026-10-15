@@ -5,6 +5,13 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.16.1 — 2026-10-15
+
+### 🐛 Opravy
+
+- **Kotel už nezapne, když požadavek zmizí během zavírání ventilů.** Nižší práh vypnutí (hystereze) platí až od skutečného zapnutí kotle. Během čekání na ventily se ověřuje plný práh, a když neplatí, start se zruší. V logbooku je „Start zrušen: požadavek během zavírání ventilů zmizel.“ Zrušený start se nepočítá do startů za hodinu ani do minimální pauzy.
+- **Krátký výpadek čidla nepřepne místnost na záložní čidlo.** Nedostupné čidlo se ještě 5 minut počítá se svou poslední hodnotou (nastavení místnosti, krok Čidla, 0 = vypnuto). Záložní čidla s jiným posunem tak skokově nemění požadavek. Atribut `held_sources` ukazuje, které čidlo se drží.
+
 ## v0.16.0 — 2026-10-15
 
 ### ✨ Novinky

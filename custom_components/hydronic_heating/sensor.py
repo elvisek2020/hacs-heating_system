@@ -112,7 +112,7 @@ SYSTEM_SENSORS: tuple[SystemSensorDescription, ...] = (
             "rooms_calling": ctrl.arbitration.calling,
             # The threshold that applies now: lower while the boiler is requested.
             "threshold": ctrl.cfg.demand_threshold
-            - (ctrl.cfg.demand_hysteresis if ctrl.arbitration.request else 0),
+            - (ctrl.cfg.demand_hysteresis if ctrl.sequencer.boiler_on else 0),
             "min_rooms_calling": ctrl.cfg.min_rooms_calling,
             "combine": ctrl.cfg.combine,
         },
@@ -221,6 +221,7 @@ ROOM_SENSORS: tuple[RoomSensorDescription, ...] = (
             "sources": list(room.valid_sources),
             "invalid_sources": list(room.invalid_sources),
             "fallback_active": room.fallback_active,
+            "held_sources": list(room.held_sources),
         },
     ),
     RoomSensorDescription(

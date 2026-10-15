@@ -597,3 +597,82 @@ def test_startup_decisions_do_not_hold_valves() -> None:
     assert ctrl.ready
     assert ctrl.rooms["id_obyvak"].demand == 100
     assert house.state("switch.hlavice_obyvak") == "off"  # open at once
+
+
+def test_start_is_cancelled_when_the_demand_vanishes_while_valves_close() -> None:
+    """15. 10. 17:29: a sensor failed for 16 s, the demand vanished during pre_close."""
+    rooms = [room(slug) for slug in ("a", "b", "c", "d")]
+    ctrl = controller(*rooms, **{c.CONF_HAS_BYPASS: True, c.CONF_MIN_ROOMS_CALLING: 2})
+    house = House(ctrl, temperatures={slug: 25.0 for slug in "abcd"})
+    house.run(60)
+    house.temp("a", 15.0)
+    house.temp("b", 15.0)
+    house.run(30)
+    assert ctrl.boiler_status.reason is BoilerReason.PRE_CLOSE
+    # b is fine again: 25 % of 30 %, one room calls. Before the boiler runs the
+    # hysteresis (20 %) does not apply, the start is cancelled.
+    house.temp("b", 25.0)
+    house.step()
+    assert ctrl.boiler_status.reason is BoilerReason.IDLE
+    assert [d.kind for d in ctrl.decisions] == ["start_cancelled"]
+    assert ctrl.decisions[0].params["waited"] == "pre_close"
+    house.run(300)
+    assert not house.boiler_on
+    assert ctrl.sequencer.starts_last_hour(house.now) == 0
+
+
+def test_hysteresis_keeps_a_running_boiler_on() -> None:
+    rooms = [room(slug) for slug in ("a", "b", "c", "d")]
+    ctrl = controller(*rooms, **{c.CONF_HAS_BYPASS: True, c.CONF_MIN_ROOMS_CALLING: 2})
+    house = House(ctrl, temperatures={"a": 15.0, "b": 15.0, "c": 25.0, "d": 25.0})
+    house.run(5 * 60)
+    assert house.boiler_on
+    house.temp("b", 25.0)  # 25 %: above the stop threshold of 20 %
+    house.run(10 * 60)
+    assert house.boiler_on
+
+
+def test_short_sensor_drop_out_keeps_the_last_value() -> None:
+    """15. 10. 17:29: the Thread sensor was away for 16 s, the backup reads 0,9 K less."""
+    sensors = [c.CONF_SENSORS, ["sensor.alpstuga", "sensor.loxone"]]
+    ctrl = controller(
+        room("loznice", **{sensors[0]: sensors[1], c.CONF_AGGREGATION: "priority"}),
+        **{c.CONF_HAS_BYPASS: True},
+    )
+    house = House(ctrl)
+    house.set("sensor.alpstuga", "21.12", 21.12)
+    house.set("sensor.loxone", "20.25", 20.25)
+    house.run(60)
+    bedroom = ctrl.rooms["id_loznice"]
+    assert bedroom.temperature == 21.12
+    house.set("sensor.alpstuga", "unavailable")
+    house.run(30)
+    assert bedroom.temperature == 21.12
+    assert bedroom.held_sources == ("sensor.alpstuga",)
+    assert bedroom.valid_sources == ("sensor.alpstuga", "sensor.loxone")
+    assert bedroom.invalid_sources == ()
+    # Back within the grace: nothing happened.
+    house.set("sensor.alpstuga", "21.1", 21.1)
+    house.run(30)
+    assert (bedroom.temperature, bedroom.held_sources) == (21.1, ())
+    # A long drop-out: after 5 min the backup sensor takes over.
+    house.set("sensor.alpstuga", "unavailable")
+    house.run(6 * 60)
+    assert bedroom.temperature == 20.25
+    assert bedroom.invalid_sources == ("sensor.alpstuga",)
+
+
+def test_held_value_counts_in_the_mean_and_stops_at_the_grace() -> None:
+    ctrl = controller(
+        room("obyvak", **{c.CONF_SENSORS: ["sensor.a", "sensor.b"], c.CONF_SENSOR_GRACE: 2}),
+    )
+    house = House(ctrl)
+    house.set("sensor.a", "20.0", 20.0)
+    house.set("sensor.b", "22.0", 22.0)
+    house.run(60)
+    living = ctrl.rooms["id_obyvak"]
+    house.set("sensor.b", "unknown")
+    house.run(60)
+    assert living.temperature == 21.0  # mean with the held 22 °C
+    house.run(90)
+    assert living.temperature == 20.0

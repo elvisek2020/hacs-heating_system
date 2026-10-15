@@ -118,6 +118,7 @@ from .const import (
     CONF_SCHEDULE_ENTITY,
     CONF_SCHEDULE_MODE,
     CONF_SENSOR_FALLBACK,
+    CONF_SENSOR_GRACE,
     CONF_SENSOR_MAX,
     CONF_SENSOR_MIN,
     CONF_SENSOR_STALE_TIMEOUT,
@@ -542,6 +543,7 @@ def _room_sensors_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_SENSOR_MIN, values): _number(-40, 80, unit=_CELSIUS),
             _required(CONF_SENSOR_MAX, values): _number(-40, 80, unit=_CELSIUS),
             _required(CONF_SENSOR_STALE_TIMEOUT, values): _number(0, 720, unit="min"),
+            _required(CONF_SENSOR_GRACE, values): _number(0, 60, unit="min"),
             _required(CONF_SENSOR_FALLBACK, values): _choice(
                 SENSOR_FALLBACKS, CONF_SENSOR_FALLBACK
             ),

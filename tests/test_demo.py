@@ -169,6 +169,11 @@ async def test_virtual_house_heats_and_reacts_to_events(
     )
     await _run(hass, freezer, 60)
     assert hass.states.get("sensor.hh_loznice_demo_temperature").state == "unavailable"
+    # A short drop-out keeps the last value (5 min); then the sensor counts as failed.
+    loznice = hass.states.get("climate.hh_loznice").attributes
+    assert loznice["held_sources"] == ["sensor.hh_loznice_demo_temperature"]
+    assert hass.states.get("binary_sensor.hh_loznice_problem").state == "off"
+    await _run(hass, freezer, 300)
     assert hass.states.get("binary_sensor.hh_loznice_problem").state == "on"
     assert _real_states(hass) == before
 

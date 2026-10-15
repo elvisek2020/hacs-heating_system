@@ -239,6 +239,15 @@ async def test_valve_check_sentences(hass: HomeAssistant) -> None:
     ]
 
 
+async def test_cancelled_start_sentence(hass: HomeAssistant) -> None:
+    hass.config.language = "cs"
+    status = BoilerStatus(BoilerReason.IDLE)
+    decision = Decision("start_cancelled", status, {"waited": "pre_close"})
+    assert decision_text(hass, decision) == (
+        "Start zrušen: požadavek během zavírání ventilů zmizel."
+    )
+
+
 async def test_valve_state_explains_the_position(hass: HomeAssistant) -> None:
     await _setup(hass)
     attrs = hass.states.get("sensor.hh_obyvak_valve_state").attributes

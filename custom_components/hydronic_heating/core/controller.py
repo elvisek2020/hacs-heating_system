@@ -290,7 +290,9 @@ class HydronicController:
                 for r in self.rooms.values()
             ],
             cfg,
-            self.arbitration.request,
+            # The hysteresis keeps a running boiler on; before it really runs (valves
+            # still closing) the full threshold applies, so a vanished demand cancels.
+            self.sequencer.boiler_on,
         )
         self.heat_request = self.arbitration.request or manual or frost_request
         # FR-MODE-03: frost and manual take priority over window block and summer.
@@ -985,6 +987,12 @@ class HydronicController:
             decisions.append(Decision("boiler_on", status))
         elif was_on and not now_on:
             decisions.append(Decision("boiler_off", status, {"cause": self._off_cause(previous)}))
+        elif (
+            previous.reason in (BoilerReason.PRE_CLOSE, BoilerReason.PRE_OPEN)
+            and status.reason is BoilerReason.IDLE
+        ):
+            # The demand vanished while the valves were moving: no start, no count.
+            decisions.append(Decision("start_cancelled", status, {"waited": previous.reason.value}))
         if status.reason in HOLD_REASONS and (
             status.reason is not previous.reason or status.until != previous.until
         ):

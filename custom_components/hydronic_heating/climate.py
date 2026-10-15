@@ -212,6 +212,7 @@ class RoomClimate(HydronicEntity, ClimateEntity):
             "invalid_sources": list(room.invalid_sources),
             "aggregation": room.cfg.aggregation,
             "fallback_active": room.fallback_active,
+            "held_sources": list(room.held_sources),
             "valves": {
                 v.entity_id: room.valves[v.entity_id].physical(v, now).value
                 for v in room.cfg.valves

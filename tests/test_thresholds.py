@@ -21,7 +21,10 @@ def _ctrl(*, request: bool, combine: str = "any", rooms: int = 2, calling: int =
         room_call_threshold=50.0,
     )
     arbitration = SimpleNamespace(request=request, calling=calling, weighted=value)
-    return SimpleNamespace(cfg=cfg, arbitration=arbitration)
+    # The hysteresis applies while the boiler really runs.
+    return SimpleNamespace(
+        cfg=cfg, arbitration=arbitration, sequencer=SimpleNamespace(boiler_on=request)
+    )
 
 
 async def test_demand_rule_sentences(hass: HomeAssistant) -> None:
@@ -43,11 +46,12 @@ async def test_demand_rule_sentences(hass: HomeAssistant) -> None:
 
 async def test_threshold_attributes_and_season_limit(hass: HomeAssistant) -> None:
     await _setup(hass)
-    # The living room wants heat: the boiler is requested, the lower threshold applies.
+    # The living room wants heat, but the boiler waits for the valves: the full
+    # threshold applies until it really runs.
     total = hass.states.get("sensor.hh_demand_total").attributes
-    assert (total["threshold"], total["min_rooms_calling"], total["combine"]) == (20, 1, "any")
+    assert (total["threshold"], total["min_rooms_calling"], total["combine"]) == (30, 1, "any")
     # Living room 100 %, bedroom 0 %: the mean is 50 %, one room calls.
-    assert total["rule"] == "50 % of 20 % (off) or 1 of 1 room"
+    assert total["rule"] == "50 % of 30 % or 1 of 1 room"
     assert hass.states.get("sensor.hh_loznice_demand").attributes["call"] == "0 % of 50 %"
     assert hass.states.get("sensor.hh_heating_limit").state == "13.0"
 

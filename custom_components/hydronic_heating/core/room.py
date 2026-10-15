@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from .aggregation import aggregate
+from .aggregation import aggregate, is_valid
 from .model import (
     EntityReading,
     Preset,
@@ -149,6 +149,10 @@ class RoomController:
         self.temperature: float | None = None
         self.valid_sources: tuple[str, ...] = ()
         self.invalid_sources: tuple[str, ...] = ()
+        # FR-ROOM-07: sensors that dropped out shortly and count with their last value.
+        self.held_sources: tuple[str, ...] = ()
+        self._sensor_last: dict[str, EntityReading] = {}
+        self._sensor_down: dict[str, datetime] = {}
         self.sensor_failure = False
         self.sensor_failure_since: datetime | None = None
         self.fallback_active = False
@@ -293,11 +297,37 @@ class RoomController:
 
     # --- Inputs -----------------------------------------------------------
 
+    def _held_readings(self, snap: Snapshot) -> dict[str, EntityReading]:
+        """Return the readings where a sensor that just dropped out keeps its last value.
+
+        A short drop-out (a Thread sensor for 16 s) must not switch the room to a
+        backup sensor with another offset. The held value keeps the time of its last
+        report, so the stale timeout still applies.
+        """
+        cfg = self.cfg
+        now = snap.now
+        readings = dict(snap.entities)
+        held: list[str] = []
+        for entity_id in cfg.sensors:
+            reading = readings.get(entity_id)
+            if reading is not None and reading.available and reading.value is not None:
+                self._sensor_down.pop(entity_id, None)
+                if is_valid(reading, now, cfg.sensor_min, cfg.sensor_max, cfg.stale_timeout_s):
+                    self._sensor_last[entity_id] = reading
+                continue
+            down = self._sensor_down.setdefault(entity_id, now)
+            last = self._sensor_last.get(entity_id)
+            if last is not None and (now - down).total_seconds() < cfg.sensor_grace_s:
+                readings[entity_id] = last
+                held.append(entity_id)
+        self.held_sources = tuple(held)
+        return readings
+
     def _read_temperature(self, snap: Snapshot) -> None:
         cfg = self.cfg
         agg = aggregate(
             cfg.sensors,
-            dict(snap.entities),
+            self._held_readings(snap),
             snap.now,
             method=cfg.aggregation,
             minimum=cfg.sensor_min,
@@ -305,6 +335,7 @@ class RoomController:
             stale_timeout_s=cfg.stale_timeout_s,
         )
         self.valid_sources, self.invalid_sources = agg.valid, agg.invalid
+        self.held_sources = tuple(s for s in self.held_sources if s in agg.valid)
         if agg.value is not None:
             self.temperature = agg.value
             self.last_valid_temp, self.last_valid_at = agg.value, snap.now

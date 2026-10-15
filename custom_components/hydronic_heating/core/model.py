@@ -235,6 +235,7 @@ class RoomConfig:
     sensor_min: float
     sensor_max: float
     stale_timeout_s: float
+    sensor_grace_s: float
     sensor_fallback: str
     fallback_hold_s: float
     fallback_demand: float
@@ -280,6 +281,7 @@ class RoomConfig:
             sensor_min=num(c.CONF_SENSOR_MIN),
             sensor_max=num(c.CONF_SENSOR_MAX),
             stale_timeout_s=num(c.CONF_SENSOR_STALE_TIMEOUT) * 60,
+            sensor_grace_s=num(c.CONF_SENSOR_GRACE) * 60,
             sensor_fallback=str(_get(data, d, c.CONF_SENSOR_FALLBACK)),
             fallback_hold_s=num(c.CONF_FALLBACK_HOLD) * 60,
             fallback_demand=num(c.CONF_FALLBACK_DEMAND),

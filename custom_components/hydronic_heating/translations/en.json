@@ -411,12 +411,14 @@
             "sensor_min": "Lowest valid value",
             "sensor_max": "Highest valid value",
             "sensor_stale_timeout": "Value is stale after",
+            "sensor_grace": "Short sensor drop-out: keep the value",
             "sensor_fallback": "When all sensors fail",
             "fallback_hold": "Keep the last value for",
             "fallback_demand": "Fixed demand"
           },
           "data_description": {
-            "sensor_stale_timeout": "Loxone sends values only when they change, so keep this long. 0 = do not check."
+            "sensor_stale_timeout": "Loxone sends values only when they change, so keep this long. 0 = do not check.",
+            "sensor_grace": "When a sensor stops reporting (unavailable), its last value counts this long before the other sensors take over. A short drop-out does not switch to a backup sensor with another offset. 0 = off."
           }
         },
         "valves": {

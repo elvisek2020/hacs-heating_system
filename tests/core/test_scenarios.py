@@ -174,7 +174,8 @@ def test_6_sensor_failure_falls_back() -> None:
     assert "sensor_failure_obyvak" in ctrl.problems
     assert ctrl.problems["sensor_failure_obyvak"].repair
 
-    house.run(31 * 60)
+    # The hold counts after the short drop-out grace (5 min) of the sensor.
+    house.run(36 * 60)
     assert obyvak.temperature is None
     assert obyvak.demand == 30  # fallback_demand
 

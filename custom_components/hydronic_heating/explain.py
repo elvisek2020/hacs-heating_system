@@ -176,6 +176,8 @@ DECISION: dict[str, dict[str, str]] = {
             "do {pause_until}."
         ),
         "ventilation_ended": "{room}: větrání skončilo, místnost zase topí podle cíle.",
+        "start_cancelled_pre_close": "Start zrušen: požadavek během zavírání ventilů zmizel.",
+        "start_cancelled_pre_open": "Start zrušen: požadavek během otevírání ventilů zmizel.",
         "ventilation_manual_started": "{room}: ruční větrání do {vent_until}.",
         "ventilation_manual_extended": "{room}: větrání prodlouženo do {vent_until}.",
         "ventilation_manual_ended": "{room}: větrání skončilo, místnost zase topí podle cíle.",
@@ -258,6 +260,8 @@ DECISION: dict[str, dict[str, str]] = {
             "until {pause_until}."
         ),
         "ventilation_ended": "{room}: airing is over, the room heats to its target again.",
+        "start_cancelled_pre_close": "Start cancelled: the demand vanished while valves closed.",
+        "start_cancelled_pre_open": "Start cancelled: the demand vanished while valves opened.",
         "ventilation_manual_started": "{room}: airing by hand until {vent_until}.",
         "ventilation_manual_extended": "{room}: airing extended until {vent_until}.",
         "ventilation_manual_ended": "{room}: airing is over, the room heats to its target again.",
@@ -506,6 +510,8 @@ def decision_text(
         message = texts[key].format_map(fill)
     elif decision.kind == "room_target":
         message = room_target_text(hass, decision.params)
+    elif decision.kind == "start_cancelled":
+        message = texts[f"start_cancelled_{decision.params.get('waited')}"]
     elif decision.kind == "ventilation":
         params = decision.params
         fill["drop"] = number(hass, params.get("drop")) if params.get("drop") is not None else "?"
@@ -890,7 +896,7 @@ def demand_rule(hass: HomeAssistant, ctrl: Any) -> str:
     texts = RULES[language(hass)]
     cfg = ctrl.cfg
     n = cfg.min_rooms_calling
-    running = ctrl.arbitration.request
+    running = ctrl.sequencer.boiler_on  # the hysteresis applies once the boiler runs
     return texts["stop" if running else "start"].format(
         value=number(hass, round(ctrl.arbitration.weighted, 1)),
         threshold=number(hass, cfg.demand_threshold),
