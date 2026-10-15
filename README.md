@@ -78,6 +78,7 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 - **Okna:** po zpoždění zavřou ventily místnosti. Při otevření oken ve více místnostech (globální práh) se zastaví kotel, kromě manuálu.
 - **Ruční větrání:** přepínač **Větrání** pro celý dům, každé patro a každou místnost (ta ve výchozím nastavení větrá celé své patro).
   - Místnosti netopí a ventily jsou zavřené 15 min, další zapnutí čas přidá („+15 min“ na dashboardu), vypnutí větrání ukončí.
+  - Na Přehledu je větrání patra odznak v nadpisu patra (klepnutí zapne nebo vypne, za běhu je vidět konec a vedle odznak +15), větrání celého domu je v bloku Topení.
   - Patra se berou z oblastí Home Assistantu: přiřaďte zařízení místnosti oblast s patrem.
   - Pro automatizace (tlačítko na zdi, zkratka v telefonu) jsou služby `hydronic_heating.ventilate` a `hydronic_heating.stop_ventilation`.
   - Když místnost pozná větrání podle poklesu teploty, přestane topit celé její patro (vypínatelné v Konfigurovat → Okna).

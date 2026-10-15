@@ -34,7 +34,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "scheme": "Schéma",
         "airing": "Větrání",
         "airing_house": "Větrání – celý dům",
-        "airing_floor": "Větrám {floor}",
         "airing_more": "+{minutes} min",
         "heating": "Topení",
         "boiler": "Kotel",
@@ -124,7 +123,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "scheme": "Scheme",
         "airing": "Airing",
         "airing_house": "Airing – whole house",
-        "airing_floor": "Airing {floor}",
         "airing_more": "+{minutes} min",
         "heating": "Heating",
         "boiler": "Boiler",
@@ -484,9 +482,10 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:weather-windy",
             "Větrání",
             (
-                "Ruční větrání: celý dům, patro nebo místnost (ve výchozím nastavení celé "
-                "patro) netopí a ventily jsou zavřené {vent} min. Další zapnutí přidá čas, "
-                "vypnutí větrání ukončí, v dlaždici je konec. Patra se berou z oblastí HA."
+                "Ruční větrání celého domu (blok Topení) nebo patra (odznak v nadpisu "
+                "patra): místnosti netopí a ventily jsou zavřené {vent} min. Klepnutí zapne "
+                "nebo vypne, +15 nebo podržení přidá čas, za běhu je vidět konec. Patra se "
+                "berou z oblastí HA."
             ),
         ),
         (
@@ -762,10 +761,10 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:weather-windy",
             "Airing",
             (
-                "Airing by hand: the whole house, a floor or a room (by default its whole "
-                "floor) does not heat and its valves are closed for {vent} min. Switching it on "
-                "again adds time, off ends it; the tile shows the end. Floors come from the "
-                "areas of HA."
+                "Airing by hand of the whole house (Heating block) or a floor (badge in the "
+                "floor heading): the rooms do not heat and their valves are closed for {vent} "
+                "min. A tap switches it on or off, +15 or holding adds time, the end shows "
+                "while it runs. Floors come from the areas of HA."
             ),
         ),
         (
@@ -1107,7 +1106,7 @@ def _overview(
     for floor_id, rooms in sorted(grouped.items(), key=lambda item: item[0] is None):
         if floor_id is not None:
             floor = runtime.floors[rooms[0].room_id]
-            sections.append(_floor_section(runtime, ids, text, floor))
+            sections.append(_floor_section(ids, floor))
         sections.extend(_room_section(runtime, ids, text, room, shown) for room in rooms)
     return {
         "title": text["overview"],
@@ -1270,18 +1269,49 @@ def _airing_tiles(
     ]
 
 
-def _floor_section(
-    runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str], floor: Floor
-) -> dict:
-    """Heading of a floor above its rooms, with the airing of the whole floor."""
+def _floor_section(ids: _Ids, floor: Floor) -> dict:
+    """Heading of a floor above its rooms; the airing of the floor is in its badges.
+
+    Off: the switch with its state, tap toggles. On: the end of the airing, tap
+    ends it; next to it +15, which adds time. Holding the switch adds time too.
+    """
     switch = ids.system("switch", f"ventilation_{floor.floor_id}")
-    name = text["airing_floor"].format(floor=floor.name)
+    more = {
+        "action": "perform-action",
+        "perform_action": f"{DOMAIN}.ventilate",
+        "data": {"entity_id": switch},
+    }
+    switch_badge = {
+        "type": "entity",
+        "entity": switch,
+        "icon": "mdi:weather-windy",
+        "color": VALVE,
+        "tap_action": {"action": "toggle"},
+        "hold_action": more,
+    }
+    off = [{"condition": "state", "entity": switch, "state": "off"}]
     return {
         "type": "grid",
         "column_span": 3,
         "cards": [
-            _heading(floor.name, "mdi:stairs", grid_options=FULL),
-            *_airing_tiles(runtime, switch, name, text, columns=4),
+            _heading(
+                floor.name,
+                "mdi:stairs",
+                grid_options=FULL,
+                badges=[
+                    {**switch_badge, "state_content": "state", "visibility": off},
+                    {**switch_badge, "state_content": "ends", "visibility": _when_on(switch)},
+                    {
+                        "type": "entity",
+                        "entity": switch,
+                        "icon": "mdi:timer-plus-outline",
+                        "color": VALVE,
+                        "show_state": False,
+                        "tap_action": more,
+                        "visibility": _when_on(switch),
+                    },
+                ],
+            ),
         ],
     }
 
@@ -1597,15 +1627,8 @@ def _room_section(
         cards.extend(_half(pipe, text["pipe"], color=WATER, icon=PIPE_ICON) for pipe in pipes)
     else:
         cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name, color=VALVE))
-    # Airing by hand (by default it airs the whole floor), FR-WIN-07.
-    cards.append(
-        _full(
-            ids.room("switch", room, "ventilation"),
-            text["airing"],
-            color=VALVE,
-            state_content=["state", "ends"],
-        )
-    )
+    # Airing is by the floor (badge in its heading) or the house; the room switch
+    # stays for services and automations, an aired room shows its window badge.
     # 3. Lasting temperatures of the room for auto (ECO as the preset); -/+ on the
     # thermostat is only a manual target.
     # The away temperature stays in the room settings (FR-SCH-02).

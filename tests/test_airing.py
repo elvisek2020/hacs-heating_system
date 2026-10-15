@@ -89,11 +89,23 @@ async def test_floor_airing(hass: HomeAssistant) -> None:
     headings = [s["cards"][0].get("heading") for s in sections]
     # Rooms by floor in their order, each floor with its airing above its rooms.
     assert headings[-4:] == ["1NP", "Obývák", "2NP", "Ložnice"]
+    # The floor section is only its heading; the airing is in its badges.
     floor_cards = sections[headings.index("1NP")]["cards"]
-    assert floor_cards[1]["entity"] == floor_switch
-    assert floor_cards[1]["name"] == "Airing 1NP"
-    assert floor_cards[2]["tap_action"]["perform_action"] == "hydronic_heating.ventilate"
-    assert floor_cards[2]["visibility"][0]["entity"] == floor_switch
+    assert len(floor_cards) == 1
+    off, on, more = floor_cards[0]["badges"]
+    assert (off["entity"], off["state_content"], off["tap_action"]) == (
+        floor_switch,
+        "state",
+        {"action": "toggle"},
+    )
+    assert off["visibility"][0]["state"] == "off"
+    assert off["hold_action"]["perform_action"] == "hydronic_heating.ventilate"
+    assert (on["state_content"], on["visibility"][0]["state"]) == ("ends", "on")
+    assert more["icon"] == "mdi:timer-plus-outline"
+    assert more["tap_action"]["data"] == {"entity_id": floor_switch}
+    # The room cards have no airing tile; the room switch stays as an entity.
+    living = sections[headings.index("Obývák")]["cards"]
+    assert "switch.hh_obyvak_ventilation" not in str(living)
     scheme = dashboard["views"][1]["sections"][0]["cards"][0]
     assert [(f["name"], f["ventilation"]) for f in scheme["floors"]] == [
         ("2NP", "switch.hh_ventilation_2np"),

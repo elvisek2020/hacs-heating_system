@@ -5,6 +5,16 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.16.2 — 2026-10-15
+
+### 🎨 Vzhled
+
+- **Větrání patra v nadpisu patra.** Místo řádku s dlaždicemi je větrání patra odznak vpravo v nadpisu patra: vypnuto ukazuje stav, klepnutí zapne nebo vypne, podržení přidá čas. Za běhu odznak ukazuje konec („do 7:15“) a vedle je odznak **+15**.
+- Karta místnosti už nemá dlaždici Větrání. Přepínač místnosti zůstává pro služby a automatizace, větrání místnosti ukazuje odznak okna v jejím nadpisu.
+- Vysvětlivky popisují větrání domu a patra.
+
+Po aktualizaci dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.16.1 — 2026-10-15
 
 ### 🐛 Opravy
