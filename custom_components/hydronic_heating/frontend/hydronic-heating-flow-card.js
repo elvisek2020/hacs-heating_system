@@ -126,6 +126,8 @@ const STYLE = `
   .label { font-size: 13px; font-weight: 500; }
   .info, .floor, .muted { font-size: 12px; fill: var(--secondary-text-color); }
   .floor { font-weight: 600; letter-spacing: 0.04em; }
+  .floor.airable { cursor: pointer; text-decoration: underline dotted; }
+  .floor.airing { fill: var(--hh-open); }
   .pipe { fill: none; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
   .pipe.supply { stroke: var(--hh-hot); opacity: 0.25; }
   .pipe.return { stroke: var(--hh-cold); opacity: 0.25; }
@@ -280,7 +282,11 @@ class HydronicHeatingFlowCard extends HTMLElement {
     for (const floor of this._config.floors || []) {
       const rooms = floor.rooms || [];
       for (let i = 0; i < Math.max(rooms.length, 1); i += slots) {
-        rows.push({ floor: i === 0 ? floor.name || "" : "", rooms: rooms.slice(i, i + slots) });
+        rows.push({
+          floor: i === 0 ? floor.name || "" : "",
+          ventilation: i === 0 ? floor.ventilation : undefined,
+          rooms: rooms.slice(i, i + slots),
+        });
       }
     }
     return { rows, slots };
@@ -304,7 +310,10 @@ class HydronicHeatingFlowCard extends HTMLElement {
     rows.forEach((row, r) => {
       const y0 = r * ROW_H;
       if (row.floor) {
-        parts.push(`<text class="floor" x="${LEFT}" y="${y0 + 14}">${esc(row.floor)}</text>`);
+        // Tap the floor to air it (FR-WIN-07); the text shows until when it airs.
+        const role = row.ventilation ? ` role="button" tabindex="0"` : "";
+        parts.push(`<text class="floor${row.ventilation ? " airable" : ""}" data-floor="${r}"
+          x="${LEFT}" y="${y0 + 14}"${role}>${esc(row.floor)}</text>`);
       }
       if (!row.rooms.length) return;
       const xs = row.rooms.map((_, i) => LEFT + slot * (i + 0.5));
@@ -421,6 +430,20 @@ class HydronicHeatingFlowCard extends HTMLElement {
         if (ev.key === "Enter" || ev.key === " ") open();
       });
     });
+    root.querySelectorAll("[data-floor]").forEach((el) => {
+      const row = (this._layoutRows || [])[el.dataset.floor];
+      if (!row?.ventilation) return;
+      const toggle = () => {
+        const on = this._state(row.ventilation)?.state === "on";
+        this._hass.callService("switch", on ? "turn_off" : "turn_on", {
+          entity_id: row.ventilation,
+        });
+      };
+      el.addEventListener("click", toggle);
+      el.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") toggle();
+      });
+    });
     const boiler = root.querySelector("[data-boiler]");
     const openBoiler = () => this._moreInfo(this._config.reason || this._config.boiler);
     boiler?.addEventListener("click", openBoiler);
@@ -472,6 +495,15 @@ class HydronicHeatingFlowCard extends HTMLElement {
       if (info) info.textContent = this._roomInfo(room);
     }
     const rows = this._layoutRows || [];
+    rows.forEach((row, r) => {
+      const label = root.querySelector(`[data-floor="${r}"]`);
+      if (!label || !row.floor) return;
+      const airing = this._state(row.ventilation);
+      label.textContent = airing?.state === "on"
+        ? `${row.floor} · ${t.airing} ${airing.attributes.ends || ""}`.trim()
+        : row.floor;
+      label.classList.toggle("airing", airing?.state === "on");
+    });
     const rowFlows = rows.map((row, r) => row.rooms.map((_, i) => flowing[`${r}-${i}`]));
     rowFlows.forEach((flows, r) => {
       flows.forEach((_, i) => {
@@ -539,7 +571,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
       })} °C`);
     }
     const window = climate?.attributes?.window_state;
-    if (window === "open_detected") parts.push(this._t.airing);
+    if (window === "open_detected" || window === "open_manual") parts.push(this._t.airing);
     else if (window && window !== "closed") parts.push(this._t.window);
     else if (climate?.state === "heat") parts.push(this._t.manual);
     return parts.join(" · ");

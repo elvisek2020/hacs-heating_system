@@ -12,14 +12,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers import (
-    area_registry as ar,
     device_registry as dr,
     entity_registry as er,
-    floor_registry as fr,
 )
 
 from .card import CARD_TYPE
 from .const import DOMAIN, ENTITY_PREFIX
+from .floors import Floor, floor_order
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, State
@@ -33,6 +32,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "overview": "Přehled",
         "history": "Grafy",
         "scheme": "Schéma",
+        "airing": "Větrání",
+        "airing_house": "Větrání – celý dům",
+        "airing_floor": "Větrám {floor}",
+        "airing_more": "+{minutes} min",
         "heating": "Topení",
         "boiler": "Kotel",
         "boiler_operation": "Provoz kotle",
@@ -119,6 +122,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "overview": "Overview",
         "history": "History",
         "scheme": "Scheme",
+        "airing": "Airing",
+        "airing_house": "Airing – whole house",
+        "airing_floor": "Airing {floor}",
+        "airing_more": "+{minutes} min",
         "heating": "Heating",
         "boiler": "Boiler",
         "boiler_operation": "Boiler operation",
@@ -473,6 +480,16 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Vlastní plán místnosti, jen když ho místnost má. Úprava mění jen tuto místnost.",
         ),
         (
+            "",
+            "mdi:weather-windy",
+            "Větrání",
+            (
+                "Ruční větrání: celý dům, patro nebo místnost (ve výchozím nastavení celé "
+                "patro) netopí a ventily jsou zavřené {vent} min. Další zapnutí přidá čas, "
+                "vypnutí větrání ukončí, v dlaždici je konec. Patra se berou z oblastí HA."
+            ),
+        ),
+        (
             "shadow",
             "mdi:ghost-outline",
             "Shadow",
@@ -739,6 +756,17 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:calendar-clock",
             "Schedule (room)",
             "The room's own schedule, only when it has one. Editing it changes only this room.",
+        ),
+        (
+            "",
+            "mdi:weather-windy",
+            "Airing",
+            (
+                "Airing by hand: the whole house, a floor or a room (by default its whole "
+                "floor) does not heat and its valves are closed for {vent} min. Switching it on "
+                "again adds time, off ends it; the tile shows the end. Floors come from the "
+                "areas of HA."
+            ),
         ),
         (
             "shadow",
@@ -1071,7 +1099,16 @@ def _overview(
     else:
         sections.append(_shadow_section(shadow, text))
     sections.append(_divider(text["rooms_settings"], "mdi:home-thermometer-outline"))
-    sections.extend(_room_section(runtime, ids, text, room, shown) for room in runtime.rooms)
+    # Rooms by floor in their order, each floor with its airing; rooms without a floor last.
+    grouped: dict[str | None, list[RoomConfig]] = {}
+    for room in runtime.rooms:
+        floor = runtime.floors.get(room.room_id)
+        grouped.setdefault(floor.floor_id if floor else None, []).append(room)
+    for floor_id, rooms in sorted(grouped.items(), key=lambda item: item[0] is None):
+        if floor_id is not None:
+            floor = runtime.floors[rooms[0].room_id]
+            sections.append(_floor_section(runtime, ids, text, floor))
+        sections.extend(_room_section(runtime, ids, text, room, shown) for room in rooms)
     return {
         "title": text["overview"],
         "path": "prehled",
@@ -1191,7 +1228,62 @@ def _system_section(runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, 
             visibility=running,
         )
     )
+    # FR-WIN-07: airing of the whole house; the time can be extended while it runs.
+    cards.append(_heading(text["airing"], "mdi:weather-windy", subtitle=True))
+    cards += _airing_tiles(runtime, sid("switch", "ventilation"), text["airing_house"], text)
     return {"type": "grid", "cards": cards}
+
+
+def _airing_tiles(
+    runtime: HydronicHeatingRuntime,
+    switch: str,
+    name: str,
+    text: dict[str, str],
+    columns: int = 6,
+) -> list[dict[str, Any]]:
+    """Airing switch with its end, and +N min while it runs (FR-WIN-07)."""
+    minutes = _number(runtime.controller.cfg.vent_manual_s / 60, _language(runtime))
+    more = {
+        "action": "perform-action",
+        "perform_action": f"{DOMAIN}.ventilate",
+        "data": {"entity_id": switch},
+    }
+    return [
+        _tile(
+            switch,
+            name,
+            color=VALVE,
+            state_content=["state", "ends"],
+            grid_options={"columns": columns},
+        ),
+        _tile(
+            switch,
+            text["airing_more"].format(minutes=minutes),
+            hide_state=True,
+            icon="mdi:timer-plus-outline",
+            color=VALVE,
+            tap_action=more,
+            icon_tap_action=more,
+            visibility=_when_on(switch),
+            grid_options={"columns": columns},
+        ),
+    ]
+
+
+def _floor_section(
+    runtime: HydronicHeatingRuntime, ids: _Ids, text: dict[str, str], floor: Floor
+) -> dict:
+    """Heading of a floor above its rooms, with the airing of the whole floor."""
+    switch = ids.system("switch", f"ventilation_{floor.floor_id}")
+    name = text["airing_floor"].format(floor=floor.name)
+    return {
+        "type": "grid",
+        "column_span": 3,
+        "cards": [
+            _heading(floor.name, "mdi:stairs", grid_options=FULL),
+            *_airing_tiles(runtime, switch, name, text, columns=4),
+        ],
+    }
 
 
 def _boiler_section(
@@ -1505,6 +1597,15 @@ def _room_section(
         cards.extend(_half(pipe, text["pipe"], color=WATER, icon=PIPE_ICON) for pipe in pipes)
     else:
         cards.append(_full(ids.room("sensor", room, "valve_state"), valve_name, color=VALVE))
+    # Airing by hand (by default it airs the whole floor), FR-WIN-07.
+    cards.append(
+        _full(
+            ids.room("switch", room, "ventilation"),
+            text["airing"],
+            color=VALVE,
+            state_content=["state", "ends"],
+        )
+    )
     # 3. Lasting temperatures of the room for auto (ECO as the preset); -/+ on the
     # thermostat is only a manual target.
     # The away temperature stays in the room settings (FR-SCH-02).
@@ -1565,22 +1666,14 @@ def _scheme_view(
 
 
 def _floors(runtime: HydronicHeatingRuntime, ids: _Ids) -> list[dict[str, Any]]:
-    """Rooms by the floor of their area, the highest floor first.
+    """Rooms by the floor of their area, the highest floor first (see `floors.py`).
 
-    The area is the one of the room's device (or entity), else an area with the
-    room's name. Rooms without a floor come last, without a heading.
+    Each floor has its airing switch; rooms without a floor come last, without a
+    heading.
     """
-    hass = runtime.hass
-    devices, areas, floors = dr.async_get(hass), ar.async_get(hass), fr.async_get(hass)
     grouped: dict[str | None, list[dict[str, Any]]] = {}
     for room in runtime.rooms:
         climate = ids.room("climate", room, "")
-        entry = ids.registry.async_get(climate)
-        area_id = entry.area_id if entry else None
-        if area_id is None and entry is not None and entry.device_id:
-            device = devices.async_get(entry.device_id)
-            area_id = device.area_id if device else None
-        area = areas.async_get_area(area_id) if area_id else areas.async_get_area_by_name(room.name)
         item: dict[str, Any] = {
             "name": room.name,
             "climate": climate,
@@ -1589,18 +1682,18 @@ def _floors(runtime: HydronicHeatingRuntime, ids: _Ids) -> list[dict[str, Any]]:
         }
         if pipe := next((v.temp_entity for v in room.valves if v.temp_entity), None):
             item["pipe"] = pipe
-        grouped.setdefault(area.floor_id if area else None, []).append(item)
-
-    def level(floor_id: str | None) -> tuple[int, int]:
-        floor = floors.async_get_floor(floor_id) if floor_id else None
-        if floor is None:
-            return (1, 0)
-        return (0, -(floor.level if floor.level is not None else 0))
-
-    result = []
-    for floor_id in sorted(grouped, key=level):
-        floor = floors.async_get_floor(floor_id) if floor_id else None
-        result.append({"name": floor.name if floor else "", "rooms": grouped[floor_id]})
+        floor = runtime.floors.get(room.room_id)
+        grouped.setdefault(floor.floor_id if floor else None, []).append(item)
+    result: list[dict[str, Any]] = [
+        {
+            "name": floor.name,
+            "ventilation": ids.system("switch", f"ventilation_{floor.floor_id}"),
+            "rooms": grouped[floor.floor_id],
+        }
+        for floor in floor_order(runtime.floors.values())
+    ]
+    if None in grouped:
+        result.append({"name": "", "rooms": grouped[None]})
     return result
 
 
@@ -1620,6 +1713,7 @@ def _legend_view(runtime: HydronicHeatingRuntime, text: dict[str, str], shown: _
         "rooms": _rooms(cfg.min_rooms_calling, lang),
         "room": _number(cfg.room_call_threshold, lang),
         "combine": COMBINE_WORDS[lang][cfg.combine],
+        "vent": _number(cfg.vent_manual_s / 60, lang),
     }
     rows = "\n".join(
         f'| <ha-icon icon="{icon}"></ha-icon> | **{name.replace(" ", NBSP)}** | '

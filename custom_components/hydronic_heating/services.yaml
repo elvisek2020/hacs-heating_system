@@ -11,3 +11,25 @@ start_manual:
           mode: box
 stop:
 generate_dashboard:
+ventilate:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          integration: hydronic_heating
+          multiple: true
+    minutes:
+      example: 15
+      selector:
+        number:
+          min: 1
+          max: 240
+          unit_of_measurement: min
+          mode: box
+stop_ventilation:
+  fields:
+    entity_id:
+      selector:
+        entity:
+          integration: hydronic_heating
+          multiple: true

@@ -21,6 +21,9 @@ SERVICE_START_MANUAL: Final = "start_manual"
 SERVICE_STOP: Final = "stop"
 SERVICE_GENERATE_DASHBOARD: Final = "generate_dashboard"
 ATTR_DURATION: Final = "duration"
+SERVICE_VENTILATE: Final = "ventilate"
+SERVICE_STOP_VENTILATION: Final = "stop_ventilation"
+ATTR_MINUTES: Final = "minutes"
 
 # Logbook event with every boiler decision and reverted output.
 EVENT_DECISION: Final = "hydronic_heating_decision"
@@ -113,6 +116,11 @@ CONF_GLOBAL_WINDOW_MODE: Final = "global_window_mode"
 CONF_GLOBAL_WINDOW_COUNT: Final = "global_window_count"
 CONF_GLOBAL_WINDOW_RATIO: Final = "global_window_ratio"
 CONF_GLOBAL_WINDOW_DELAY: Final = "global_window_delay"
+# Manual airing (FR-WIN-07): duration, what the room switch airs, the floor follows.
+CONF_VENT_MANUAL: Final = "vent_manual"
+CONF_VENT_SCOPE: Final = "vent_scope"
+VENT_SCOPES: Final = ["floor", "room"]
+CONF_VENT_FLOOR_AUTO: Final = "vent_floor_auto"
 GLOBAL_WINDOW_MODES: Final = ["count", "ratio", "any"]
 
 # --- Manual mode (FR-MAN) ------------------------------------------------
@@ -261,6 +269,9 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_GLOBAL_WINDOW_COUNT: 2,
     CONF_GLOBAL_WINDOW_RATIO: 0.5,
     CONF_GLOBAL_WINDOW_DELAY: 120,
+    CONF_VENT_MANUAL: 15,
+    CONF_VENT_SCOPE: "floor",
+    CONF_VENT_FLOOR_AUTO: True,
     # Manual
     CONF_MANUAL_DURATIONS: [30, 60, 120, 180],
     CONF_MANUAL_RESTART_POLICY: "replace",

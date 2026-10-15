@@ -176,6 +176,14 @@ DECISION: dict[str, dict[str, str]] = {
             "do {pause_until}."
         ),
         "ventilation_ended": "{room}: větrání skončilo, místnost zase topí podle cíle.",
+        "ventilation_manual_started": "{room}: ruční větrání do {vent_until}.",
+        "ventilation_manual_extended": "{room}: větrání prodlouženo do {vent_until}.",
+        "ventilation_manual_ended": "{room}: větrání skončilo, místnost zase topí podle cíle.",
+        "ventilation_floor_started": (
+            "{room}: větrá se celé patro do {vent_until} (rychlý pokles teploty: {trigger})."
+        ),
+        "ventilation_floor_extended": "{room}: větrání prodlouženo do {vent_until}.",
+        "ventilation_floor_ended": "{room}: větrání skončilo, místnost zase topí podle cíle.",
         "valve_not_opening": (
             "{room}: ventil asi neotvírá – trubka se za {minutes} min ohřála jen o {rise} °C."
         ),
@@ -250,6 +258,15 @@ DECISION: dict[str, dict[str, str]] = {
             "until {pause_until}."
         ),
         "ventilation_ended": "{room}: airing is over, the room heats to its target again.",
+        "ventilation_manual_started": "{room}: airing by hand until {vent_until}.",
+        "ventilation_manual_extended": "{room}: airing extended until {vent_until}.",
+        "ventilation_manual_ended": "{room}: airing is over, the room heats to its target again.",
+        "ventilation_floor_started": (
+            "{room}: the whole floor is aired until {vent_until} (fast temperature drop: "
+            "{trigger})."
+        ),
+        "ventilation_floor_extended": "{room}: airing extended until {vent_until}.",
+        "ventilation_floor_ended": "{room}: airing is over, the room heats to its target again.",
         "valve_not_opening": (
             "{room}: the valve does not seem to open – the pipe warmed only by {rise} °C "
             "in {minutes} min."
@@ -493,6 +510,8 @@ def decision_text(
         params = decision.params
         fill["drop"] = number(hass, params.get("drop")) if params.get("drop") is not None else "?"
         fill["pause_until"] = moment(params.get("pause_until"))
+        fill["vent_until"] = moment(params.get("vent_until"))
+        fill["trigger"] = params.get("trigger") or "?"
         message = texts[f"ventilation_{params.get('event')}"].format_map(fill)
     elif decision.kind == "valve_check":
         params = decision.params
@@ -564,6 +583,8 @@ ROOM: dict[str, dict[str, str]] = {
             "Větrá se (rychlý pokles teploty): ventil je zavřený nejméně do {until}, pak "
             "dokud teplota zase nezačne stoupat."
         ),
+        "ventilation_manual": "Větrá se (ručně) do {until}: ventil je zavřený.",
+        "ventilation_floor": "Větrá se celé patro do {until}: ventil je zavřený.",
         "manual": "Manuální topení: ventil je otevřený, dokud manuál běží.",
         "room_off": "Místnost je vypnutá.",
         "summer": "Mimo topnou sezónu: netopí se.",
@@ -598,6 +619,8 @@ ROOM: dict[str, dict[str, str]] = {
             "Airing (fast temperature drop): the valve is closed at least until {until}, then "
             "until the temperature rises again."
         ),
+        "ventilation_manual": "Airing (by hand) until {until}: the valve is closed.",
+        "ventilation_floor": "The whole floor is aired until {until}: the valve is closed.",
         "manual": "Manual heating: the valve is open while manual heating runs.",
         "room_off": "The room is off.",
         "summer": "Off the heating season: no heating.",
@@ -674,6 +697,8 @@ def room_detail(hass: HomeAssistant, room: Any) -> str:
     key = reason
     if reason.startswith("schedule_") and room.target_until is not None:
         key = f"{reason}_until"
+    if reason == "ventilation" and room.manual_vent:
+        key = f"ventilation_{room.vent_source or 'manual'}"
     text = texts[key].format_map(_Defaults(values))
     if reason in ("absent", "long_away") and room.target_until is not None:
         text += texts["return"].format_map(_Defaults(values))
@@ -733,6 +758,7 @@ SCHEME: dict[str, dict[str, str]] = {
         "schedule_eco": "V {at} útlum podle rozvrhu: {rooms}.",
         "return": "Očekávaný návrat v {at}: {rooms}.",
         "ventilation_end": "Po větrání topí zase nejdřív v {at}: {rooms}.",
+        "manual_ventilation_end": "Konec větrání v {at}: {rooms}.",
     },
     "en": {
         "demand": "Heat wanted by: {rooms}.",
@@ -759,6 +785,7 @@ SCHEME: dict[str, dict[str, str]] = {
         "schedule_eco": "At {at} setback by schedule: {rooms}.",
         "return": "Expected return at {at}: {rooms}.",
         "ventilation_end": "After airing the room heats again at {at} at the earliest: {rooms}.",
+        "manual_ventilation_end": "Airing ends at {at}: {rooms}.",
     },
 }
 # Boiler events need seconds ("05:32:38"), room events only the time of day.
@@ -799,7 +826,7 @@ def now_lines(hass: HomeAssistant, ctrl: Any) -> list[str]:
             moving = [r.cfg.name for r in rooms if r.valve_summary(now) == state]
             if moving:
                 lines.append(texts[state].format(rooms=_names(hass, moving)))
-    if airing := [r.cfg.name for r in rooms if r.vent.active]:
+    if airing := [r.cfg.name for r in rooms if r.vent.active or r.manual_vent]:
         lines.append(texts["airing"].format(rooms=_names(hass, airing)))
     if frost := [r.cfg.name for r in rooms if r.frost_active]:
         lines.append(texts["frost"].format(rooms=_names(hass, frost)))
@@ -880,3 +907,11 @@ def room_call(hass: HomeAssistant, room: Any, ctrl: Any) -> str:
         value=number(hass, round(room.demand, 1)),
         threshold=number(hass, ctrl.cfg.room_call_threshold),
     )
+
+
+def airing_end(hass: HomeAssistant, until: Any) -> str | None:
+    """End of airing by hand for a tile: "do 6:45", "zítra do 0:15" (FR-WIN-07)."""
+    if not isinstance(until, datetime):
+        return None
+    word = "do" if language(hass) == "cs" else "until"
+    return finish(hass, f"{word} {moment(until)}")

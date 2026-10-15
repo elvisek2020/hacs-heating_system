@@ -134,6 +134,12 @@
       },
       "demo_sensor_fault": {
         "default": "mdi:thermometer-off"
+      },
+      "ventilation": {
+        "default": "mdi:weather-windy"
+      },
+      "floor_ventilation": {
+        "default": "mdi:weather-windy"
       }
     },
     "climate": {
@@ -154,6 +160,12 @@
     },
     "generate_dashboard": {
       "service": "mdi:view-dashboard-edit-outline"
+    },
+    "ventilate": {
+      "service": "mdi:weather-windy"
+    },
+    "stop_ventilation": {
+      "service": "mdi:window-closed-variant"
     }
   }
 }

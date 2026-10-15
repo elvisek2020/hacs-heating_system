@@ -274,10 +274,16 @@
           "global_window_mode": "Způsob globálního prahu",
           "global_window_count": "Počet místností s otevřeným oknem",
           "global_window_ratio": "Podíl místností s otevřeným oknem",
-          "global_window_delay": "Zpoždění globálního prahu"
+          "global_window_delay": "Zpoždění globálního prahu",
+          "vent_manual": "Ruční větrání: doba",
+          "vent_scope": "Větrání místnosti větrá",
+          "vent_floor_auto": "Poznané větrání rozšířit na celé patro"
         },
         "data_description": {
-          "window_outdoor_condition": "Blokovat jen tehdy, když je venku chladněji než v místnosti."
+          "window_outdoor_condition": "Blokovat jen tehdy, když je venku chladněji než v místnosti.",
+          "vent_manual": "Jak dlouho místnost po zapnutí větrání netopí. Další zapnutí během větrání tuto dobu přidá.",
+          "vent_scope": "Většinou se větrá průvanem přes víc místností patra. Patra se berou z oblastí Home Assistantu.",
+          "vent_floor_auto": "Když místnost pozná větrání podle poklesu teploty, přestanou topit i ostatní místnosti patra."
         }
       },
       "manual": {
@@ -591,6 +597,12 @@
         "house": "Podle domu",
         "own": "Vlastní"
       }
+    },
+    "vent_scope": {
+      "options": {
+        "floor": "Celé patro",
+        "room": "Jen místnost"
+      }
     }
   },
   "entity": {
@@ -884,6 +896,12 @@
       },
       "demo_sensor_fault": {
         "name": "Demo výpadek čidla"
+      },
+      "ventilation": {
+        "name": "Větrání"
+      },
+      "floor_ventilation": {
+        "name": "Větrání {floor}"
       }
     },
     "climate": {
@@ -939,11 +957,38 @@
     "generate_dashboard": {
       "name": "Vytvořit dashboard",
       "description": "Vrátí dashboard pro tuto instalaci. Odpověď zkopírujte do nového dashboardu (editor kódu YAML)."
+    },
+    "ventilate": {
+      "name": "Větrat",
+      "description": "Místnosti netopí, ventily jsou zavřené. Když větrání už běží, doba se přidá.",
+      "fields": {
+        "entity_id": {
+          "name": "Místnosti",
+          "description": "Termostaty místností nebo přepínače Větrání (místnost, patro, celý dům). Bez výběru celý dům."
+        },
+        "minutes": {
+          "name": "Doba",
+          "description": "Bez zadání doba z nastavení."
+        }
+      }
+    },
+    "stop_ventilation": {
+      "name": "Ukončit větrání",
+      "description": "Místnosti zase topí podle cíle.",
+      "fields": {
+        "entity_id": {
+          "name": "Místnosti",
+          "description": "Termostaty místností nebo přepínače Větrání (místnost, patro, celý dům). Bez výběru celý dům."
+        }
+      }
     }
   },
   "exceptions": {
     "not_loaded": {
       "message": "Integrace Heating Controller není načtená."
+    },
+    "not_heating_entity": {
+      "message": "Entita {entity_id} nepatří topení nebo nepatří žádné místnosti."
     }
   }
 }

@@ -274,10 +274,16 @@
           "global_window_mode": "Global threshold mode",
           "global_window_count": "Rooms with an open window",
           "global_window_ratio": "Share of rooms with an open window",
-          "global_window_delay": "Global threshold delay"
+          "global_window_delay": "Global threshold delay",
+          "vent_manual": "Airing by hand: time",
+          "vent_scope": "Airing of a room airs",
+          "vent_floor_auto": "Spread noticed airing to the whole floor"
         },
         "data_description": {
-          "window_outdoor_condition": "Block heating only when it is colder outside than in the room."
+          "window_outdoor_condition": "Block heating only when it is colder outside than in the room.",
+          "vent_manual": "How long a room does not heat after airing is switched on. Switching it on again during airing adds this time.",
+          "vent_scope": "Airing usually draughts through several rooms of a floor. Floors come from the areas of Home Assistant.",
+          "vent_floor_auto": "When a room notices airing by a temperature drop, the other rooms of its floor stop heating too."
         }
       },
       "manual": {
@@ -591,6 +597,12 @@
         "house": "By the house",
         "own": "Own"
       }
+    },
+    "vent_scope": {
+      "options": {
+        "floor": "Whole floor",
+        "room": "Room only"
+      }
     }
   },
   "entity": {
@@ -884,6 +896,12 @@
       },
       "demo_sensor_fault": {
         "name": "Demo sensor fault"
+      },
+      "ventilation": {
+        "name": "Airing"
+      },
+      "floor_ventilation": {
+        "name": "Airing {floor}"
       }
     },
     "climate": {
@@ -939,11 +957,38 @@
     "generate_dashboard": {
       "name": "Generate dashboard",
       "description": "Returns a dashboard for this installation. Copy the response into a new dashboard (raw configuration editor)."
+    },
+    "ventilate": {
+      "name": "Air",
+      "description": "The rooms do not heat, their valves are closed. When airing already runs, the time is added.",
+      "fields": {
+        "entity_id": {
+          "name": "Rooms",
+          "description": "Room thermostats or Airing switches (room, floor, whole house). Without any, the whole house."
+        },
+        "minutes": {
+          "name": "Time",
+          "description": "Without it, the time from the settings."
+        }
+      }
+    },
+    "stop_ventilation": {
+      "name": "Stop airing",
+      "description": "The rooms heat to their targets again.",
+      "fields": {
+        "entity_id": {
+          "name": "Rooms",
+          "description": "Room thermostats or Airing switches (room, floor, whole house). Without any, the whole house."
+        }
+      }
     }
   },
   "exceptions": {
     "not_loaded": {
       "message": "Heating Controller is not loaded."
+    },
+    "not_heating_entity": {
+      "message": "Entity {entity_id} does not belong to the heating or to any room."
     }
   }
 }

@@ -14,7 +14,13 @@ from typing import Any
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import Context, Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+    floor_registry as fr,
+    issue_registry as ir,
+)
 from homeassistant.helpers.event import (
     async_track_point_in_utc_time,
     async_track_state_change_event,
@@ -54,6 +60,7 @@ from .core.model import (
 )
 from .demo import DemoLayout, DemoSimulator, build_layout, remap
 from .explain import decision_text
+from .floors import Floor, room_floors
 from .notifications import notification_text, reason_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -160,6 +167,8 @@ class HydronicHeatingRuntime:
         self.entry = entry
         self.structure = structure_of(entry)
         self.rooms = room_configs(entry)
+        self.floors: dict[str, Floor] = {}
+        self.floor_signature: tuple[tuple[str, str], ...] = ()
         self.demo_mode = str(entry.options.get(CONF_DEMO_MODE, DEMO_OFF))
         self.layout: DemoLayout | None = None
         self.demo: DemoSimulator | None = None
@@ -224,6 +233,9 @@ class HydronicHeatingRuntime:
             data = data.get("controller")
         self.controller.restore(data, dt_util.utcnow())
         self._mirror_ends_at = self.controller.modes.manual_ends_at
+        self._update_floors()
+        # The floor switches exist for these floors; another set needs a reload.
+        self.floor_signature = self._floor_signature()
         self._activate()
         self.async_step()
         self._cleanup_stale_problems()
@@ -241,6 +253,13 @@ class HydronicHeatingRuntime:
                 self.hass, self._async_tick, timedelta(seconds=UPDATE_INTERVAL_S)
             )
         )
+        # FR-WIN-07: floors follow the areas of the room devices.
+        for event in (
+            dr.EVENT_DEVICE_REGISTRY_UPDATED,
+            ar.EVENT_AREA_REGISTRY_UPDATED,
+            fr.EVENT_FLOOR_REGISTRY_UPDATED,
+        ):
+            self._unsubs.append(self.hass.bus.async_listen(event, self._async_registry_changed))
         self._unsubs.append(
             async_track_time_interval(self.hass, self._async_forecast_tick, FORECAST_INTERVAL)
         )
@@ -278,11 +297,53 @@ class HydronicHeatingRuntime:
         self.deactivate()
         await self.async_save()
 
+    # --- Floors and airing (FR-WIN-07) ------------------------------------------
+
+    @callback
+    def _update_floors(self) -> None:
+        self.floors = room_floors(self.hass, self.entry.entry_id, self.rooms)
+        self.controller.floors = {room_id: f.floor_id for room_id, f in self.floors.items()}
+
+    def _floor_signature(self) -> tuple[tuple[str, str], ...]:
+        return tuple(sorted({(f.floor_id, f.name) for f in self.floors.values()}))
+
+    @callback
+    def _async_registry_changed(self, event: Event) -> None:
+        """Rooms moved between floors apply at once; other floors need other entities."""
+        self._update_floors()
+        if self._floor_signature() != self.floor_signature:
+            self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
+
+    def floor_room_ids(self, floor_id: str) -> list[str]:
+        """Rooms on a floor."""
+        return [room_id for room_id, f in self.floors.items() if f.floor_id == floor_id]
+
+    def scope_room_ids(self, room_id: str) -> list[str]:
+        """Rooms the airing switch of a room airs: its floor by default."""
+        if self.controller.cfg.vent_scope == "floor":
+            return self.controller.floor_rooms(room_id)
+        return [room_id]
+
+    @callback
+    def ventilate(self, room_ids: list[str] | None = None, minutes: float | None = None) -> None:
+        """Air rooms by hand, all without IDs; running airing gets the time added."""
+        ids = list(self.controller.rooms) if room_ids is None else room_ids
+        self.controller.ventilate(ids, dt_util.utcnow(), minutes)
+        self._after_action()
+
+    @callback
+    def stop_ventilation(self, room_ids: list[str] | None = None) -> None:
+        """End airing by hand, in all rooms without IDs."""
+        ids = list(self.controller.rooms) if room_ids is None else room_ids
+        self.controller.stop_ventilation(ids, dt_util.utcnow())
+        self._after_action()
+
     @callback
     def apply_config(self) -> None:
         """Apply changed options or room data without reloading (NFR-13)."""
         self.rooms = room_configs(self.entry)
         self.controller.reconfigure(*self._controller_configs())
+        self._update_floors()
         self._subscribe()
         self.async_step()
         self._schedule_forecast()

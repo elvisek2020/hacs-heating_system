@@ -91,6 +91,8 @@ def _room_events(ctrl: HydronicController) -> list[Upcoming]:
             extra[key] = {"target_at": room.preheat_planned_for}
         if (pause := room.vent_pause_until) is not None:
             grouped[(pause, "ventilation_end")].append(name)
+        if (aired := room.manual_vent_until) is not None:
+            grouped[(aired, "manual_ventilation_end")].append(name)
         if room.hvac_mode is not RoomHvacMode.AUTO:
             continue
         if room.target_reason in (TargetReason.ABSENT, TargetReason.LONG_AWAY):

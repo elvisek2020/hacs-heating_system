@@ -320,16 +320,18 @@ async def test_dashboard_structure(hass: HomeAssistant) -> None:
     assert living[0]["badges"][0]["entity"] == "binary_sensor.hh_obyvak_window"
     # Thermostat, the demand (the cause), the valve (the result), then the lasting
     # temperatures; no text. Without absence the away temperature is not used.
-    assert [c.get("entity") for c in living[1:6]] == [
+    assert [c.get("entity") for c in living[1:7]] == [
         "climate.hh_obyvak",
         "sensor.hh_obyvak_demand",
         "sensor.hh_obyvak_valve_state",
+        "switch.hh_obyvak_ventilation",
         "number.hh_obyvak_comfort",
         "number.hh_obyvak_eco",
     ]
-    assert living[4]["features"] == [{"type": "numeric-input", "style": "buttons"}]
-    assert (living[4]["color"], living[5]["color"]) == ("orange", "teal")
-    assert living[5]["name"] == "Eco"  # as the preset of the thermostat
+    assert living[4]["state_content"] == ["state", "ends"]  # airing with its end
+    assert living[5]["features"] == [{"type": "numeric-input", "style": "buttons"}]
+    assert (living[5]["color"], living[6]["color"]) == ("orange", "teal")
+    assert living[6]["name"] == "Eco"  # as the preset of the thermostat
     assert "**Away**" not in rows
     assert all(c["type"] != "markdown" for c in living)
     assert "color" not in living[1]  # room thermostats keep the colors of HA

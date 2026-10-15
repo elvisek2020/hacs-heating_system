@@ -420,6 +420,9 @@ class SystemConfig:
     valve_check_rise: float = 5.0
     valve_check_closed_rise: float = 3.0
     valve_check_hot: float = 40.0
+    vent_manual_s: float = 15 * 60
+    vent_scope: str = "floor"
+    vent_floor_auto: bool = True
     house_schedule_entity: str | None = None
     house_presence_entity: str | None = None
     long_away_entity: str | None = None
@@ -518,6 +521,9 @@ class SystemConfig:
             valve_check_rise=num(c.CONF_VALVE_CHECK_RISE),
             valve_check_closed_rise=num(c.CONF_VALVE_CHECK_CLOSED_RISE),
             valve_check_hot=num(c.CONF_VALVE_CHECK_HOT),
+            vent_manual_s=num(c.CONF_VENT_MANUAL) * 60,
+            vent_scope=str(opt(c.CONF_VENT_SCOPE)),
+            vent_floor_auto=bool(opt(c.CONF_VENT_FLOOR_AUTO)),
             house_schedule_entity=options.get(c.CONF_HOUSE_SCHEDULE_ENTITY),
             house_presence_entity=options.get(c.CONF_HOUSE_PRESENCE_ENTITY),
             long_away_entity=options.get(c.CONF_LONG_AWAY_ENTITY),

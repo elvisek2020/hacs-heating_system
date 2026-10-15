@@ -142,8 +142,11 @@ from .const import (
     CONF_VALVES,
     CONF_VENT_DETECT,
     CONF_VENT_DROP,
+    CONF_VENT_FLOOR_AUTO,
+    CONF_VENT_MANUAL,
     CONF_VENT_MAX,
     CONF_VENT_PAUSE,
+    CONF_VENT_SCOPE,
     CONF_VENT_TIME,
     CONF_WEATHER_ENTITY,
     CONF_WEIGHT,
@@ -177,6 +180,7 @@ from .const import (
     STOP_POLICIES,
     SUBENTRY_ROOM,
     VALVE_DOMAINS,
+    VENT_SCOPES,
 )
 
 type Errors = dict[str, str]
@@ -430,6 +434,10 @@ def _windows_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_GLOBAL_WINDOW_COUNT, values): _number(1, 20),
             _required(CONF_GLOBAL_WINDOW_RATIO, values): _number(0.1, 1, step=0.05),
             _required(CONF_GLOBAL_WINDOW_DELAY, values): _number(0, 900, unit="s"),
+            # FR-WIN-07: airing by hand.
+            _required(CONF_VENT_MANUAL, values): _number(1, 120, unit="min"),
+            _required(CONF_VENT_SCOPE, values): _choice(VENT_SCOPES, CONF_VENT_SCOPE),
+            _required(CONF_VENT_FLOOR_AUTO, values): _BOOL,
         }
     )
 

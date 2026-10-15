@@ -5,6 +5,24 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.16.0 — 2026-10-15
+
+### ✨ Novinky
+
+- **Ruční větrání.** Přepínač **Větrání** pro celý dům, každé patro a každou místnost. Místnosti netopí a ventily jsou zavřené (výchozí 15 min), další zapnutí čas přidá, vypnutí větrání ukončí.
+  - Přepínač místnosti ve výchozím nastavení větrá celé její patro (průvan jde přes víc místností). Jde přepnout na „jen místnost“.
+  - **Patra** se berou z oblastí Home Assistantu (oblast zařízení místnosti → patro).
+  - Když místnost pozná větrání podle poklesu teploty, přestane topit celé její patro (vypínatelné).
+  - Po ručním větrání se 10 minut nevyhodnocuje automatická detekce, aby ochlazená místnost nespustila falešné větrání.
+  - Služby `hydronic_heating.ventilate` a `hydronic_heating.stop_ventilation` pro automatizace.
+  - Začátek, prodloužení a konec se zapíšou do logbooku, ve schématu jde na patro klepnout.
+
+### 🎨 Vzhled
+
+- Místnosti jsou na Přehledu seskupené po patrech, nad každým patrem je „Větrám …“ s „+15 min“. V bloku Topení je větrání celého domu, v kartě místnosti dlaždice Větrání.
+
+Po aktualizaci restartuj Home Assistant, přiřaď zařízením místností oblasti s patry a dashboard znovu vygeneruj službou `hydronic_heating.generate_dashboard`.
+
 ## v0.15.0 — 2026-10-14
 
 ### ✨ Novinky

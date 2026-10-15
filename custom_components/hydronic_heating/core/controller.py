@@ -88,6 +88,8 @@ class HydronicController:
         self.flow_check = FlowCheck()
         # FR-SAFE-09: pipe temperature checks of the valves, by valve entity.
         self.valve_checks: dict[str, ValveCheck] = {}
+        # FR-WIN-07: the floor of each room (room ID -> floor ID), set by the runtime.
+        self.floors: dict[str, str] = {}
         self._firing_since: datetime | None = None
         self._valve_check_changes: list[tuple[RoomController, ValveConfig, str, str]] = []
         self.valve_desired: dict[str, bool] = {}
@@ -119,6 +121,7 @@ class HydronicController:
                 room.calling = previous.calling
                 room.window = previous.window
                 room.vent = previous.vent
+                room.vent_quiet_until = previous.vent_quiet_until
                 room.valve_open_cmd = previous.valve_open_cmd
                 room.valve_switched_at = previous.valve_switched_at
                 room.valve_forced = previous.valve_forced
@@ -170,6 +173,42 @@ class HydronicController:
         return self.cfg.shadow_mode or not self.ready
 
     # --- User actions -----------------------------------------------------
+
+    def ventilate(
+        self, room_ids: Iterable[str], now: datetime, minutes: float | None = None
+    ) -> None:
+        """Air rooms by hand; a running airing gets the time added (FR-WIN-07)."""
+        seconds = minutes * 60 if minutes else self.cfg.vent_manual_s
+        for room_id in room_ids:
+            if room := self.rooms.get(room_id):
+                room.start_ventilation(now, seconds)
+
+    def stop_ventilation(self, room_ids: Iterable[str], now: datetime) -> None:
+        """End airing by hand in rooms (FR-WIN-07)."""
+        for room_id in room_ids:
+            if room := self.rooms.get(room_id):
+                room.stop_ventilation(now)
+
+    def floor_rooms(self, room_id: str) -> list[str]:
+        """Return the room and the others on its floor; the room alone without a floor."""
+        floor = self.floors.get(room_id)
+        if floor is None:
+            return [room_id]
+        return [other for other in self.rooms if self.floors.get(other) == floor]
+
+    def _spread_airing(self, now: datetime) -> None:
+        """Airing noticed in one room airs its whole floor: the draught goes through it."""
+        if not self.cfg.vent_floor_auto:
+            return
+        for room_id, room in self.rooms.items():
+            if room.vent_event != "started" or room_id not in self.floors:
+                continue
+            for other_id in self.floor_rooms(room_id):
+                other = self.rooms[other_id]
+                if other_id != room_id and not other.window_open:
+                    other.start_ventilation(
+                        now, room.cfg.vent_hold_s, source="floor", trigger=room.cfg.name
+                    )
 
     def set_season_mode(self, mode: str, now: datetime) -> None:
         """Heating season: auto, on or off, chosen by the user (FR-EQ-03)."""
@@ -241,6 +280,7 @@ class HydronicController:
         reasons_before = {room_id: r.target_reason for room_id, r in self.rooms.items()}
         for room in self.rooms.values():
             room.update(snap, ctx)
+        self._spread_airing(now)
 
         self._update_global_window(now)
         frost_request = self._frost_request(now)
@@ -317,6 +357,8 @@ class HydronicController:
             self.decisions += self._valve_check_decisions()
         self._season_logged = self.season.active
         self._learn_heat_rates(now)
+        for room in self.rooms.values():
+            room.manual_vent_event = None  # logged above
         self.last_step = now
 
         plan = Plan(boiler_on=boiler_on, valves_open=dict(self.valve_desired))
@@ -1024,8 +1066,8 @@ class HydronicController:
         ]
 
     def _ventilation_decisions(self) -> list[Decision]:
-        """Log the start and the end of airing noticed by a fast drop (FR-WIN-06)."""
-        return [
+        """Log airing: noticed by a fast drop (FR-WIN-06) and by hand or floor (FR-WIN-07)."""
+        decisions = [
             Decision(
                 "ventilation",
                 self.boiler_status,
@@ -1040,6 +1082,22 @@ class HydronicController:
             for room_id, room in self.rooms.items()
             if room.vent_event is not None
         ]
+        decisions += [
+            Decision(
+                "ventilation",
+                self.boiler_status,
+                {
+                    "room": room.cfg.name,
+                    "room_id": room_id,
+                    "event": f"{room.vent_source or 'manual'}_{room.manual_vent_event}",
+                    "vent_until": room.manual_vent_until,
+                    "trigger": room.vent_trigger,
+                },
+            )
+            for room_id, room in self.rooms.items()
+            if room.manual_vent_event is not None
+        ]
+        return decisions
 
     def _room_target_decisions(self, reasons_before: dict[str, TargetReason]) -> list[Decision]:
         """Log rooms whose target changed because of presence or the schedule."""

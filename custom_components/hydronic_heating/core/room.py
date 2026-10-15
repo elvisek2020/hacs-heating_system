@@ -34,6 +34,8 @@ from .valve import ValveState, pwm_open
 from .ventilation import VentDetector
 
 FROST_HYSTERESIS_K = 2.0
+# After airing by hand the cooled room is not taken for a new airing (FR-WIN-07).
+VENT_QUIET_S = 10 * 60
 NOT_REACHED_DEFICIT_K = 1.5
 NOT_REACHED_AFTER_S = 3 * 3600
 SENSOR_FAILURE_REPORT_S = 5 * 60
@@ -176,6 +178,12 @@ class RoomController:
         self.window = WindowMachine()
         self.vent = VentDetector()
         self.vent_event: str | None = None
+        # FR-WIN-07: airing switched on by hand (or for the whole floor) until a time.
+        self.manual_vent_until: datetime | None = None
+        self.vent_source: str | None = None  # manual or floor
+        self.vent_trigger: str | None = None  # the room whose airing spread to the floor
+        self.manual_vent_event: str | None = None  # started, extended or ended
+        self.vent_quiet_until: datetime | None = None
         self.valves: dict[str, ValveState] = {v.entity_id: ValveState() for v in cfg.valves}
         self.valve_open_cmd: bool | None = None
         self.valve_switched_at: datetime | None = None
@@ -231,16 +239,45 @@ class RoomController:
         return self.auto_preset
 
     @property
+    def manual_vent(self) -> bool:
+        """Airing switched on by hand or for the whole floor (FR-WIN-07)."""
+        return self.manual_vent_until is not None
+
+    @property
     def window_open(self) -> bool:
-        """An open window by its contact, or airing noticed by a fast drop (FR-WIN-06)."""
-        return self.window.effective_open or self.vent.active
+        """An open window by its contact, airing by hand or noticed by a fast drop."""
+        return self.window.effective_open or self.manual_vent or self.vent.active
 
     @property
     def window_state(self) -> str:
-        """State of the window machine, `open_detected` while airing is noticed."""
-        if self.vent.active and not self.window.effective_open:
+        """State of the window machine; `open_manual` or `open_detected` while airing."""
+        if self.window.effective_open:
+            return self.window.state.value
+        if self.manual_vent:
+            return "open_manual"
+        if self.vent.active:
             return "open_detected"
         return self.window.state.value
+
+    def start_ventilation(
+        self, now: datetime, seconds: float, *, source: str = "manual", trigger: str | None = None
+    ) -> None:
+        """Air the room until now + seconds; a running airing gets the time added."""
+        if self.manual_vent_until is not None and self.manual_vent_until > now:
+            self.manual_vent_until += timedelta(seconds=seconds)
+            self.manual_vent_event = "extended"
+            return
+        self.manual_vent_until = now + timedelta(seconds=seconds)
+        self.vent_source, self.vent_trigger = source, trigger
+        self.manual_vent_event = "started"
+
+    def stop_ventilation(self, now: datetime) -> None:
+        """End the airing; the cooled room is not taken for a new airing for a while."""
+        if self.manual_vent_until is None:
+            return
+        self.manual_vent_until = None
+        self.vent_quiet_until = now + timedelta(seconds=VENT_QUIET_S)
+        self.manual_vent_event = "ended"
 
     @property
     def vent_pause_until(self) -> datetime | None:
@@ -420,13 +457,22 @@ class RoomController:
             or ctx.outdoor_now < self.temperature
         )
         self.window.update(self._read_windows(snap), condition_ok, ctx)
-        # FR-WIN-06: airing noticed by a fast drop, also without window contacts.
+        # FR-WIN-07: airing by hand ends at its time.
+        if self.manual_vent_until is not None and ctx.now >= self.manual_vent_until:
+            self.stop_ventilation(ctx.now)
+        # FR-WIN-06: airing noticed by a fast drop, also without window contacts. Not
+        # during airing by hand, nor shortly after it while the room warms up again.
         cfg = self.cfg
+        quiet = self.vent_quiet_until is not None and ctx.now < self.vent_quiet_until
         self.vent_event = self.vent.update(
             ctx.now,
             None if self.sensor_failure else self.temperature,
             tuple(self.valid_sources),
-            enabled=cfg.vent_detect and ctx.heating_allowed and not self.window.effective_open,
+            enabled=cfg.vent_detect
+            and ctx.heating_allowed
+            and not self.window.effective_open
+            and not self.manual_vent
+            and not quiet,
             drop_k=cfg.vent_drop_k,
             window_s=cfg.vent_window_s,
             hold_s=cfg.vent_hold_s,
@@ -457,6 +503,8 @@ class RoomController:
             return TargetReason.FROST, None
         if self.window.effective_open:
             return TargetReason.WINDOW, None
+        if self.manual_vent:
+            return TargetReason.VENTILATION, self.manual_vent_until
         if self.vent.active:
             return TargetReason.VENTILATION, self.vent_pause_until
         if ctx.manual:
@@ -581,6 +629,11 @@ class RoomController:
             "last_valid_at": self.last_valid_at.isoformat() if self.last_valid_at else None,
             "valves": {key: state.to_dict() for key, state in self.valves.items()},
             "heat_rate": self.heat_rate.to_dict(),
+            "manual_vent_until": self.manual_vent_until.isoformat()
+            if self.manual_vent_until
+            else None,
+            "vent_source": self.vent_source,
+            "vent_trigger": self.vent_trigger,
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -597,3 +650,7 @@ class RoomController:
             if key in self.valves:
                 self.valves[key] = ValveState.from_dict(valve)
         self.heat_rate.restore(data.get("heat_rate"))
+        if until := data.get("manual_vent_until"):
+            self.manual_vent_until = datetime.fromisoformat(until)
+            self.vent_source = data.get("vent_source") or "manual"
+            self.vent_trigger = data.get("vent_trigger")
