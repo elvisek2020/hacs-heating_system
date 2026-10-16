@@ -160,10 +160,45 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 
 - Voda proudí jen tam, kam opravdu teče, v doběhu pomaleji. Kotel při běhu svítí a hoří, hlavice v pohybu bliká a radiátor je teplý, jen když jím teče voda.
 - Pod schématem je pruh fází **Klid → Ventily → Kotel topí → Doběh** s odpočtem („kotel zapne za 1:12“, „doběh ještě 2:10“) a se štítkem, když kotel něco drží (minimální pauza, mimo sezónu, porucha…).
-- **Teď** říká, proč je to tak (kdo chce teplo, které ventily se zavírají). **Pak** vypisuje příští události s časy: start a vypnutí kotle, konec doběhu, předtápění, změny rozvrhu.
+- **Teď** říká, proč je to tak (kdo chce teplo, které ventily se zavírají). **Pak** vypisuje příští události s časy: start a vypnutí kotle, konec doběhu a manuálu, předtápění, změny rozvrhu, návrat a konec větrání.
 - Klepnutím na místnost se otevře její termostat, klepnutím na kotel důvod jeho stavu.
 - **Patra** se berou z oblastí Home Assistantu. Přiřaďte zařízení místnosti oblast s patrem, nebo pojmenujte oblast stejně jako místnost. Bez pater jsou všechny místnosti v jedné řadě.
 - Kartu `custom:hydronic-heating-flow-card` přináší integrace, nic dalšího se neinstaluje. Po aktualizaci integrace stačí obnovit stránku.
+
+### Karta na jiném dashboardu
+
+Schéma jde dát i na hlavní dashboard, třeba vedle kamer. Entity a patra do karty vkládá služba `generate_dashboard`, proto kartu zkopírujte z pohledu Schéma:
+
+1. Na pohledu Schéma: Upravit dashboard → upravit kartu schématu → Zobrazit editor kódu, zkopírovat YAML.
+2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact`.
+
+```yaml
+type: custom:hydronic-heating-flow-card
+layout: compact
+boiler: binary_sensor.hh_boiler_command
+reason: sensor.hh_boiler_reason
+outdoor: sensor.hh_outdoor_temperature
+floors:
+  - name: Přízemí
+    ventilation: switch.hh_ventilation_prizemi
+    rooms:
+      - name: Obývák
+        climate: climate.hh_obyvak
+        demand: sensor.hh_obyvak_demand
+        valve: sensor.hh_obyvak_valve_state
+```
+
+| Volba | Výchozí | Co dělá |
+|---|---|---|
+| `layout` | `full` | `compact` = nižší schéma bez textů Teď a Pak |
+| `show_text` | `true`, u `compact` `false` | oba sloupce Teď a Pak |
+| `show_now`, `show_upcoming` | podle `show_text` | jen sloupec Teď, jen sloupec Pak |
+| `upcoming_max` | všechny | nejvýš tolik řádků v Pak |
+| `show_phases` | `true` | pruh fází (Klid, Ventily, Kotel topí, Doběh) se štítkem a odpočtem |
+| `show_outdoor` | `true` | venkovní teplota vpravo nahoře |
+| `title` | bez nadpisu | nadpis karty |
+
+Volby jdou naklikat i ve vizuálním editoru karty, entity a patra editor nemění. Zkopírovaná karta se sama neaktualizuje: po změně místností nebo pater ji zkopírujte znovu z přegenerovaného pohledu Schéma.
 
 ## Teplota vody a kontrola topení
 
@@ -190,7 +225,7 @@ Termoelektrické hlavice neříkají, jestli ventil opravdu otevřely. Čidlo te
 
 Ochrana kotle někdy drží kotel v chodu nebo ve stání i proti tomu, co zrovna chcete. Například po **Stop** kotel doběhne svou minimální dobu běhu. Proto integrace vždy ukazuje, proč je kotel v aktuálním stavu a kdy se to změní:
 
-- `sensor.hh_boiler_reason` říká důvod, třeba „Minimální doba běhu“, „Minimální pauza“, „Doběh“ nebo „Topí na požadavek“. Atribut `detail` obsahuje celou větu, například „Teplo už nikdo nechce, ale kotel musí běžet minimální dobu 10 min. Vypne se v 00:55:12.“ V atributu `rule` je nastavení, které za tím stojí.
+- `sensor.hh_boiler_reason` říká důvod, třeba „Minimální doba běhu“, „Minimální pauza“, „Doběh“ nebo „Topí na požadavek“. Atribut `detail` obsahuje celou větu, například „Teplo už nikdo nechce, ale kotel musí běžet minimální dobu 10 min. Vypne se v 0:55:12.“ V atributu `rule` je nastavení, které za tím stojí.
 - `sensor.hh_boiler_hold_ends_at` ukazuje, kdy časové pravidlo skončí. Dashboard z něj dělá odpočet „za 4 minuty“.
 - **Logbook** (Aktivita) zapisuje každé zapnutí a vypnutí kotle s příčinou a každé odložení povelu s časem. Zapíše i výstup, který někdo přepnul ručně a integrace ho vrátila. Stejné věty jsou v logu Home Assistantu. Ve shadow režimu mají předponu `[Shadow]`, v demu `[Demo]`.
 - U ventilů ukazují atributy `reason` a `until` na `sensor.hh_<místnost>_valve_state`, proč je ventil otevřený nebo zavřený (PWM, okno, doběh kotle, protáčení…) a kdy se to změní.
@@ -220,10 +255,12 @@ Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastn�
 | `sensor.hh_open_windows` | počet místností s otevřeným oknem |
 | `binary_sensor.hh_heat_demand`, `_boiler_command`, `_window_block`, `_heating_season`, `_problem` | požadavek, povel kotli, blokace okny, topná sezóna, porucha |
 | `switch.hh_shadow_mode` | shadow režim |
+| `switch.hh_ventilation`, `switch.hh_ventilation_<patro>` | ruční větrání celého domu a patra (atributy `until` a `ends` = konec) |
 | `climate.hh_<místnost>` | termostat místnosti s presety komfort, eco, pryč a ruční teplota |
 | `sensor.hh_<místnost>_temperature`, `_demand`, `_valve_state` | teplota, požadavek, stav ventilů |
 | `number.hh_<místnost>_comfort`, `_eco`, `_away` | komfortní, útlumová a teplota Pryč (útlum nejde nad komfort, útlum a Pryč nejdou na protimrazovou teplotu nebo pod ni) |
-| `binary_sensor.hh_<místnost>_window`, `_problem` | otevřené okno nebo větrání (atribut `state` = `open_detected`), porucha místnosti |
+| `switch.hh_<místnost>_ventilation` | ruční větrání místnosti, ve výchozím nastavení větrá celé patro (atributy `until`, `ends`, `source`) |
+| `binary_sensor.hh_<místnost>_window`, `_problem` | otevřené okno nebo větrání (atribut `state` = `open_manual` ručně, `open_detected` podle poklesu teploty), porucha místnosti |
 
 Ruční změna teploty nebo presetu místnosti v režimu automaticky platí trvale: místnost přejde do režimu topit a rozvrh se ignoruje, dokud ji nevrátíte na automaticky. Atribut `override_active` ukazuje, kde rozvrh neběží.
 
@@ -232,6 +269,8 @@ Ruční změna teploty nebo presetu místnosti v režimu automaticky platí trva
 - `hydronic_heating.start_manual` s parametrem `duration` (1–720 min): spustí nebo prodlouží manuální topení.
 - `hydronic_heating.stop`: ukončí manuál.
 - `hydronic_heating.generate_dashboard`: vrátí dashboard pro tuto instalaci (viz demo režim).
+- `hydronic_heating.ventilate` s volitelnými parametry `entity_id` (termostaty místností nebo přepínače Větrání, bez výběru celý dům) a `minutes` (1–240 min): spustí větrání, když už běží, čas přidá.
+- `hydronic_heating.stop_ventilation` s volitelným `entity_id`: ukončí větrání.
 
 ## Příprava v Loxone
 
@@ -265,10 +304,9 @@ docker run --rm -v "$PWD:/github/workspace" ghcr.io/home-assistant/hassfest
 
 - Kotel řízený jen kontaktem: Home Assistant ho umí jen zapnout a vypnout. Teplota vody podle topné křivky je proto jen virtuální hodnota, skutečnou teplotu si kotel drží sám. Modulované řízení (OpenTherm, eBUS) zatím není.
 - Předtápění se rychlost ohřevu teprve učí. Prvních pár ohřevů počítá s výchozí hodnotou 0,5 °C za hodinu.
-- Předtápění podle návratu konkrétní osoby (např. dětský pokoj) zatím není, jen podle návratu domácnosti a podle rozvrhu.
 - Dashboard se negeneruje sám: po změně místností nebo po aktualizaci je potřeba znovu spustit službu `hydronic_heating.generate_dashboard` a vložit výsledek.
 - Jedna instance integrace na Home Assistant.
 
 ## Autor
 
-**[elvisek2020](https://github.com/elvisek2020)** — integrace vznikla jako náhrada regulace Loxone (Intelligent Room Controller a Climate Controller) pro teplovodní topení v rodinném domě. Licence MIT.
+**[elvisek2020](https://github.com/elvisek2020)** — integrace vznikla jako náhrada regulace Loxone (Intelligent Room Controller a Climate Controller) pro teplovodní topení v rodinném domě. Celý příběh je v článku [Jak jsem přestěhoval topení z Loxone do Home Assistantu](https://www.elvisek.cz/2026/10/topeni-z-loxone-do-home-assistantu/). Licence MIT.

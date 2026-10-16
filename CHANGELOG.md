@@ -5,6 +5,20 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.17.0 — 2026-10-16
+
+### ✨ Novinky
+
+- **Karta schématu na jiném dashboardu.** Karta `custom:hydronic-heating-flow-card` má volby, takže jde dát i na hlavní dashboard:
+  - `layout: compact`: nižší schéma bez textů Teď a Pak,
+  - `show_text: false` schová texty Teď a Pak, `show_now` / `show_upcoming` jen jeden z nich, `upcoming_max` omezí počet řádků v Pak,
+  - `show_phases: false` schová pruh fází s odpočtem, `show_outdoor: false` venkovní teplotu.
+- Volby jdou naklikat ve vizuálním editoru karty. Entity a patra zůstávají, jak je vygeneroval dashboard. Postup a příklad jsou v README v sekci „Karta na jiném dashboardu“.
+- Bez voleb vypadá karta stejně jako dřív, pohled Schéma se nemění.
+- README popisuje služby a přepínače ručního větrání a odkazuje na článek o projektu na www.elvisek.cz.
+
+Po aktualizaci obnov stránku prohlížeče, ať se načte nová verze karty.
+
 ## v0.16.2 — 2026-10-15
 
 ### 🎨 Vzhled
