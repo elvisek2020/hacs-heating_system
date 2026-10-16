@@ -49,14 +49,14 @@ DETAIL: dict[str, dict[str, str]] = {
         "firing_demand": (
             "Kotel topí na požadavek místností (celkem {demand} %, volajících místností: {rooms})."
         ),
-        "firing_manual": "Kotel topí v manuálním režimu do {manual_until}.",
+        "firing_manual": "Ruční topení: topí se {flow} do {manual_until}.",
         "firing_frost": "Kotel topí kvůli protimrazové ochraně.",
         "duty_stop": " Omezení střídy ho vypne v {until}.",
         "min_on_hold": (
             "Teplo už nikdo nechce, ale kotel musí běžet minimální dobu {minutes} min. "
-            "Vypne se v {until}."
+            "Vypne se v {until}, teplo jde {flow}."
         ),
-        "overrun": "Kotel je vypnutý, ventily zůstávají otevřené kvůli doběhu do {until}.",
+        "overrun": "Kotel je vypnutý, čerpadlo dobíhá do {until} {flow}.",
         "fault_safe": "Porucha: {fault}. Kotel je vypnutý, ventily jsou v klidovém stavu.",
         "fault_recovery": (
             "Porucha odeznívá ({fault}). Pokud vše vydrží v pořádku, vrátí se řízení "
@@ -96,14 +96,14 @@ DETAIL: dict[str, dict[str, str]] = {
         "firing_demand": (
             "The boiler heats on room demand ({demand} % in total, rooms calling: {rooms})."
         ),
-        "firing_manual": "The boiler heats in manual mode until {manual_until}.",
+        "firing_manual": "Manual heating: heating {flow} until {manual_until}.",
         "firing_frost": "The boiler heats for frost protection.",
         "duty_stop": " The duty limit stops it at {until}.",
         "min_on_hold": (
             "Nobody needs heat any more, but the boiler must run its minimum time of "
-            "{minutes} min. It stops at {until}."
+            "{minutes} min. It stops at {until}, the heat goes {flow}."
         ),
-        "overrun": "The boiler is off, the valves stay open for the overrun until {until}.",
+        "overrun": "The boiler is off, the pump runs on until {until} {flow}.",
         "fault_safe": "Fault: {fault}. The boiler is off, the valves are in their idle position.",
         "fault_recovery": (
             "The fault is clearing ({fault}). If everything stays fine, control resumes at {until}."
@@ -114,7 +114,7 @@ DETAIL: dict[str, dict[str, str]] = {
 DECISION: dict[str, dict[str, str]] = {
     "cs": {
         "boiler_on": "Kotel zapnut: {cause}.",
-        "on_firing_manual": "manuální topení do {manual_until}",
+        "on_firing_manual": "ruční topení {flow} do {manual_until}",
         "on_firing_frost": "protimrazová ochrana",
         "on_firing_demand": (
             "požadavek místností (celkem {demand} %, volajících místností: {rooms})"
@@ -138,8 +138,10 @@ DECISION: dict[str, dict[str, str]] = {
         "off_duty_limit": "omezení střídy, další start nejdříve v {next_start}",
         "off_no_flow": "chybí průtok, otevřených ventilů je málo",
         "off_fault": "porucha ({fault})",
-        "overrun_suffix": " Ventily zůstanou otevřené do {until}.",
-        "hold_min_on_hold": "Kotel poběží do {until} kvůli minimální době běhu {minutes} min.",
+        "overrun_suffix": " Čerpadlo dobíhá do {until} {flow}.",
+        "hold_min_on_hold": (
+            "Kotel poběží do {until} kvůli minimální době běhu {minutes} min, teplo jde {flow}."
+        ),
         "hold_min_off_hold": "Start odložen do {until}: minimální pauza {minutes} min.",
         "hold_max_starts_hold": "Start odložen do {until}: limit {count} startů za hodinu.",
         "hold_duty_hold": "Start odložen do {until}: omezení střídy, cyklus {cycle_min} min.",
@@ -198,7 +200,7 @@ DECISION: dict[str, dict[str, str]] = {
     },
     "en": {
         "boiler_on": "Boiler on: {cause}.",
-        "on_firing_manual": "manual heating until {manual_until}",
+        "on_firing_manual": "manual heating {flow} until {manual_until}",
         "on_firing_frost": "frost protection",
         "on_firing_demand": "room demand ({demand} % in total, rooms calling: {rooms})",
         "boiler_off": "Boiler off: {cause}.",
@@ -220,9 +222,9 @@ DECISION: dict[str, dict[str, str]] = {
         "off_duty_limit": "duty limit, next start at {next_start} at the earliest",
         "off_no_flow": "no flow, too few valves are open",
         "off_fault": "fault ({fault})",
-        "overrun_suffix": " The valves stay open until {until}.",
+        "overrun_suffix": " The pump runs on until {until} {flow}.",
         "hold_min_on_hold": "The boiler runs until {until} because of its minimum run time of "
-        "{minutes} min.",
+        "{minutes} min, the heat goes {flow}.",
         "hold_min_off_hold": "Start delayed until {until}: minimum pause of {minutes} min.",
         "hold_max_starts_hold": "Start delayed until {until}: limit of {count} starts per hour.",
         "hold_duty_hold": "Start delayed until {until}: duty limit, cycle of {cycle_min} min.",
@@ -301,6 +303,7 @@ VALVE_REASONS: dict[str, dict[str, str]] = {
         "min_state_hold": "minimální doba stavu ventilu",
         "exercise": "protáčení ventilu",
         "overrun": "doběh kotle",
+        "min_run": "minimální běh kotle, teplo z běhu",
         "min_flow": "minimální průtok kotlem",
         "preheat": "předtápění",
     },
@@ -318,6 +321,7 @@ VALVE_REASONS: dict[str, dict[str, str]] = {
         "min_state_hold": "minimum valve state time",
         "exercise": "valve exercise",
         "overrun": "boiler overrun",
+        "min_run": "minimum boiler run, heat of the run",
         "min_flow": "minimum flow through the boiler",
         "preheat": "preheating",
     },
@@ -422,8 +426,38 @@ def number(hass: HomeAssistant, value: Any) -> str:
     return text.replace(".", ",") if language(hass) == "cs" else text
 
 
+FLOW: dict[str, dict[str, str]] = {
+    "cs": {
+        "all": "do všech místností",
+        "one": "do místnosti {rooms}",
+        "many": "do místností {rooms}",
+        "none": "jen obtokem u kotle",
+    },
+    "en": {
+        "all": "to all rooms",
+        "one": "to the room {rooms}",
+        "many": "to the rooms {rooms}",
+        "none": "only through the bypass at the boiler",
+    },
+}
+
+
+def flow_phrase(hass: HomeAssistant, params: Mapping[str, Any]) -> str:
+    """Where the water of the boiler goes, by the planned valve positions (FR-BOI-09)."""
+    texts = FLOW[language(hass)]
+    heated = tuple(params.get("heated") or ())
+    if params.get("heated_all"):
+        return texts["all"]
+    if not heated:
+        return texts["none"]
+    key = "one" if len(heated) == 1 else "many"
+    return texts[key].format(rooms=_names(hass, heated))
+
+
 def _values(hass: HomeAssistant, status: BoilerStatus, extra: Mapping[str, Any]) -> dict[str, Any]:
     values: dict[str, Any] = {**status.params, **extra}
+    if "heated" in values:
+        values["flow"] = flow_phrase(hass, values)
     values["until"] = clock(status.until)
     for key in ("manual_until", "next_start", "valve_until"):
         if key in values:

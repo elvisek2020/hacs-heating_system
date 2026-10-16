@@ -12,7 +12,9 @@
  *
  * Options (FR-UI-25): `layout: compact` is lower and without the texts,
  * `show_text`, `show_now`, `show_upcoming`, `upcoming_max`, `show_phases` and
- * `show_outdoor` hide parts. The defaults keep the full scheme.
+ * `show_outdoor` hide parts, `interactive: false` makes the parts not
+ * clickable and `tap_action` is a standard action of the whole card. The
+ * defaults keep the full, clickable scheme.
  */
 
 const TAG = "hydronic-heating-flow-card";
@@ -52,6 +54,8 @@ const TEXTS = {
       upcoming_max: "Nejvýš řádků v Pak (prázdné = všechny)",
       show_phases: "Pruh fází a odpočet",
       show_outdoor: "Venkovní teplota",
+      interactive: "Klikací prvky (místnosti, kotel, patra)",
+      tap_action: "Akce po klepnutí na kartu",
       entities: "Entity a patra vkládá služba generate_dashboard. Kartu zkopírujte z pohledu Schéma.",
     },
   },
@@ -87,6 +91,8 @@ const TEXTS = {
       upcoming_max: "At most lines in Next (empty = all)",
       show_phases: "Phase bar and countdown",
       show_outdoor: "Outdoor temperature",
+      interactive: "Clickable parts (rooms, boiler, floors)",
+      tap_action: "Tap action of the card",
       entities: "The service generate_dashboard fills in the entities and floors. Copy the card from the Scheme view.",
     },
   },
@@ -186,10 +192,9 @@ const STYLE = `
   .head-valve.closed, .head-valve.unknown { fill: var(--hh-idle); }
   .head-valve.moving { fill: var(--hh-moving); animation: hh-blink 1s ease-in-out infinite; }
   @keyframes hh-blink { 50% { opacity: 0.25; } }
-  .room { cursor: pointer; }
+  .room[role="button"], .boiler[role="button"], ha-card.tappable { cursor: pointer; }
   .room:focus { outline: none; }
   .room:focus-visible .body { stroke: var(--primary-color); stroke-width: 2; }
-  .boiler { cursor: pointer; }
   .boiler rect.case { fill: var(--secondary-background-color, #f2f2f2);
     stroke: var(--hh-idle); stroke-width: 2; transition: stroke 0.6s; }
   .boiler.burning rect.case { stroke: var(--hh-hot); }
@@ -345,7 +350,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
     return { rows, slots };
   }
 
-  _build(g) {
+  _build(g, interactive) {
     const width = Math.max(300, this._width || this.clientWidth || 900);
     const { rows, slots } = this._rows(width);
     const slot = Math.max(MIN_SLOT, (width - LEFT - 8) / Math.max(1, Math.min(slots,
@@ -365,8 +370,9 @@ class HydronicHeatingFlowCard extends HTMLElement {
       const y0 = r * g.row;
       if (row.floor) {
         // Tap the floor to air it (FR-WIN-07); the text shows until when it airs.
-        const role = row.ventilation ? ` role="button" tabindex="0"` : "";
-        parts.push(`<text class="floor${row.ventilation ? " airable" : ""}" data-floor="${r}"
+        const airable = interactive && row.ventilation;
+        const role = airable ? ` role="button" tabindex="0"` : "";
+        parts.push(`<text class="floor${airable ? " airable" : ""}" data-floor="${r}"
           x="${LEFT}" y="${y0 + g.floor}"${role}>${esc(row.floor)}</text>`);
       }
       if (!row.rooms.length) return;
@@ -380,10 +386,10 @@ class HydronicHeatingFlowCard extends HTMLElement {
         parts.push(this._pipe(`M${x + rw / 2 - 8} ${y0 + g.ret} H${to}`, "return", `main-r-${r}-${i}`));
       });
       row.rooms.forEach((room, i) => {
-        parts.push(this._room(g, room, xs[i], y0, rw, slot, `${r}-${i}`));
+        parts.push(this._room(g, room, xs[i], y0, rw, slot, `${r}-${i}`, interactive));
       });
     });
-    parts.push(this._boiler(g, boilerY));
+    parts.push(this._boiler(g, boilerY, interactive));
     return { svg: `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"
       role="img">${parts.join("")}</svg>`, rows };
   }
@@ -393,7 +399,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
       `<path class="flow ${kind}" data-flow="${id}" d="${d}"/>`;
   }
 
-  _room(g, room, cx, y0, rw, slot, id) {
+  _room(g, room, cx, y0, rw, slot, id, interactive) {
     const left = cx - rw / 2;
     const sx = left + 8;
     const rx = left + rw - 8;
@@ -404,7 +410,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
     }
     const name = clip(room.name || "", Math.floor(slot / 7.2));
     return `
-      <g class="room" data-room="${id}" tabindex="0" role="button"
+      <g class="room" data-room="${id}"${interactive ? ` tabindex="0" role="button"` : ""}
          aria-label="${esc(room.name || "")}">
         ${this._pipe(`M${sx} ${y0 + g.supply} V${y0 + g.body}`, "supply", `branch-s-${id}`)}
         ${this._pipe(`M${rx} ${bottom} V${y0 + g.ret}`, "return", `branch-r-${id}`)}
@@ -420,10 +426,11 @@ class HydronicHeatingFlowCard extends HTMLElement {
       </g>`;
   }
 
-  _boiler(g, y) {
+  _boiler(g, y, interactive) {
     const [label, temp, state] = g.textY;
+    const role = interactive ? ` tabindex="0" role="button"` : "";
     return `
-      <g class="boiler" data-boiler tabindex="0" role="button" aria-label="${this._t.boiler}">
+      <g class="boiler" data-boiler${role} aria-label="${this._t.boiler}">
         <rect class="glow" x="2" y="${y + g.caseY - 6}" width="${g.caseW + 12}"
               height="${g.caseH + 12}" rx="16"/>
         <rect class="case" x="8" y="${y + g.caseY}" width="${g.caseW}" height="${g.caseH}" rx="12"/>
@@ -450,7 +457,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
     if (key !== this._layoutKey) {
       this._layoutKey = key;
       const opt = options(this._config);
-      const { svg, rows } = this._build(GEOMETRY[opt.layout]);
+      const { svg, rows } = this._build(GEOMETRY[opt.layout], opt.interactive);
       this._layoutRows = rows;
       const t = this._t;
       const title = this._config.title ? `<div class="title">${esc(this._config.title)}</div>` : "<div></div>";
@@ -473,9 +480,10 @@ class HydronicHeatingFlowCard extends HTMLElement {
       const texts = columns.length
         ? `<div class="texts${columns.length === 1 ? " single" : ""}">${columns.join("")}</div>`
         : "";
+      const tap = opt.tapAction ? ` tappable" tabindex="0" role="button` : "";
       this.shadowRoot.innerHTML = `
         <style>${STYLE}</style>
-        <ha-card class="${opt.layout}" style="--hh-hot: var(--deep-orange-color, #ff6f22);
+        <ha-card class="${opt.layout}${tap}" style="--hh-hot: var(--deep-orange-color, #ff6f22);
           --hh-cold: var(--blue-color, #2196f3); --hh-open: var(--cyan-color, #00bcd4);
           --hh-moving: var(--amber-color, #ffc107); --hh-idle: var(--grey-color, #9e9e9e);">
           ${head}
@@ -483,42 +491,53 @@ class HydronicHeatingFlowCard extends HTMLElement {
           ${phases}
           ${texts}
         </ha-card>`;
-      this._bind();
+      this._bind(opt);
     }
     this._update();
   }
 
-  _bind() {
+  _bind(opt) {
     const root = this.shadowRoot;
+    // A tapped part does not also run the action of the card.
+    const press = (el, run) => {
+      el?.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        run();
+      });
+      el?.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        ev.stopPropagation();
+        ev.preventDefault();
+        run();
+      });
+    };
+    if (opt.tapAction) {
+      // A standard action of Home Assistant (navigate, more-info…), FR-UI-25.
+      const config = { tap_action: opt.tapAction };
+      press(root.querySelector("ha-card"), () =>
+        this.dispatchEvent(new CustomEvent("hass-action", {
+          detail: { config, action: "tap" }, bubbles: true, composed: true,
+        })),
+      );
+    }
+    if (!opt.interactive) return;
     const rooms = this._layoutRooms();
     root.querySelectorAll("[data-room]").forEach((el) => {
       const room = rooms[el.dataset.room];
-      const open = () => this._moreInfo(room?.climate);
-      el.addEventListener("click", open);
-      el.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" || ev.key === " ") open();
-      });
+      press(el, () => this._moreInfo(room?.climate));
     });
     root.querySelectorAll("[data-floor]").forEach((el) => {
       const row = (this._layoutRows || [])[el.dataset.floor];
       if (!row?.ventilation) return;
-      const toggle = () => {
+      press(el, () => {
         const on = this._state(row.ventilation)?.state === "on";
         this._hass.callService("switch", on ? "turn_off" : "turn_on", {
           entity_id: row.ventilation,
         });
-      };
-      el.addEventListener("click", toggle);
-      el.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter" || ev.key === " ") toggle();
       });
     });
-    const boiler = root.querySelector("[data-boiler]");
-    const openBoiler = () => this._moreInfo(this._config.reason || this._config.boiler);
-    boiler?.addEventListener("click", openBoiler);
-    boiler?.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") openBoiler();
-    });
+    press(root.querySelector("[data-boiler]"),
+      () => this._moreInfo(this._config.reason || this._config.boiler));
   }
 
   _layoutRooms() {
@@ -683,6 +702,8 @@ const FIELDS = {
   upcoming_max: "upcomingMax",
   show_phases: "phases",
   show_outdoor: "outdoor",
+  interactive: "interactive",
+  tap_action: "tapAction",
 };
 
 /*
@@ -740,12 +761,13 @@ class HydronicHeatingFlowCardEditor extends HTMLElement {
       {
         type: "grid",
         name: "",
-        schema: ["show_now", "show_upcoming", "show_phases", "show_outdoor"].map((name) => ({
+        schema: ["show_now", "show_upcoming", "show_phases", "show_outdoor", "interactive"].map((name) => ({
           name,
           selector: { boolean: {} },
         })),
       },
       { name: "upcoming_max", selector: { number: { min: 1, max: 8, mode: "box" } } },
+      { name: "tap_action", selector: { ui_action: { default_action: "none" } } },
     ];
   }
 
@@ -759,6 +781,9 @@ class HydronicHeatingFlowCardEditor extends HTMLElement {
       delete config[field];
       if (field === "title") {
         if (val) config.title = val;
+      } else if (field === "tap_action") {
+        // "Nothing" is the default of the card, so it is left out.
+        if (options({ tap_action: val }).tapAction) config.tap_action = val;
       } else if (FIELDS[field] && val != null && val !== "" && val !== options(config)[FIELDS[field]]) {
         config[field] = val;
       }
@@ -796,6 +821,8 @@ function options(config) {
     phases: flag(cfg.show_phases, true),
     outdoor: flag(cfg.show_outdoor, true),
     upcomingMax: Number.isInteger(max) && max > 0 ? max : undefined,
+    interactive: flag(cfg.interactive, true),
+    tapAction: cfg.tap_action?.action && cfg.tap_action.action !== "none" ? cfg.tap_action : undefined,
   };
 }
 

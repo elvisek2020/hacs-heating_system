@@ -72,7 +72,9 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 ## Jak řídí
 
 - **Místnost:** teplota z 1..n čidel (průměr, minimum, maximum, medián nebo první platné). Požadavek 0–100 % počítá algoritmus TPI nebo hystereze. Ventily jedou v PWM (perioda 30 min, synchronní začátek), s minimální dobou stavu kvůli pomalým hlavicím.
-- **Kotel:** zapne se, když vážený požadavek místností překročí práh (s hysterezí), nebo když volá dost místností. Nejdřív se zavřou ventily místností, které teplo nechtějí, a otevřou ty, které ho chtějí. Kotel startuje až po době přestavení, aby voda netekla tam, kde se netopí. Hlídá minimální dobu běhu, minimální pauzu a počet startů za hodinu. Po vypnutí drží ventily otevřené po dobu doběhu.
+- **Kotel:** zapne se, když vážený požadavek místností překročí práh (s hysterezí), nebo když volá dost místností. Nejdřív se zavřou ventily místností, které teplo nechtějí, a otevřou ty, které ho chtějí. Kotel startuje až po době přestavení, aby voda netekla tam, kde se netopí. Hlídá minimální dobu běhu, minimální pauzu a počet startů za hodinu.
+- **Minimální běh a doběh:** když teplo už nikdo nechce, ale kotel ještě musí běžet minimální dobu, a pak během doběhu čerpadla, zůstávají otevřené ventily místností, kam se při běhu topilo. Ostatní jsou zavřené. Když žádná taková místnost není (třeba se v ní mezitím začalo větrat), dobíhá voda jen obtokem u kotle. Teď, logbook i důvod kotle říkají, kam teplo jde: „Kotel je vypnutý, čerpadlo dobíhá do 22:59:34 do místností Kuchyně a Obývák.“
+- **Ruční topení** (tlačítka 30 až 180 min) otevře ventily všech místností bez ohledu na jejich požadavek (Konfigurovat → Manuální režim → Manuál otevírá ventily, výchozí Všechny místnosti). Platí to i pro minimální běh a doběh po ručním topení, také po předčasném Stop. Místnost s otevřeným oknem nebo větráním a vypnutá místnost zůstanou zavřené.
 - **Ventily v klidu:** když kotel stojí a nikdo nechce teplo, jdou všechny hlavice do klidové polohy (výchozí bez proudu, u NO hlavic otevřeno). Hlavice tak nehřejí a neberou proud zbytečně celé hodiny. Proud dostanou jen hlavice místností bez požadavku, a jen během běhu kotle a doběhu.
 - **Priority:** porucha > protimrazová ochrana > manuál > blokace okny > mimo topnou sezónu > zvolený režim (vypnuto, pryč, automaticky).
 - **Okna:** po zpoždění zavřou ventily místnosti. Při otevření oken ve více místnostech (globální práh) se zastaví kotel, kromě manuálu.
@@ -170,11 +172,15 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 Schéma jde dát i na hlavní dashboard, třeba vedle kamer. Entity a patra do karty vkládá služba `generate_dashboard`, proto kartu zkopírujte z pohledu Schéma:
 
 1. Na pohledu Schéma: Upravit dashboard → upravit kartu schématu → Zobrazit editor kódu, zkopírovat YAML.
-2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact`.
+2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact` a `interactive: false`, aby se na mobilu při posouvání omylem nespustilo větrání patra.
 
 ```yaml
 type: custom:hydronic-heating-flow-card
 layout: compact
+interactive: false
+tap_action:
+  action: navigate
+  navigation_path: /dashboard-topeni/schema
 boiler: binary_sensor.hh_boiler_command
 reason: sensor.hh_boiler_reason
 outdoor: sensor.hh_outdoor_temperature
@@ -196,6 +202,8 @@ floors:
 | `upcoming_max` | všechny | nejvýš tolik řádků v Pak |
 | `show_phases` | `true` | pruh fází (Klid, Ventily, Kotel topí, Doběh) se štítkem a odpočtem |
 | `show_outdoor` | `true` | venkovní teplota vpravo nahoře |
+| `interactive` | `true` | `false` = prvky nejdou klepnout: místnost neotevře termostat, kotel důvod a patro nepřepne větrání |
+| `tap_action` | nic | standardní akce Home Assistantu po klepnutí na kartu, například `navigate` na pohled Schéma. S `interactive: true` mají přednost prvky. |
 | `title` | bez nadpisu | nadpis karty |
 
 Volby jdou naklikat i ve vizuálním editoru karty, entity a patra editor nemění. Zkopírovaná karta se sama neaktualizuje: po změně místností nebo pater ji zkopírujte znovu z přegenerovaného pohledu Schéma.
@@ -225,10 +233,10 @@ Termoelektrické hlavice neříkají, jestli ventil opravdu otevřely. Čidlo te
 
 Ochrana kotle někdy drží kotel v chodu nebo ve stání i proti tomu, co zrovna chcete. Například po **Stop** kotel doběhne svou minimální dobu běhu. Proto integrace vždy ukazuje, proč je kotel v aktuálním stavu a kdy se to změní:
 
-- `sensor.hh_boiler_reason` říká důvod, třeba „Minimální doba běhu“, „Minimální pauza“, „Doběh“ nebo „Topí na požadavek“. Atribut `detail` obsahuje celou větu, například „Teplo už nikdo nechce, ale kotel musí běžet minimální dobu 10 min. Vypne se v 0:55:12.“ V atributu `rule` je nastavení, které za tím stojí.
+- `sensor.hh_boiler_reason` říká důvod, třeba „Minimální doba běhu“, „Minimální pauza“, „Doběh“ nebo „Topí na požadavek“. Atribut `detail` obsahuje celou větu, například „Teplo už nikdo nechce, ale kotel musí běžet minimální dobu 10 min. Vypne se v 0:55:12, teplo jde do všech místností.“ V atributu `rule` je nastavení, které za tím stojí.
 - `sensor.hh_boiler_hold_ends_at` ukazuje, kdy časové pravidlo skončí. Dashboard z něj dělá odpočet „za 4 minuty“.
 - **Logbook** (Aktivita) zapisuje každé zapnutí a vypnutí kotle s příčinou a každé odložení povelu s časem. Zapíše i výstup, který někdo přepnul ručně a integrace ho vrátila. Stejné věty jsou v logu Home Assistantu. Ve shadow režimu mají předponu `[Shadow]`, v demu `[Demo]`.
-- U ventilů ukazují atributy `reason` a `until` na `sensor.hh_<místnost>_valve_state`, proč je ventil otevřený nebo zavřený (PWM, okno, doběh kotle, protáčení…) a kdy se to změní.
+- U ventilů ukazují atributy `reason` a `until` na `sensor.hh_<místnost>_valve_state`, proč je ventil otevřený nebo zavřený (PWM, okno, minimální běh a doběh kotle, protáčení…) a kdy se to změní.
 
 Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastníkem výstupu je ona (ověření povelu). Ručně topit jde přes manuál, ne přepnutím výstupu.
 

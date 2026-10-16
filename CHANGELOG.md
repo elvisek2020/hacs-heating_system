@@ -5,6 +5,20 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.18.0 — 2026-10-16
+
+### 🐛 Opravy
+
+- **Ruční topení topí do všech místností až do konce doběhu.** Po ručním topení (i po předčasném Stop) zůstávají ventily všech místností otevřené i během minimálního běhu kotle a doběhu čerpadla. Dřív se po Stopu všechny zavřely a voda dobíhala jen obtokem u kotle. Místnost s otevřeným oknem nebo větráním a vypnutá místnost zůstávají zavřené.
+- **Minimální běh a doběh po normálním běhu** drží otevřené ventily místností, kam se topilo. Ostatní zůstávají zavřené.
+- **Texty doběhu podle skutečných ventilů.** Teď, logbook i důvod kotle říkají, kam teplo jde: „Kotel je vypnutý, čerpadlo dobíhá do 22:59:34 do místností Kuchyně a Obývák.“, „… do všech místností.“ nebo „… jen obtokem u kotle.“ Dřív psaly „ventily zůstávají otevřené“, i když byly zavřené. Ruční topení: „Ruční topení: topí se do všech místností do 23:21:00.“
+
+### ✨ Novinky
+
+- **Karta schématu bez klikání.** Volba `interactive: false` vypne klepnutí na místnosti, kotel a patra, takže se třeba na hlavním dashboardu omylem nespustí větrání patra. Volba `tap_action` přidá celé kartě standardní akci Home Assistantu, například `navigate` na pohled Schéma. Obojí jde nastavit i ve vizuálním editoru karty.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.17.0 — 2026-10-16
 
 ### ✨ Novinky

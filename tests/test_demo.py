@@ -86,10 +86,15 @@ async def test_virtual_outputs_never_touch_real_entities(
     assert hass.states.get("sensor.hh_state").state == "auto"
     assert entry.runtime_data.store.key.endswith(".demo")
 
-    # Real sensors drive the decision.
-    hass.states.async_set("sensor.obyvak", "24.0", {"unit_of_measurement": "°C"})
+    # A higher target makes the bedroom call for heat; its demo valve opens.
+    await hass.services.async_call(
+        "climate",
+        "set_temperature",
+        {"entity_id": "climate.hh_loznice", "temperature": 26},
+        blocking=True,
+    )
     await _run(hass, freezer, 6 * 60)
-    assert hass.states.get("switch.hh_obyvak_demo_valve_1").state == "on"
+    assert hass.states.get("switch.hh_loznice_demo_valve_1").state == "off"
     assert _real_states(hass) == before
 
 

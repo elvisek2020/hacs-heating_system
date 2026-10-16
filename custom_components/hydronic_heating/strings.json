@@ -855,6 +855,7 @@
               "min_state_hold": "Minimum state time",
               "exercise": "Valve exercise",
               "overrun": "Boiler overrun",
+              "min_run": "Minimum boiler run",
               "min_flow": "Minimum flow",
               "preheat": "Preheating"
             }

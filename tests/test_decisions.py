@@ -39,7 +39,11 @@ def _reason(hass: HomeAssistant) -> Any:
 async def test_manual_then_stop_shows_min_on_hold(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    """The case from the to-do list: manual 30 min, stop after 16 s, warm rooms."""
+    """The case from the to-do list: manual 30 min, stop after 16 s, warm rooms.
+
+    The heat of the minimum run and of the overrun after manual heating goes to
+    all rooms, although no room wants heat (FR-MAN-06, FR-BOI-09).
+    """
     freezer.move_to("2026-01-15 11:00:00+00:00")
     entry = await _setup(hass, **LIVE)
     hass.states.async_set("sensor.obyvak", "25.0", CELSIUS)
@@ -55,7 +59,7 @@ async def test_manual_then_stop_shows_min_on_hold(
     assert hass.states.get("input_boolean.kotel").state == "on"
     assert _reason(hass).state == "firing_manual"
     assert [e.data["kind"] for e in events] == ["boiler_on"]
-    assert events[0].data["message"].startswith("Boiler on: manual heating until ")
+    assert events[0].data["message"].startswith("Boiler on: manual heating to all rooms until ")
     assert events[0].data["entity_id"] == "sensor.hh_boiler_reason"
 
     freezer.tick(timedelta(seconds=16))
@@ -81,8 +85,14 @@ async def test_manual_then_stop_shows_min_on_hold(
     assert hold_event["reason"] == "min_on_hold"
     assert hold_event["until"] == ends.isoformat()
     assert hold_event["message"] == (
-        f"Stop: the boiler runs until {clock} because of its minimum run time of 10 min."
+        f"Stop: the boiler runs until {clock} because of its minimum run time of 10 min, "
+        "the heat goes to all rooms."
     )
+    for room in ("obyvak", "loznice"):
+        valve = hass.states.get(f"sensor.hh_{room}_valve_state")
+        assert valve.attributes["reason"] == "min_run"
+        assert valve.attributes["until"] == ends.isoformat()
+    assert reason.attributes["detail"].endswith("the heat goes to all rooms.")
 
     await _wait(hass, freezer, 600)
     assert hass.states.get("input_boolean.kotel").state == "off"
@@ -91,8 +101,13 @@ async def test_manual_then_stop_shows_min_on_hold(
     assert len(off) == 1
     assert off[0]["cause"] == "min_on_done"
     assert off[0]["message"].startswith(
-        "Boiler off: the minimum run time is over and nobody needs heat."
+        "Boiler off: the minimum run time is over and nobody needs heat. The pump runs on until "
     )
+    assert off[0]["message"].endswith(" to all rooms.")
+    assert _reason(hass).attributes["detail"].endswith(" to all rooms.")
+    for room in ("obyvak", "loznice"):
+        valve = hass.states.get(f"sensor.hh_{room}_valve_state")
+        assert valve.attributes["reason"] == "overrun"
 
     await _wait(hass, freezer, 180)
     assert _reason(hass).state == "idle"

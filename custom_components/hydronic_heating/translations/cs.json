@@ -855,6 +855,7 @@
               "min_state_hold": "Minimální doba stavu",
               "exercise": "Protáčení ventilu",
               "overrun": "Doběh kotle",
+              "min_run": "Minimální běh kotle",
               "min_flow": "Minimální průtok",
               "preheat": "Předtápění"
             }

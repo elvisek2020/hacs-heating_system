@@ -103,6 +103,12 @@ class HydronicController:
         self.last_revert: dict[str, Any] | None = None
         self._stop_immediate = False
         self._closing_until: datetime | None = None
+        # FR-BOI-09: where the heat of the current run goes, for its minimum run and
+        # overrun. Rooms that wanted heat at the last step heat was wanted, or all
+        # rooms of a manual run (FR-MAN-06).
+        self._wants_heat = False
+        self._run_manual = False
+        self._run_rooms: set[str] = set()
         self._heartbeat_at: datetime | None = None
         self._circulation_until: datetime | None = None
 
@@ -331,6 +337,8 @@ class HydronicController:
                 valves_ready=valves_ready,
             )
         self._stop_immediate = False
+        self._wants_heat = self.heat_request and not blocked
+        self._update_run(manual=manual)
 
         self.valve_desired = self._plan_valves(now, manual=manual, heating_allowed=heating_allowed)
         boiler_on = self.sequencer.boiler_on and not self.fault_safe
@@ -694,14 +702,7 @@ class HydronicController:
             status[entity_id] = ValveStatus(
                 ValveReason.EXERCISE, self.exercise.active.get(entity_id)
             )
-        if self.sequencer.phase is BoilerPhase.OVERRUN:
-            overrun_ends = self.sequencer.overrun_since + timedelta(  # type: ignore[operator]
-                seconds=cfg.boiler_overrun_s
-            )
-            for entity_id in self.sequencer.overrun_valves:
-                if entity_id in plan and not plan[entity_id]:
-                    plan[entity_id] = True
-                    status[entity_id] = ValveStatus(ValveReason.OVERRUN, overrun_ends)
+        self._apply_run_tail(plan, status)
         if not cfg.has_bypass and self.sequencer.phase is not BoilerPhase.IDLE:
             before = {entity_id for entity_id, want in plan.items() if want}
             self._keep_min_open(now, plan)
@@ -712,6 +713,87 @@ class HydronicController:
             status = {entity_id: ValveStatus(ValveReason.STARTUP) for entity_id in plan}
         self.valve_status = status
         return plan
+
+    def _update_run(self, *, manual: bool) -> None:
+        """Remember where the heat of this run goes while heat is wanted (FR-BOI-09)."""
+        seq = self.sequencer
+        if seq.phase is BoilerPhase.IDLE:
+            self._run_manual = False
+            self._run_rooms = set()
+        elif seq.phase is BoilerPhase.FIRING and self._wants_heat:
+            self._run_manual = manual
+            self._run_rooms = {
+                room_id
+                for room_id, room in self.rooms.items()
+                if room.demand > 0 or room.frost_active
+            }
+
+    def _tail_rooms(self) -> set[str]:
+        """Rooms whose valves stay open in the minimum run and the overrun (FR-BOI-09).
+
+        After manual heating all rooms (FR-MAN-06, by `manual_scope`), else the rooms
+        that wanted heat at the end of the run. Without that knowledge (restart in
+        the overrun) the rooms whose valves were open when the boiler stopped.
+        """
+        if self._run_manual and self.cfg.manual_scope == "all_rooms":
+            return set(self.rooms)
+        if self._run_rooms or self._run_manual:
+            return set(self._run_rooms)
+        open_at_stop = self.sequencer.overrun_valves
+        return {
+            room_id
+            for room_id, room in self.rooms.items()
+            if any(valve.entity_id in open_at_stop for valve in room.cfg.valves)
+        }
+
+    def _tail_phase(self) -> tuple[ValveReason, datetime | None] | None:
+        """Return the minimum run without heat wanted or the overrun, else None."""
+        seq = self.sequencer
+        if self.fault_safe:
+            return None
+        if seq.phase is BoilerPhase.FIRING and not self._wants_heat:
+            return ValveReason.MIN_RUN, seq.min_on_until(self.cfg)
+        if seq.phase is BoilerPhase.OVERRUN and seq.overrun_since is not None:
+            return ValveReason.OVERRUN, seq.overrun_since + timedelta(
+                seconds=self.cfg.boiler_overrun_s
+            )
+        return None
+
+    def _apply_run_tail(self, plan: dict[str, bool], status: dict[str, ValveStatus]) -> None:
+        """Keep the valves of the run open while the boiler runs out (FR-BOI-09).
+
+        The heat of the minimum run and of the overrun goes where the run heated:
+        after manual heating to all rooms, else to the rooms that wanted heat. Rooms
+        with an open window or airing and rooms switched off stay closed.
+        """
+        tail = self._tail_phase()
+        if tail is None:
+            return
+        reason, until = tail
+        rooms = self._tail_rooms()
+        for room_id, room in self.rooms.items():
+            if room_id not in rooms or room.window_open or room.hvac_mode is RoomHvacMode.OFF:
+                continue
+            for valve in room.cfg.valves:
+                if valve.entity_id in plan and not plan[valve.entity_id]:
+                    plan[valve.entity_id] = True
+                    status[valve.entity_id] = ValveStatus(reason, until)
+
+    def heated_rooms(self) -> list[str]:
+        """Names of the rooms with an open valve by the plan, in room order."""
+        return [
+            room.cfg.name
+            for room in self.rooms.values()
+            if any(self.valve_desired.get(valve.entity_id) for valve in room.cfg.valves)
+        ]
+
+    def _flow_params(self) -> dict[str, Any]:
+        """Where the water of the boiler goes, for the texts (FR-BOI-09)."""
+        heated = self.heated_rooms()
+        return {
+            "heated": tuple(heated),
+            "heated_all": len(self.rooms) > 1 and len(heated) == len(self.rooms),
+        }
 
     def _room_wants_heat(self, room: RoomController, now: datetime, *, manual: bool) -> bool:
         """Whether the room's valves stay open once the boiler runs (without hold times)."""
@@ -871,7 +953,7 @@ class HydronicController:
                     BoilerReason.MIN_ON_HOLD,
                     seq.min_on_until(cfg),
                     f"boiler_min_on = {minutes} min",
-                    {"minutes": minutes},
+                    {"minutes": minutes, **self._flow_params()},
                 )
             params: dict[str, Any] = {
                 "rooms": self.arbitration.calling,
@@ -880,6 +962,7 @@ class HydronicController:
             if manual:
                 reason = BoilerReason.FIRING_MANUAL
                 params["manual_until"] = self.modes.manual_ends_at
+                params.update(self._flow_params())
             elif frost:
                 reason = BoilerReason.FIRING_FROST
             else:
@@ -900,7 +983,11 @@ class HydronicController:
                 BoilerReason.OVERRUN,
                 until,
                 f"boiler_overrun = {cfg.boiler_overrun_s:.0f} s",
-                {"seconds": round(cfg.boiler_overrun_s), "valves": len(seq.overrun_valves)},
+                {
+                    "seconds": round(cfg.boiler_overrun_s),
+                    "valves": len(seq.overrun_valves),
+                    **self._flow_params(),
+                },
             )
         if mode is SystemMode.OFF:
             return BoilerStatus(BoilerReason.OFF)

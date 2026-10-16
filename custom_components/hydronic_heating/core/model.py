@@ -139,6 +139,7 @@ class ValveReason(StrEnum):
     PREHEAT = "preheat"
     EXERCISE = "exercise"
     OVERRUN = "overrun"
+    MIN_RUN = "min_run"
     MIN_FLOW = "min_flow"
 
 
