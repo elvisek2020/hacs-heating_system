@@ -375,6 +375,9 @@ def test_room_off_closes_valve_but_keeps_frost() -> None:
     assert house.state("switch.hlavice_obyvak") == "on"  # closed while b heats
     house.temp("obyvak", 4.0)
     house.run(30)
+    # A single sample is no frost yet (FR-FROST-03); the next one confirms it.
+    assert not ctrl.rooms["id_obyvak"].frost_active
+    house.run(30)
     assert house.state("switch.hlavice_obyvak") == "off"  # open for frost
 
 

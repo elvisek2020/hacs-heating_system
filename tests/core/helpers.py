@@ -46,8 +46,10 @@ def room(slug: str, **overrides: Any) -> RoomConfig:
         c.CONF_ROOM_NAME: slug.capitalize(),
         c.CONF_SENSORS: [f"sensor.{slug}"],
         c.CONF_VALVES: [valve(f"switch.hlavice_{slug}")],
-        # Tests change temperatures in jumps; airing detection only where tested.
+        # Tests change temperatures in jumps; airing detection and the jump filter
+        # (FR-ROOM-08) only where tested.
         c.CONF_VENT_DETECT: False,
+        c.CONF_SENSOR_SPIKE: 0,
         **overrides,
     }
     return RoomConfig.from_data(f"id_{slug}", slug, data)

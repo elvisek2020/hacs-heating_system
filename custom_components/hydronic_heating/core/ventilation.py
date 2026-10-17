@@ -5,6 +5,8 @@ at least `drop_k` within `window_s`. The room then behaves as with an open
 window for at least `hold_s`, afterwards until the temperature rises again, at
 most for `max_s`. A change of the temperature sources (a sensor fails, another
 one takes over) restarts the history, so a jump between sensors is no airing.
+After a jump of a sensor (FR-ROOM-08) detection waits one window: the offset of
+a reconnected Matter sensor settles back like a fast drop.
 """
 
 from __future__ import annotations
@@ -45,6 +47,7 @@ class VentDetector:
         window_s: float,
         hold_s: float,
         max_s: float,
+        settling: bool = False,
     ) -> str | None:
         """Follow the temperature; return `started` or `ended` on a change."""
         if not enabled:
@@ -57,6 +60,11 @@ class VentDetector:
             self._pending_since = None
         if self.active:
             return self._follow(now, temperature, hold_s, max_s)
+        if settling:
+            # A sensor just jumped; its way back is no airing.
+            self.samples = []
+            self._pending_since = None
+            return None
         if temperature is None:
             return None
         cutoff = now - timedelta(seconds=window_s)

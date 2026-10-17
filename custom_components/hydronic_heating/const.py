@@ -186,6 +186,8 @@ CONF_SENSOR_MAX: Final = "sensor_max"
 CONF_SENSOR_STALE_TIMEOUT: Final = "sensor_stale_timeout"
 # A sensor that drops out keeps its last value this long (FR-ROOM-07).
 CONF_SENSOR_GRACE: Final = "sensor_grace"
+# A jump of a sensor above this (K) counts only once confirmed (FR-ROOM-08), 0 = off.
+CONF_SENSOR_SPIKE: Final = "sensor_spike"
 CONF_SENSOR_FALLBACK: Final = "sensor_fallback"
 CONF_FALLBACK_HOLD: Final = "fallback_hold"
 CONF_FALLBACK_DEMAND: Final = "fallback_demand"
@@ -319,6 +321,7 @@ DEFAULT_ROOM: Final[dict[str, Any]] = {
     CONF_SENSOR_MAX: 50,
     CONF_SENSOR_STALE_TIMEOUT: 120,
     CONF_SENSOR_GRACE: 5,
+    CONF_SENSOR_SPIKE: 3,
     CONF_SENSOR_FALLBACK: "last_known",
     CONF_FALLBACK_HOLD: 60,
     CONF_FALLBACK_DEMAND: 30,

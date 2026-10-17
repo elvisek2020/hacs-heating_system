@@ -34,6 +34,10 @@ from .valve import ValveState, pwm_open
 from .ventilation import VentDetector
 
 FROST_HYSTERESIS_K = 2.0
+# FR-FROST-03: frost protection starts after two samples below frost_temp or this time.
+FROST_CONFIRM_S = 60
+# FR-ROOM-08: a jump of a sensor counts once another sample confirms it or after this.
+SPIKE_CONFIRM_S = 60
 # After airing by hand the cooled room is not taken for a new airing (FR-WIN-07).
 VENT_QUIET_S = 10 * 60
 NOT_REACHED_DEFICIT_K = 1.5
@@ -132,6 +136,15 @@ class WindowMachine:
         )
 
 
+@dataclass(slots=True)
+class _Spike:
+    """A jump of one sensor waiting for its confirmation (FR-ROOM-08)."""
+
+    value: float
+    reported: datetime | None
+    since: datetime
+
+
 class RoomController:
     """State and decisions of one room."""
 
@@ -153,6 +166,15 @@ class RoomController:
         self.held_sources: tuple[str, ...] = ()
         self._sensor_last: dict[str, EntityReading] = {}
         self._sensor_down: dict[str, datetime] = {}
+        # FR-ROOM-08: sensors whose jump waits for a confirmation, and until when
+        # airing detection waits for a jumped sensor to settle (FR-WIN-06).
+        self.filtered_sources: tuple[str, ...] = ()
+        self._spikes: dict[str, _Spike] = {}
+        self.settle_until: datetime | None = None
+        # Time of the newest sample behind the temperature; FR-FROST-03 counts samples.
+        self.sample_at: datetime | None = None
+        self._frost_below: datetime | None = None
+        self._frost_samples: set[datetime] = set()
         self.sensor_failure = False
         self.sensor_failure_since: datetime | None = None
         self.fallback_active = False
@@ -300,34 +322,81 @@ class RoomController:
     def _held_readings(self, snap: Snapshot) -> dict[str, EntityReading]:
         """Return the readings where a sensor that just dropped out keeps its last value.
 
-        A short drop-out (a Thread sensor for 16 s) must not switch the room to a
-        backup sensor with another offset. The held value keeps the time of its last
-        report, so the stale timeout still applies.
+        A short drop-out (a Thread sensor for 16 s) or a value out of the valid range
+        must not switch the room to a backup sensor with another offset. The held
+        value keeps the time of its last report, so the stale timeout still applies.
+        A jump of a sensor waits for its confirmation (FR-ROOM-08).
         """
         cfg = self.cfg
         now = snap.now
         readings = dict(snap.entities)
         held: list[str] = []
+        filtered: list[str] = []
         for entity_id in cfg.sensors:
             reading = readings.get(entity_id)
-            if reading is not None and reading.available and reading.value is not None:
+            if reading is not None and is_valid(
+                reading, now, cfg.sensor_min, cfg.sensor_max, cfg.stale_timeout_s
+            ):
                 self._sensor_down.pop(entity_id, None)
-                if is_valid(reading, now, cfg.sensor_min, cfg.sensor_max, cfg.stale_timeout_s):
+                use = self._spike_gate(entity_id, reading, now)
+                if use is reading:
                     self._sensor_last[entity_id] = reading
+                else:
+                    readings[entity_id] = use
+                    filtered.append(entity_id)
                 continue
+            self._spikes.pop(entity_id, None)
             down = self._sensor_down.setdefault(entity_id, now)
             last = self._sensor_last.get(entity_id)
             if last is not None and (now - down).total_seconds() < cfg.sensor_grace_s:
                 readings[entity_id] = last
                 held.append(entity_id)
         self.held_sources = tuple(held)
+        self.filtered_sources = tuple(filtered)
         return readings
+
+    def _spike_gate(self, entity_id: str, reading: EntityReading, now: datetime) -> EntityReading:
+        """Return the reading to use; a jump waits for its confirmation (FR-ROOM-08).
+
+        A Matter sensor sends 0.0 or a value with an offset after a reconnect. A
+        value further than `sensor_spike` from the last accepted one counts once
+        another sample close to it confirms it, or after SPIKE_CONFIRM_S; until then
+        the last accepted reading stays. Either way airing detection waits one
+        window, the offset of a jumped sensor settles back like a fast drop.
+        """
+        limit = self.cfg.sensor_spike_k
+        last = self._sensor_last.get(entity_id)
+        value = reading.value
+        if (
+            limit <= 0
+            or value is None
+            or last is None
+            or last.value is None
+            or abs(value - last.value) <= limit
+        ):
+            self._spikes.pop(entity_id, None)
+            return reading
+        self.settle_until = now + timedelta(seconds=self.cfg.vent_window_s)
+        spike = self._spikes.get(entity_id)
+        if spike is not None and abs(value - spike.value) <= limit:
+            newer = (
+                reading.last_reported is not None
+                and spike.reported is not None
+                and reading.last_reported > spike.reported
+            )
+            if newer or (now - spike.since).total_seconds() >= SPIKE_CONFIRM_S:
+                del self._spikes[entity_id]
+                return reading
+            return last
+        self._spikes[entity_id] = _Spike(value, reading.last_reported, now)
+        return last
 
     def _read_temperature(self, snap: Snapshot) -> None:
         cfg = self.cfg
+        readings = self._held_readings(snap)
         agg = aggregate(
             cfg.sensors,
-            self._held_readings(snap),
+            readings,
             snap.now,
             method=cfg.aggregation,
             minimum=cfg.sensor_min,
@@ -336,6 +405,12 @@ class RoomController:
         )
         self.valid_sources, self.invalid_sources = agg.valid, agg.invalid
         self.held_sources = tuple(s for s in self.held_sources if s in agg.valid)
+        reported = [
+            reading.last_reported
+            for entity_id in agg.valid
+            if (reading := readings.get(entity_id)) is not None and reading.last_reported
+        ]
+        self.sample_at = max(reported, default=None)
         if agg.value is not None:
             self.temperature = agg.value
             self.last_valid_temp, self.last_valid_at = agg.value, snap.now
@@ -495,6 +570,7 @@ class RoomController:
         # during airing by hand, nor shortly after it while the room warms up again.
         cfg = self.cfg
         quiet = self.vent_quiet_until is not None and ctx.now < self.vent_quiet_until
+        settling = self.settle_until is not None and ctx.now < self.settle_until
         self.vent_event = self.vent.update(
             ctx.now,
             None if self.sensor_failure else self.temperature,
@@ -508,6 +584,7 @@ class RoomController:
             window_s=cfg.vent_window_s,
             hold_s=cfg.vent_hold_s,
             max_s=cfg.vent_max_s,
+            settling=settling,
         )
         base = self.target_temp(ctx)
         self._update_preheat(ctx, base)
@@ -562,15 +639,31 @@ class RoomController:
             return TargetReason.SCHEDULE_COMFORT, self.schedule_next
         return TargetReason.COMFORT, None
 
+    def _confirm_frost(self, now: datetime) -> None:
+        """Start frost protection after two samples below or a while (FR-FROST-03).
+
+        A single wrong sample (a sensor sends 0.0 after a reconnect) is no frost.
+        """
+        self._frost_below = self._frost_below or now
+        self._frost_samples.add(self.sample_at or now)
+        if (
+            len(self._frost_samples) >= 2
+            or (now - self._frost_below).total_seconds() >= FROST_CONFIRM_S
+        ):
+            self.frost_active = True
+
     def _compute_demand(self, ctx: RoomContext) -> float:
         cfg = self.cfg
         t = self.temperature
         # 1) Frost protection first, it overrides windows and modes (FR-FROST-01).
         if t is not None:
             if t < cfg.frost_temp:
-                self.frost_active = True
-            elif t > cfg.frost_temp + FROST_HYSTERESIS_K:
-                self.frost_active = False
+                self._confirm_frost(ctx.now)
+            else:
+                self._frost_below = None
+                self._frost_samples = set()
+                if t > cfg.frost_temp + FROST_HYSTERESIS_K:
+                    self.frost_active = False
         if self.frost_active:
             return 100.0
         # 2) No heating into an open window, not even on sensor failure.

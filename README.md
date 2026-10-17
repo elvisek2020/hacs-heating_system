@@ -72,6 +72,10 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 ## Jak řídí
 
 - **Místnost:** teplota z 1..n čidel (průměr, minimum, maximum, medián nebo první platné). Požadavek 0–100 % počítá algoritmus TPI nebo hystereze. Ventily jedou v PWM (perioda 30 min, synchronní začátek), s minimální dobou stavu kvůli pomalým hlavicím.
+- **Chybné hodnoty čidel** (nastavení místnosti, krok Teplotní čidla):
+  - Krátký výpadek čidla nebo hodnota mimo platný rozsah: 5 min se počítá s poslední platnou hodnotou (atribut `held_sources`), pak teprve s dalšími čidly.
+  - Skok o víc než 3 K (Skok hodnoty čidla, 0 = vypnuto) se použije až po potvrzení dalším blízkým vzorkem nebo po 1 min (atribut `filtered_sources`). Odfiltruje 0,0 nebo hodnotu s posunem, kterou pošlou čidla Matter/Thread po obnovení spojení.
+  - Po skoku čeká detekce větrání jedno okno (5 min), aby návrat čidla z posunu nevypadal jako větrání.
 - **Kotel:** zapne se, když vážený požadavek místností překročí práh (s hysterezí), nebo když volá dost místností. Nejdřív se zavřou ventily místností, které teplo nechtějí, a otevřou ty, které ho chtějí. Kotel startuje až po době přestavení, aby voda netekla tam, kde se netopí. Hlídá minimální dobu běhu, minimální pauzu a počet startů za hodinu.
 - **Minimální běh a doběh:** když teplo už nikdo nechce, ale kotel ještě musí běžet minimální dobu, a pak během doběhu čerpadla, zůstávají otevřené ventily místností, kam se při běhu topilo. Ostatní jsou zavřené. Když žádná taková místnost není (třeba se v ní mezitím začalo větrat), dobíhá voda jen obtokem u kotle. Teď, logbook i důvod kotle říkají, kam teplo jde: „Kotel je vypnutý, čerpadlo dobíhá do 22:59:34 do místností Kuchyně a Obývák.“
 - **Ruční topení** (tlačítka 30 až 180 min) otevře ventily všech místností bez ohledu na jejich požadavek (Konfigurovat → Manuální režim → Manuál otevírá ventily, výchozí Všechny místnosti). Platí to i pro minimální běh a doběh po ručním topení, také po předčasném Stop. Místnost s otevřeným oknem nebo větráním a vypnutá místnost zůstanou zavřené.
@@ -88,7 +92,7 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
   - Topí zase nejdřív po 20 min, až teplota začne stoupat, nejpozději po 45 min.
   - Do blokace celého kotle se větrání nepočítá.
   - Nastavení je v místnosti, krok Okna. Začátek i konec se zapíšou do deníku.
-- **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a mimo topnou sezónu. Tuto ochranu nejde vypnout.
+- **Mráz:** místnost pod protimrazovou teplotou topí vždy, i při otevřeném okně a mimo topnou sezónu. Tuto ochranu nejde vypnout. Spustí se až po dvou vzorcích pod hranicí nebo po 1 min, jeden chybný vzorek ji nezapne.
 - **Topná sezóna:**
   - Řídí se průměrem venkovní teploty za poslední 4 hodiny (`sensor.hh_outdoor_mean_4h`), ne denním průměrem, který by schoval studené večery po slunečném dni.
   - Začne hned, jakmile 4h průměr klesne pod hranici (výchozí 13 °C, Konfigurovat → Ekviterm → Hranice topné sezóny).

@@ -412,13 +412,15 @@
             "sensor_max": "Nejvyšší platná hodnota",
             "sensor_stale_timeout": "Hodnota je zastaralá po",
             "sensor_grace": "Krátký výpadek čidla: držet hodnotu",
+            "sensor_spike": "Skok hodnoty čidla: potvrdit nad",
             "sensor_fallback": "Při výpadku všech čidel",
             "fallback_hold": "Držet poslední hodnotu",
             "fallback_demand": "Pevný požadavek"
           },
           "data_description": {
             "sensor_stale_timeout": "Loxone posílá hodnoty jen při změně, proto ponechte delší. 0 = nekontrolovat.",
-            "sensor_grace": "Když čidlo přestane hlásit (nedostupné), počítá se ještě tuto dobu s jeho poslední hodnotou a teprve potom s dalšími čidly. Krátký výpadek tak nepřepne na záložní čidlo s jiným posunem. 0 = vypnuto."
+            "sensor_grace": "Když čidlo přestane hlásit (nedostupné) nebo pošle hodnotu mimo platný rozsah, počítá se ještě tuto dobu s jeho poslední hodnotou a teprve potom s dalšími čidly. Krátký výpadek tak nepřepne na záložní čidlo s jiným posunem. 0 = vypnuto.",
+            "sensor_spike": "Hodnota, která se od poslední platné liší víc než o tolik, se použije až po potvrzení dalším blízkým vzorkem nebo po 1 min. Do té doby platí poslední platná hodnota a detekce větrání počká. Odfiltruje 0,0 nebo hodnotu s posunem po obnovení spojení čidla (Matter, Thread). 0 = vypnuto."
           }
         },
         "valves": {

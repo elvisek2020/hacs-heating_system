@@ -5,6 +5,20 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.19.0 — 2026-10-17
+
+### ✨ Novinky
+
+- **Filtr skoků čidla.** Čidla Matter/Thread po obnovení spojení pošlou 0,0 nebo hodnotu s posunem kolem +3 K, která se pak několik minut vrací. Hodnota, která se od poslední platné liší o víc než 3 K, se teď použije až po potvrzení dalším blízkým vzorkem nebo po 1 min. Do té doby platí poslední platná hodnota (atribut termostatu `filtered_sources`). Nastavení místnosti, krok Teplotní čidla: **Skok hodnoty čidla: potvrdit nad** (0 = vypnuto).
+- Po skoku čidla detekce větrání 5 min počká, aby návrat čidla z posunu nevypadal jako větrání. Skutečné větrání se pozná dál.
+
+### 🐛 Opravy
+
+- **Protimrazová ochrana z jednoho chybného vzorku.** Spustí se až po dvou vzorcích pod hranicí nebo po 1 min. Hodnota 0,0 z čidla po obnovení spojení už nespustí start kotle.
+- **Hodnota mimo platný rozsah** (Nejnižší / Nejvyšší platná hodnota) se drží jako krátký výpadek čidla: 5 min platí poslední platná hodnota. Dřív místnost hned přešla na záložní čidlo s jiným posunem.
+
+Po aktualizaci restartuj Home Assistant. Filtr skoků je zapnutý ve všech místnostech (3 K).
+
 ## v0.18.0 — 2026-10-16
 
 ### 🐛 Opravy
