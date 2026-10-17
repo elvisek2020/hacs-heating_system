@@ -122,18 +122,7 @@ class HydronicController:
         for room_cfg in rooms:
             room = RoomController(room_cfg)
             if previous := old.get(room_cfg.room_id):
-                room.restore(previous.to_dict())
-                room.frost_active = previous.frost_active
-                room.calling = previous.calling
-                room.window = previous.window
-                room.vent = previous.vent
-                room.vent_quiet_until = previous.vent_quiet_until
-                room.valve_open_cmd = previous.valve_open_cmd
-                room.valve_switched_at = previous.valve_switched_at
-                room.valve_forced = previous.valve_forced
-                room.heating_since = previous.heating_since
-                room.preheat_until = previous.preheat_until
-                room.preheat_source = previous.preheat_source
+                room.carry_over(previous)
             self.rooms[room_cfg.room_id] = room
         if system.shadow_mode:
             self.tracker.reset()

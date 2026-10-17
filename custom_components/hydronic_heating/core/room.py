@@ -217,6 +217,37 @@ class RoomController:
         self.heating_since: datetime | None = None
         self.not_reached = False
 
+    def carry_over(self, previous: RoomController) -> None:
+        """Keep the runtime state of the room across a change of its settings (NFR-13).
+
+        The reason of the target stays too: a fresh default would look like a change
+        and log the schedule or presence of the room again. The state of the sensor
+        filter stays, so a change of settings does not let a jump through.
+        """
+        self.restore(previous.to_dict())
+        for name in (
+            "frost_active",
+            "calling",
+            "window",
+            "vent",
+            "vent_quiet_until",
+            "valve_open_cmd",
+            "valve_switched_at",
+            "valve_forced",
+            "heating_since",
+            "preheat_until",
+            "preheat_source",
+            "target_reason",
+            "target_until",
+            "settle_until",
+            "_sensor_last",
+            "_sensor_down",
+            "_spikes",
+            "_frost_below",
+            "_frost_samples",
+        ):
+            setattr(self, name, getattr(previous, name))
+
     # --- User actions (FR-MODE-02) ----------------------------------------
 
     def set_hvac_mode(self, mode: RoomHvacMode, now: datetime) -> None:

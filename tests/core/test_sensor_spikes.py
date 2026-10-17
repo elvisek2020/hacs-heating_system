@@ -156,3 +156,20 @@ def test_a_value_out_of_range_keeps_the_last_one() -> None:
     study = ctrl.rooms["id_pracovna"]
     assert study.temperature == 20.23
     assert study.held_sources == ("sensor.pracovna",)
+
+
+def test_a_change_of_settings_keeps_a_waiting_jump() -> None:
+    """A jump waiting for its confirmation stays held back across a change of settings."""
+    house = _warm_up("pracovna", 20.23)
+    ctrl = house.ctrl
+    house.fresh_sensors = False
+    house.now += timedelta(seconds=10)
+    house.temp("pracovna", 0.0)
+    house.step()
+    ctrl.reconfigure(ctrl.cfg, [r.cfg for r in ctrl.rooms.values()])
+    house.now += timedelta(seconds=1)
+    house.step()
+    study = ctrl.rooms["id_pracovna"]
+    assert study.temperature == 20.23
+    assert study.filtered_sources == ("sensor.pracovna",)
+    assert study.settle_until is not None

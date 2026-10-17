@@ -339,3 +339,19 @@ def test_room_with_own_presence_uses_its_own_return() -> None:
     assert pracovna.target_until is None
     assert not pracovna.preheating
     assert pracovna.preheat_planned is None
+
+
+def test_changed_settings_do_not_log_the_schedule_again() -> None:
+    """17. 10. 8:13: saving the rooms logged "comfort by schedule" six times (NFR-13)."""
+    ctrl = controller(
+        room("obyvak"), room("pracovna"), **{c.CONF_HOUSE_SCHEDULE_ENTITY: "schedule.dum"}
+    )
+    house = House(ctrl, temperatures={"obyvak": 21.0, "pracovna": 21.0})
+    house.set("schedule.dum", "on", next_event=(T0 + timedelta(hours=8)).isoformat())
+    house.run(60)
+    assert ctrl.rooms["id_pracovna"].target_reason is TargetReason.SCHEDULE_COMFORT
+    for _ in range(6):
+        ctrl.reconfigure(ctrl.cfg, [r.cfg for r in ctrl.rooms.values()])
+        house.step()
+        assert not [d for d in ctrl.decisions if d.kind == "room_target"]
+    assert ctrl.rooms["id_pracovna"].target_reason is TargetReason.SCHEDULE_COMFORT

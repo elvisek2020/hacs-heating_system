@@ -5,6 +5,13 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.19.1 — 2026-10-17
+
+### 🐛 Opravy
+
+- **Logbook při změně nastavení.** Uložení nastavení místnosti nebo změna Komfort/ECO už do logbooku znovu nezapíše „komfort podle rozvrhu“ u každé místnosti, která jede podle rozvrhu nebo přítomnosti. Místnost si přes změnu nastavení drží důvod svého cíle.
+- Skok čidla, který čeká na potvrzení, zůstane zadržený i přes změnu nastavení.
+
 ## v0.19.0 — 2026-10-17
 
 ### ✨ Novinky
