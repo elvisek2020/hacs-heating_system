@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.components.lovelace.const import LOVELACE_DATA
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
     area_registry as ar,
@@ -11,8 +13,15 @@ from homeassistant.helpers import (
     entity_registry as er,
     floor_registry as fr,
 )
+from homeassistant.loader import async_get_integration
+from homeassistant.setup import async_setup_component
 
-from custom_components.hydronic_heating.card import CARD_FILE, CARD_URL, async_register_card
+from custom_components.hydronic_heating.card import (
+    CARD_FILE,
+    CARD_URL,
+    async_register_card,
+    async_unregister_card,
+)
 from custom_components.hydronic_heating.const import DOMAIN
 from custom_components.hydronic_heating.sensor import BoilerReasonSensor
 
@@ -74,12 +83,87 @@ async def test_rooms_without_floor_share_one_row(hass: HomeAssistant) -> None:
 
 
 async def test_card_is_served_and_loaded_with_the_version(hass: HomeAssistant) -> None:
+    """Without resources in storage the card is added to every page."""
     assert CARD_FILE.is_file()
     hass.http = MagicMock(async_register_static_paths=AsyncMock())
     hass.config.components.add("frontend")
     with patch("custom_components.hydronic_heating.card.add_extra_js_url") as add_js:
         await async_register_card(hass)
     (paths,), _ = hass.http.async_register_static_paths.call_args
-    assert (paths[0].url_path, paths[0].path) == (CARD_URL, str(CARD_FILE))
+    assert (paths[0].url_path, paths[0].path, paths[0].cache_headers) == (
+        CARD_URL,
+        str(CARD_FILE),
+        True,
+    )
     url = add_js.call_args.args[1]
     assert url.startswith(f"{CARD_URL}?v=")
+
+
+async def _lovelace(hass: HomeAssistant):
+    """Lovelace with its resources in storage, and the version of the integration."""
+    assert await async_setup_component(hass, "lovelace", {})
+    hass.http = MagicMock(async_register_static_paths=AsyncMock())
+    hass.config.components.add("frontend")
+    version = (await async_get_integration(hass, DOMAIN)).version
+    return hass.data[LOVELACE_DATA].resources, f"{CARD_URL}?v={version}"
+
+
+def _cards(resources) -> list[dict]:
+    return [r for r in resources.async_items() if r["url"].startswith(CARD_URL)]
+
+
+async def test_card_is_a_lovelace_resource(hass: HomeAssistant) -> None:
+    """A resource loads before the dashboard renders, an extra module may come late."""
+    resources, url = await _lovelace(hass)
+    with patch("custom_components.hydronic_heating.card.add_extra_js_url") as add_js:
+        await async_register_card(hass)
+        await async_register_card(hass)
+    add_js.assert_not_called()
+    assert [(r["type"], r["url"]) for r in _cards(resources)] == [("module", url)]
+
+
+async def test_resource_follows_the_version_and_goes_with_the_integration(
+    hass: HomeAssistant,
+) -> None:
+    resources, url = await _lovelace(hass)
+    other = await resources.async_create_item({"res_type": "module", "url": "/local/x.js"})
+    await resources.async_create_item({"res_type": "js", "url": f"{CARD_URL}?v=0.18.0"})
+    await resources.async_create_item({"res_type": "module", "url": f"{CARD_URL}?v=0.19.0"})
+    await async_register_card(hass)
+    assert [(r["type"], r["url"]) for r in _cards(resources)] == [("module", url)]
+
+    await async_unregister_card(hass)
+    assert _cards(resources) == []
+    assert [r["id"] for r in resources.async_items()] == [other["id"]]
+
+
+async def test_removing_the_integration_removes_the_resource(hass: HomeAssistant) -> None:
+    resources, url = await _lovelace(hass)
+    entry = await _setup(hass)
+    assert [r["url"] for r in _cards(resources)] == [url]
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _cards(resources) == []
+
+
+async def test_stored_resources_are_loaded_and_tidied(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """Resources saved before the start: the old one is updated in place."""
+    hass_storage["lovelace_resources"] = {
+        "version": 1,
+        "key": "lovelace_resources",
+        "data": {
+            "items": [
+                {"id": "other", "type": "module", "url": "/local/x.js"},
+                {"id": "old", "type": "js", "url": f"{CARD_URL}?v=0.18.0"},
+                {"id": "copy", "type": "module", "url": CARD_URL},
+            ]
+        },
+    }
+    resources, url = await _lovelace(hass)
+    await async_register_card(hass)
+    items = {r["id"]: (r["type"], r["url"]) for r in resources.async_items()}
+    assert items == {"other": ("module", "/local/x.js"), "old": ("module", url)}
+    await async_register_card(hass)
+    assert {r["id"] for r in resources.async_items()} == {"other", "old"}

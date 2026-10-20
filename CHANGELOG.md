@@ -5,6 +5,15 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.19.2 — 2026-10-20
+
+### 🐛 Opravy
+
+- **Karta schématu po obnovení stránky.** Občas se místo karty ukázala chyba „Custom element doesn't exist: hydronic-heating-flow-card“, protože se karta načetla až po vykreslení dashboardu. Integrace teď kartu sama zapíše mezi zdroje dashboardů (Nastavení → Řídicí panely → ⋮ → Zdroje), takže se načte dřív. Při aktualizaci přepíše verzi v adrese, zdvojený záznam smaže a po odebrání integrace zdroj odstraní. Se zdroji v YAML se karta načítá jako dřív.
+- Karta se nezaregistruje dvakrát a v nabídce karet je jen jednou, ani když se soubor načte dvakrát.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.19.1 — 2026-10-17
 
 ### 🐛 Opravy

@@ -844,16 +844,26 @@ function esc(value) {
   })[c]);
 }
 
-if (!customElements.get(TAG)) {
-  customElements.define(TAG, HydronicHeatingFlowCard);
-  customElements.define(`${TAG}-editor`, HydronicHeatingFlowCardEditor);
-  window.customCards = window.customCards || [];
+// The card may load twice (a Lovelace resource and an extra module of an older
+// version): each element is defined once and the card picker lists it once.
+function defineOnce(tag, element) {
+  if (customElements.get(tag)) return false;
+  customElements.define(tag, element);
+  return true;
+}
+
+const defined = defineOnce(TAG, HydronicHeatingFlowCard);
+defineOnce(`${TAG}-editor`, HydronicHeatingFlowCardEditor);
+window.customCards = window.customCards || [];
+if (!window.customCards.some((card) => card.type === TAG)) {
   window.customCards.push({
     type: TAG,
     name: "Heating Controller – scheme",
     description: "Animated scheme of the boiler, pipes, valves and radiators.",
     documentationURL: "https://github.com/elvisek2020/hacs-heating_system#karta-na-jiném-dashboardu",
   });
+}
+if (defined) {
   console.info(`%c HYDRONIC-HEATING-FLOW-CARD %c ${VERSION} `,
     "color: #fff; background: #ff6f22; font-weight: 700;",
     "color: #ff6f22; background: #fff; font-weight: 700;");

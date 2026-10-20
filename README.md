@@ -169,7 +169,7 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 - **Teď** říká, proč je to tak (kdo chce teplo, které ventily se zavírají). **Pak** vypisuje příští události s časy: start a vypnutí kotle, konec doběhu a manuálu, předtápění, změny rozvrhu, návrat a konec větrání.
 - Klepnutím na místnost se otevře její termostat, klepnutím na kotel důvod jeho stavu.
 - **Patra** se berou z oblastí Home Assistantu. Přiřaďte zařízení místnosti oblast s patrem, nebo pojmenujte oblast stejně jako místnost. Bez pater jsou všechny místnosti v jedné řadě.
-- Kartu `custom:hydronic-heating-flow-card` přináší integrace, nic dalšího se neinstaluje. Po aktualizaci integrace stačí obnovit stránku.
+- Kartu `custom:hydronic-heating-flow-card` přináší integrace, nic dalšího se neinstaluje. Integrace ji sama zapíše mezi zdroje dashboardů (Nastavení → Řídicí panely → ⋮ → Zdroje, `/hydronic_heating/hydronic-heating-flow-card.js?v=<verze>`), takže se načte dřív než dashboard. Po aktualizaci verzi v adrese přepíše, po odebrání integrace zdroj smaže. Po aktualizaci integrace stačí obnovit stránku. Se zdroji v YAML se karta načítá na každé stránce jako dřív.
 
 ### Karta na jiném dashboardu
 

@@ -13,7 +13,7 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 import voluptuous as vol
 
-from .card import async_register_card
+from .card import async_register_card, async_unregister_card
 from .const import (
     ATTR_DURATION,
     ATTR_MINUTES,
@@ -164,6 +164,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: HydronicConfigEntry) ->
     else:
         runtime.reactivate()
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: HydronicConfigEntry) -> None:
+    """Remove the Lovelace resource of the scheme card with the integration (FR-UI-25)."""
+    await async_unregister_card(hass)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: HydronicConfigEntry) -> None:

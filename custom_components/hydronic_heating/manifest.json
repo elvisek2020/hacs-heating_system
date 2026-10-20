@@ -3,7 +3,8 @@
   "name": "Heating Controller",
   "after_dependencies": [
     "frontend",
-    "http"
+    "http",
+    "lovelace"
   ],
   "codeowners": [
     "@elvisek2020"
@@ -15,5 +16,5 @@
   "issue_tracker": "https://github.com/elvisek2020/hacs-heating_system/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.19.1"
+  "version": "0.19.2"
 }
