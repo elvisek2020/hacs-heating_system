@@ -135,6 +135,7 @@ class ValveReason(StrEnum):
     IDLE_POLICY = "idle_policy"
     ROOM_OFF = "room_off"
     PWM = "pwm"
+    HEAT_CALL = "heat_call"
     MIN_STATE_HOLD = "min_state_hold"
     PREHEAT = "preheat"
     EXERCISE = "exercise"

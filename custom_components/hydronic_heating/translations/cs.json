@@ -854,6 +854,7 @@
               "idle_policy": "Klidová poloha",
               "room_off": "Místnost vypnutá",
               "pwm": "Regulace místnosti (PWM)",
+              "heat_call": "Požadavek nad prahem kotle",
               "min_state_hold": "Minimální doba stavu",
               "exercise": "Protáčení ventilu",
               "overrun": "Doběh kotle",

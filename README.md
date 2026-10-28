@@ -71,7 +71,7 @@ Ve virtuálních výstupech i ve virtuálním domě lze přes `select.hh_demo_bo
 
 ## Jak řídí
 
-- **Místnost:** teplota z 1..n čidel (průměr, minimum, maximum, medián nebo první platné). Požadavek 0–100 % počítá algoritmus TPI nebo hystereze. Ventily jedou v PWM (perioda 30 min, synchronní začátek), s minimální dobou stavu kvůli pomalým hlavicím.
+- **Místnost:** teplota z 1..n čidel (průměr, minimum, maximum, medián nebo první platné). Požadavek 0–100 % počítá algoritmus TPI nebo hystereze. Ventily jedou v PWM (perioda 30 min, synchronní začátek), s minimální dobou stavu kvůli pomalým hlavicím. Místnost s požadavkem aspoň na prahu kotle (při běžícím kotli práh minus hystereze) má ventil otevřený celou dobu, takže kotel netopí do samých zavřených ventilů. PWM platí pro místnosti pod prahem.
 - **Chybné hodnoty čidel** (nastavení místnosti, krok Teplotní čidla):
   - Krátký výpadek čidla nebo hodnota mimo platný rozsah: 5 min se počítá s poslední platnou hodnotou (atribut `held_sources`), pak teprve s dalšími čidly.
   - Skok o víc než 3 K (Skok hodnoty čidla, 0 = vypnuto) se použije až po potvrzení dalším blízkým vzorkem nebo po 1 min (atribut `filtered_sources`). Odfiltruje 0,0 nebo hodnotu s posunem, kterou pošlou čidla Matter/Thread po obnovení spojení.
@@ -164,7 +164,14 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 
 Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpátečkou a radiátory po patrech.
 
-- Voda proudí jen tam, kam opravdu teče, v doběhu pomaleji. Kotel při běhu svítí a hoří, hlavice v pohybu bliká a radiátor je teplý, jen když jím teče voda.
+- Voda proudí jen tam, kam opravdu teče, v doběhu pomaleji. Kotel při běhu svítí a hoří.
+- **Jedna barva = jeden význam:**
+  - **Radiátor:** sytě oranžový = teď jím teče teplá voda. Tlumeně oranžový = ještě hřeje a do 30 min po průtoku vybledne do šedé (pamatuje si to i přes restart). Teplota trubky barvu neovlivňuje, je jen číslem vlevo od ventilu.
+  - **Ventil** je kulový kohout: páčka podél trubky = otevřeno, napříč = zavřeno. Při přestavování se žlutě otáčí podle skutečné doby přestavení hlavice. Tyrkysový = otevřený a teče voda, prázdný kroužek = otevřený bez proudu v klidu, šedý = zavřený.
+  - **Místnost, která volá kotel** (požadavek aspoň práh místnosti), má oranžový rámeček a plamínek. Pod radiátorem je pruh požadavku 0–100 %, pod názvem „teplota → cíl“, u vypnuté místnosti „vypnuto“.
+  - **Poruchy:** červený čárkovaný rámeček = porucha místnosti, červený okraj ventilu = porucha ventilu, „čidlo!“ = neplatné čidlo, červený kotel a „porucha“ = porucha kotle nebo kotel netopí.
+  - **Větrání:** okénko nad radiátorem = okno nebo větrání místnosti, tyrkysový pás přes patro = větrá celé patro.
+  - **Shadow a demo:** žlutočerný pruh přes horní okraj karty, řízení nic nespíná.
 - Pod schématem je pruh fází **Klid → Ventily → Kotel topí → Doběh** s odpočtem („kotel zapne za 1:12“, „doběh ještě 2:10“) a se štítkem, když kotel něco drží (minimální pauza, mimo sezónu, porucha…).
 - **Teď** říká, proč je to tak (kdo chce teplo, které ventily se zavírají). **Pak** vypisuje příští události s časy: start a vypnutí kotle, konec doběhu a manuálu, předtápění, změny rozvrhu, návrat a konec větrání.
 - Klepnutím na místnost se otevře její termostat, klepnutím na kotel důvod jeho stavu.
@@ -176,7 +183,7 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 Schéma jde dát i na hlavní dashboard, třeba vedle kamer. Entity a patra do karty vkládá služba `generate_dashboard`, proto kartu zkopírujte z pohledu Schéma:
 
 1. Na pohledu Schéma: Upravit dashboard → upravit kartu schématu → Zobrazit editor kódu, zkopírovat YAML.
-2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact` a `interactive: false`, aby se na mobilu při posouvání omylem nespustilo větrání patra.
+2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact` a `interactive: false`, aby se na mobilu při posouvání omylem nespustilo větrání patra. Kompaktní karta má pod schématem jeden řádek stavu s barevnou tečkou podle fáze a odpočtem („Doběh · doběh ještě 1:33“). Jestli se karta ukazuje jen při běhu kotle, je nastavení viditelnosti dashboardu, ne karty.
 
 ```yaml
 type: custom:hydronic-heating-flow-card
@@ -196,15 +203,20 @@ floors:
         climate: climate.hh_obyvak
         demand: sensor.hh_obyvak_demand
         valve: sensor.hh_obyvak_valve_state
+        problem: binary_sensor.hh_obyvak_problem
+shadow: switch.hh_shadow_mode
 ```
+
+Kartu zkopírovanou ze starší verze přegenerujte: nové značky potřebují `problem` u místností a `shadow`, číslo trubky `pipe` (generátor ho doplní, když má ventil čidlo trubky).
 
 | Volba | Výchozí | Co dělá |
 |---|---|---|
-| `layout` | `full` | `compact` = nižší schéma bez textů Teď a Pak |
+| `layout` | `full` | `compact` = nižší schéma s řádkem stavu místo textů Teď a Pak a pruhu fází |
 | `show_text` | `true`, u `compact` `false` | oba sloupce Teď a Pak |
 | `show_now`, `show_upcoming` | podle `show_text` | jen sloupec Teď, jen sloupec Pak |
 | `upcoming_max` | všechny | nejvýš tolik řádků v Pak |
-| `show_phases` | `true` | pruh fází (Klid, Ventily, Kotel topí, Doběh) se štítkem a odpočtem |
+| `show_phases` | `true`, u `compact` `false` | pruh fází (Klid, Ventily, Kotel topí, Doběh) se štítkem a odpočtem |
+| `show_status` | `false`, u `compact` `true` | jeden řádek stavu: barevná tečka podle fáze, důvod a odpočet |
 | `show_outdoor` | `true` | venkovní teplota vpravo nahoře |
 | `interactive` | `true` | `false` = prvky nejdou klepnout: místnost neotevře termostat, kotel důvod a patro nepřepne větrání |
 | `tap_action` | nic | standardní akce Home Assistantu po klepnutí na kartu, například `navigate` na pohled Schéma. S `interactive: true` mají přednost prvky. |
@@ -240,7 +252,7 @@ Ochrana kotle někdy drží kotel v chodu nebo ve stání i proti tomu, co zrovn
 - `sensor.hh_boiler_reason` říká důvod, třeba „Minimální doba běhu“, „Minimální pauza“, „Doběh“ nebo „Topí na požadavek“. Atribut `detail` obsahuje celou větu, například „Teplo už nikdo nechce, ale kotel musí běžet minimální dobu 10 min. Vypne se v 0:55:12, teplo jde do všech místností.“ V atributu `rule` je nastavení, které za tím stojí.
 - `sensor.hh_boiler_hold_ends_at` ukazuje, kdy časové pravidlo skončí. Dashboard z něj dělá odpočet „za 4 minuty“.
 - **Logbook** (Aktivita) zapisuje každé zapnutí a vypnutí kotle s příčinou a každé odložení povelu s časem. Zapíše i výstup, který někdo přepnul ručně a integrace ho vrátila. Stejné věty jsou v logu Home Assistantu. Ve shadow režimu mají předponu `[Shadow]`, v demu `[Demo]`.
-- U ventilů ukazují atributy `reason` a `until` na `sensor.hh_<místnost>_valve_state`, proč je ventil otevřený nebo zavřený (PWM, okno, minimální běh a doběh kotle, protáčení…) a kdy se to změní.
+- U ventilů ukazují atributy `reason` a `until` na `sensor.hh_<místnost>_valve_state`, proč je ventil otevřený nebo zavřený (PWM, požadavek nad prahem kotle, okno, minimální běh a doběh kotle, protáčení…) a kdy se to změní.
 
 Výstup kotle nebo hlavice, který přepnete ručně, integrace vrátí. Vlastníkem výstupu je ona (ověření povelu). Ručně topit jde přes manuál, ne přepnutím výstupu.
 

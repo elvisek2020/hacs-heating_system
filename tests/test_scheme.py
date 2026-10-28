@@ -61,6 +61,8 @@ async def test_scheme_view_groups_rooms_by_floor(hass: HomeAssistant) -> None:
     assert card["boiler"] == "binary_sensor.hh_boiler_command"
     assert card["reason"] == "sensor.hh_boiler_reason"
     assert "actual" not in card  # no feedback configured
+    assert card["shadow"] == "switch.hh_shadow_mode"
+    assert "demo" not in card
     assert [(f["name"], [r["name"] for r in f["rooms"]]) for f in card["floors"]] == [
         ("2NP", ["Ložnice"]),
         ("1NP", ["Obývák"]),
@@ -70,6 +72,7 @@ async def test_scheme_view_groups_rooms_by_floor(hass: HomeAssistant) -> None:
         "climate": "climate.hh_obyvak",
         "demand": "sensor.hh_obyvak_demand",
         "valve": "sensor.hh_obyvak_valve_state",
+        "problem": "binary_sensor.hh_obyvak_problem",
     }
 
 
@@ -167,3 +170,11 @@ async def test_stored_resources_are_loaded_and_tidied(
     assert items == {"other": ("module", "/local/x.js"), "old": ("module", url)}
     await async_register_card(hass)
     assert {r["id"] for r in resources.async_items()} == {"other", "old"}
+
+
+async def test_valve_state_tells_the_card_about_flow_and_travel(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    await _settle(hass)
+    attrs = hass.states.get("sensor.hh_obyvak_valve_state").attributes
+    assert {"last_flow", "moving_since", "moving_until"} <= set(attrs)
+    assert hass.states.get("sensor.hh_obyvak_demand").attributes["call_threshold"] == 50

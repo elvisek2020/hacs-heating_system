@@ -586,8 +586,14 @@ def test_short_sensor_outage_is_not_reported() -> None:
 
 def test_startup_decisions_do_not_hold_valves() -> None:
     """Sensors that load after the valves must not keep a valve closed for 5 minutes."""
-    ctrl = controller(room("obyvak"), **{c.CONF_HAS_BYPASS: True})
-    house = House(ctrl, temperatures={"obyvak": None})
+    # The cold bedroom calls the boiler; a threshold above the fallback demand keeps
+    # the living room on its PWM period.
+    ctrl = controller(
+        room("obyvak"),
+        room("loznice"),
+        **{c.CONF_HAS_BYPASS: True, c.CONF_BOILER_DEMAND_THRESHOLD: 50},
+    )
+    house = House(ctrl, temperatures={"obyvak": None, "loznice": 15.0})
     house.set(BOILER, "unavailable")
     # Fallback demand 30 % lands in the closed part of the PWM period.
     house.now = T0.replace(minute=20)

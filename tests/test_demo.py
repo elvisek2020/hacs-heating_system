@@ -155,7 +155,9 @@ async def test_virtual_house_heats_and_reacts_to_events(
     # The controller now reads the simulated sensor.
     assert hass.states.get("climate.hh_obyvak").attributes["current_temperature"] == start
 
-    await _run(hass, freezer, 60 * 60)
+    # Rooms above the boiler threshold stay open the whole run, so the house
+    # warms within the hour and the boiler stops after about 50 minutes.
+    await _run(hass, freezer, 40 * 60)
     assert hass.states.get("switch.hh_demo_boiler").state == "on"
     assert float(hass.states.get("sensor.hh_obyvak_demo_temperature").state) > start
 

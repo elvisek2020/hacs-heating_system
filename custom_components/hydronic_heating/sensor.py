@@ -73,6 +73,12 @@ def _valve_attrs(room: RoomController, ctrl: HydronicController) -> dict[str, An
         return {}
     first = next(iter(found.values()))
     attrs: dict[str, Any] = {"reason": first.reason.value, "until": _iso(first.until)}
+    # FR-UI-25: the scheme fades a radiator after the flow and turns the valve as it moves.
+    attrs["last_flow"] = _iso(room.last_flow)
+    moving = room.valves_moving(ctrl.last_step) if ctrl.last_step else None
+    attrs["moving_since"], attrs["moving_until"] = (
+        (_iso(moving[0]), _iso(moving[1])) if moving else (None, None)
+    )
     # FR-SAFE-09: result of the pipe check; the pipe temperature is its own sensor.
     if (check := ctrl.room_valve_check(room)[0]) is not None:
         attrs["check"] = check

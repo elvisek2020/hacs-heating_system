@@ -5,6 +5,26 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.20.0 — 2026-10-28
+
+### ✨ Novinky
+
+- **Karta schématu: jedna barva = jeden význam.** Malá i velká karta teď ukazují totéž.
+  - **Radiátor** je sytě oranžový, když jím teče teplá voda. Pak ještě hřeje a do 30 min vybledne do šedé, i přes restart.
+  - **Ventil** je kulový kohout: páčka podél trubky = otevřeno, napříč = zavřeno. Při přestavování se otáčí podle skutečné doby přestavení hlavice.
+  - **Místnost, která volá kotel**, má rámeček, plamínek a pruh požadavku. Pod názvem je „teplota → cíl“, „vypnuto“ nebo „čidlo!“.
+  - **Poruchy** místnosti, ventilu, čidla i kotle jsou vidět přímo ve schématu. V shadow režimu je přes kartu pruh SHADOW, v demu DEMO.
+  - **Větrání:** okénko nad radiátorem a tyrkysový pás přes patro.
+  - **Kompaktní karta** má řádek stavu s barevnou tečkou podle fáze a odpočtem (volba `show_status`). Pruh fází je u ní ve výchozím stavu vypnutý, `show_phases: true` ho vrátí.
+  - Vysvětlivky popisují i značky schématu.
+- Nové atributy `sensor.hh_<místnost>_valve_state`: `last_flow` (kdy naposledy tekla voda), `moving_since` a `moving_until` (přestavování ventilu).
+
+### 🐛 Opravy
+
+- **Kotel netopí do samých zavřených ventilů.** Místnost s požadavkem aspoň na prahu kotle (výchozí 30 %, při běžícím kotli 20 %) má ventil otevřený celou dobu, dokud kotel topí. Dřív se ventily otevíraly jen na část 30min periody a na jejím konci byly zavřené všechny, takže kotel občas hořel jen do obtoku. Místnosti pod prahem se otevírají na část periody jako dřív. Nový důvod ventilu: „Požadavek nad prahem kotle“.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče. Kartu schématu zkopírovanou na jiný dashboard přegeneruj (služba `generate_dashboard`, pohled Schéma), nové značky potřebují `problem` u místností a `shadow`.
+
 ## v0.19.2 — 2026-10-20
 
 ### 🐛 Opravy

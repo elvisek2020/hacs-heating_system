@@ -266,7 +266,7 @@ async def test_cancelled_start_sentence(hass: HomeAssistant) -> None:
 async def test_valve_state_explains_the_position(hass: HomeAssistant) -> None:
     await _setup(hass)
     attrs = hass.states.get("sensor.hh_obyvak_valve_state").attributes
-    assert attrs["reason"] in ("pwm", "min_state_hold", "startup")
+    assert attrs["reason"] in ("pwm", "heat_call", "min_state_hold", "startup")
     assert "until" in attrs
 
 

@@ -40,6 +40,8 @@ FROST_CONFIRM_S = 60
 SPIKE_CONFIRM_S = 60
 # After airing by hand the cooled room is not taken for a new airing (FR-WIN-07).
 VENT_QUIET_S = 10 * 60
+# FR-UI-25: water flows through the room while the pump runs and a valve is not shut.
+FLOWING = frozenset({"open", "opening", "closing", "mixed"})
 NOT_REACHED_DEFICIT_K = 1.5
 NOT_REACHED_AFTER_S = 3 * 3600
 SENSOR_FAILURE_REPORT_S = 5 * 60
@@ -216,6 +218,9 @@ class RoomController:
         self.valve_forced = False
         self.heating_since: datetime | None = None
         self.not_reached = False
+        # FR-UI-25: water flows through the room now, and when it last flowed.
+        self.flowing = False
+        self.flow_seen: datetime | None = None
 
     def carry_over(self, previous: RoomController) -> None:
         """Keep the runtime state of the room across a change of its settings (NFR-13).
@@ -245,6 +250,7 @@ class RoomController:
             "_spikes",
             "_frost_below",
             "_frost_samples",
+            "flowing",
         ):
             setattr(self, name, getattr(previous, name))
 
@@ -760,6 +766,29 @@ class RoomController:
         """Open or closed according to the demand and the PWM period."""
         return pwm_open(now, self.demand, self.cfg.pwm_period_s, self.cfg.min_state_s)
 
+    def note_flow(self, pump: bool, now: datetime) -> None:
+        """Remember when water flowed through the room; the scheme fades it (FR-UI-25)."""
+        self.flowing = pump and self.valve_summary(now) in FLOWING
+        if self.flowing:
+            self.flow_seen = now
+
+    @property
+    def last_flow(self) -> datetime | None:
+        """End of the last flow; None while water flows, so the time changes only then."""
+        return None if self.flowing else self.flow_seen
+
+    def valves_moving(self, now: datetime) -> tuple[datetime, datetime] | None:
+        """Start and end of the valves' travel while they move (FR-UI-25), else None."""
+        spans = []
+        for valve in self.cfg.valves:
+            state = self.valves[valve.entity_id]
+            moving = state.physical(valve, now) in (ValvePhysical.OPENING, ValvePhysical.CLOSING)
+            if moving and state.changed_at and (ends := state.transition_ends_at(valve)):
+                spans.append((state.changed_at, ends))
+        if not spans:
+            return None
+        return min(start for start, _ in spans), max(end for _, end in spans)
+
     def valve_summary(self, now: datetime) -> str:
         """Summary state of all valves of the room."""
         states = {self.valves[v.entity_id].physical(v, now) for v in self.cfg.valves}
@@ -789,6 +818,7 @@ class RoomController:
             else None,
             "vent_source": self.vent_source,
             "vent_trigger": self.vent_trigger,
+            "flow_seen": self.flow_seen.isoformat() if self.flow_seen else None,
         }
 
     def restore(self, data: dict[str, Any]) -> None:
@@ -809,3 +839,5 @@ class RoomController:
             self.manual_vent_until = datetime.fromisoformat(until)
             self.vent_source = data.get("vent_source") or "manual"
             self.vent_trigger = data.get("vent_trigger")
+        if seen := data.get("flow_seen"):
+            self.flow_seen = datetime.fromisoformat(seen)

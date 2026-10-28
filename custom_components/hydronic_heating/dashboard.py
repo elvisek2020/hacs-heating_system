@@ -17,7 +17,7 @@ from homeassistant.helpers import (
 )
 
 from .card import CARD_TYPE
-from .const import DOMAIN, ENTITY_PREFIX
+from .const import DEMO_OFF, DOMAIN, ENTITY_PREFIX
 from .floors import Floor, floor_order
 
 if TYPE_CHECKING:
@@ -494,6 +494,62 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "Shadow",
             "Řízení všechno počítá, ale kotel ani ventily nespíná. Jen v shadow režimu.",
         ),
+        # The scheme card (FR-UI-25).
+        (
+            "",
+            "mdi:radiator",
+            "Radiátor ve schématu",
+            (
+                "Sytě oranžový = teď jím teče teplá voda. Tlumeně oranžový = ještě hřeje, "
+                "do 30 min po průtoku vybledne. Šedý = studený."
+            ),
+        ),
+        (
+            "",
+            "mdi:valve",
+            "Ventil ve schématu",
+            (
+                "Páčka podél trubky = otevřeno, napříč = zavřeno, při přestavování se otáčí "
+                "(žlutě). Tyrkysový = otevřený a teče voda, prázdný kroužek = otevřený bez "
+                "proudu v klidu, šedý = zavřený, červený okraj = porucha ventilu."
+            ),
+        ),
+        (
+            "valve_temps",
+            "mdi:thermometer",
+            "Trubka ve schématu",
+            "Číslo vlevo od ventilu je teplota trubky u ventilu. Barvu radiátoru neovlivňuje.",
+        ),
+        (
+            "",
+            "mdi:fire",
+            "Místnost volá kotel",
+            (
+                "Oranžový rámeček a plamínek: požadavek místnosti je aspoň {room} %. Pruh pod "
+                "radiátorem je požadavek 0–100 %, pod názvem teplota → cíl."
+            ),
+        ),
+        (
+            "",
+            "mdi:alert-circle-outline",
+            "Porucha ve schématu",
+            (
+                "Červený čárkovaný rámeček = porucha místnosti, „čidlo!“ = neplatné čidlo, "
+                "červený kotel = porucha kotle nebo kotel netopí."
+            ),
+        ),
+        (
+            "",
+            "mdi:window-open-variant",
+            "Větrání ve schématu",
+            "Okénko nad radiátorem = okno nebo větrání, tyrkysový pás = větrá celé patro.",
+        ),
+        (
+            "shadow",
+            "mdi:ghost-outline",
+            "Pruh SHADOW",
+            "Žlutočerný pruh přes schéma: řízení nic nespíná, schéma ukazuje jen výpočet.",
+        ),
     ],
     "en": [
         (
@@ -775,6 +831,62 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
                 "The controller calculates everything but switches neither the boiler nor the "
                 "valves. Only in shadow mode."
             ),
+        ),
+        # The scheme card (FR-UI-25).
+        (
+            "",
+            "mdi:radiator",
+            "Radiator in the scheme",
+            (
+                "Bright orange = hot water flows through it now. Faded orange = it still gives "
+                "heat, it fades out within 30 min after the flow. Grey = cold."
+            ),
+        ),
+        (
+            "",
+            "mdi:valve",
+            "Valve in the scheme",
+            (
+                "Lever along the pipe = open, across = closed, it turns while moving (amber). "
+                "Cyan = open with water flowing, empty ring = open without current at rest, "
+                "grey = closed, red rim = valve fault."
+            ),
+        ),
+        (
+            "valve_temps",
+            "mdi:thermometer",
+            "Pipe in the scheme",
+            "The number left of the valve is the pipe temperature, not the radiator colour.",
+        ),
+        (
+            "",
+            "mdi:fire",
+            "Room calls the boiler",
+            (
+                "Orange frame and flame: the room demand is at least {room} %. The bar under the "
+                "radiator is the demand 0–100 %, under the name temperature → target."
+            ),
+        ),
+        (
+            "",
+            "mdi:alert-circle-outline",
+            "Fault in the scheme",
+            (
+                'Red dashed frame = room fault, "sensor!" = invalid sensor, red boiler = boiler '
+                "fault or the boiler does not heat."
+            ),
+        ),
+        (
+            "",
+            "mdi:window-open-variant",
+            "Airing in the scheme",
+            "Window icon over the radiator = window or airing, cyan band = the whole floor airs.",
+        ),
+        (
+            "shadow",
+            "mdi:ghost-outline",
+            "SHADOW stripe",
+            "Striped band across the scheme: the control switches nothing, it only computes.",
         ),
     ],
 }
@@ -1677,6 +1789,10 @@ def _scheme_view(
         card["flow"] = shown.flow
     if shown.feedback:
         card["actual"] = shown.feedback
+    # A stripe across the card while nothing is switched (FR-UI-25).
+    card["shadow"] = sid("switch", "shadow_mode")
+    if runtime.demo_mode != DEMO_OFF:
+        card["demo"] = True
     card["floors"] = _floors(runtime, ids)
     return {
         "title": text["scheme"],
@@ -1702,6 +1818,7 @@ def _floors(runtime: HydronicHeatingRuntime, ids: _Ids) -> list[dict[str, Any]]:
             "climate": climate,
             "demand": ids.room("sensor", room, "demand"),
             "valve": ids.room("sensor", room, "valve_state"),
+            "problem": ids.room("binary_sensor", room, "problem"),
         }
         if pipe := next((v.temp_entity for v in room.valves if v.temp_entity), None):
             item["pipe"] = pipe

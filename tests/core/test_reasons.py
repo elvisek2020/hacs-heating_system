@@ -255,7 +255,7 @@ def test_valve_switched_outside_is_reverted_with_its_reason() -> None:
     params = reverted[0].params
     assert params["output"] == "valve"
     assert (params["observed"], params["desired"]) == (False, True)
-    assert params["valve_reason"] == ValveReason.PWM
+    assert params["valve_reason"] == ValveReason.HEAT_CALL
     assert house.state("switch.hlavice_obyvak") == "off"
 
 
@@ -265,7 +265,7 @@ def test_valve_reasons() -> None:
     house.set("binary_sensor.okno", "off")
     house.step()
     status = ctrl.valve_status["switch.hlavice_obyvak"]
-    assert status.reason is ValveReason.PWM
+    assert status.reason is ValveReason.HEAT_CALL
 
     house.set("binary_sensor.okno", "on")
     _run(house, 90)  # window delay 60 s, the boiler still runs its minimum time
@@ -280,12 +280,14 @@ def test_valve_reasons() -> None:
 
 
 def test_pwm_reason_has_the_next_switching_time() -> None:
-    ctrl = controller(room("obyvak"), **BYPASS)  # TPI is the default algorithm
-    house = House(ctrl, temperatures={"obyvak": 20.5})
+    # TPI is the default algorithm; the cold living room runs the boiler and the
+    # bedroom below the boiler threshold follows its PWM period.
+    ctrl = controller(room("obyvak"), room("loznice"), **BYPASS)
+    house = House(ctrl, temperatures={"obyvak": 19.0, "loznice": 20.7})
     house.step()
-    room_ctrl = ctrl.rooms["id_obyvak"]
-    assert 0 < room_ctrl.demand < 100
-    status = ctrl.valve_status["switch.hlavice_obyvak"]
+    room_ctrl = ctrl.rooms["id_loznice"]
+    assert 0 < room_ctrl.demand < 20  # threshold 30 % less the hysteresis of a running boiler
+    status = ctrl.valve_status["switch.hlavice_loznice"]
     assert status.reason in (ValveReason.PWM, ValveReason.MIN_STATE_HOLD)
     assert status.until is not None
     assert status.until > house.now

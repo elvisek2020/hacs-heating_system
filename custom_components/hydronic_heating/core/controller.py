@@ -328,6 +328,10 @@ class HydronicController:
         self._stop_immediate = False
         self._wants_heat = self.heat_request and not blocked
         self._update_run(manual=manual)
+        # FR-UI-25: water flows through open valves while the boiler fires or runs out.
+        pumping = self.sequencer.phase in (BoilerPhase.FIRING, BoilerPhase.OVERRUN)
+        for room in self.rooms.values():
+            room.note_flow(pumping and not self.fault_safe, now)
 
         self.valve_desired = self._plan_valves(now, manual=manual, heating_allowed=heating_allowed)
         boiler_on = self.sequencer.boiler_on and not self.fault_safe
@@ -645,7 +649,7 @@ class HydronicController:
         status: dict[str, ValveStatus] = {}
         boiler_idle = self.sequencer.phase is BoilerPhase.IDLE and not self.heat_request
         for room in self.rooms.values():
-            forced = True
+            forced, full = True, False
             want: bool | None
             reason = ValveReason.PWM
             if self.fault_safe:
@@ -670,17 +674,20 @@ class HydronicController:
             elif room.hvac_mode is RoomHvacMode.OFF:
                 want, reason = False, ValveReason.ROOM_OFF
             else:
-                want = room.pwm_want(now)
+                full = self._opens_for_run(room)
+                want = full or room.pwm_want(now)
                 forced = False
                 if room.preheating:
                     reason = ValveReason.PREHEAT
+                elif full:
+                    reason = ValveReason.HEAT_CALL
             decided = room.decide_open(want, now, forced=forced)
             until = None
             if not forced:
                 if decided != want and room.valve_switched_at is not None:
                     reason = ValveReason.MIN_STATE_HOLD
                     until = room.valve_switched_at + timedelta(seconds=room.cfg.min_state_s)
-                else:
+                elif not full:
                     until = self._pwm_switch_at(room, now)
             for valve in room.cfg.valves:
                 plan[valve.entity_id] = self._idle_position(valve) if decided is None else decided
@@ -792,7 +799,19 @@ class HydronicController:
             return False
         if manual:
             return self.cfg.manual_scope == "all_rooms" or room.demand > 0
-        return room.pwm_want(now)
+        return self._opens_for_run(room) or room.pwm_want(now)
+
+    def _opens_for_run(self, room: RoomController) -> bool:
+        """Whether the room's valve stays open for the whole run (FR-VAL-05).
+
+        A room with demand at the boiler's threshold (lowered by the hysteresis while
+        the boiler runs) skips the closed part of its PWM period. The boiler fires on
+        the weighted demand, so such a room exists while it fires for it and the boiler
+        never heats into closed valves only. Rooms below follow the PWM period.
+        """
+        cfg = self.cfg
+        hysteresis = cfg.demand_hysteresis if self.sequencer.boiler_on else 0
+        return room.demand > 0 and room.demand >= cfg.demand_threshold - hysteresis
 
     def _closing_ends(
         self, now: datetime, *, manual: bool, heating_allowed: bool

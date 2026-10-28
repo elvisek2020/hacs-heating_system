@@ -854,6 +854,7 @@
               "idle_policy": "Idle position",
               "room_off": "Room off",
               "pwm": "Room control (PWM)",
+              "heat_call": "Demand at boiler threshold",
               "min_state_hold": "Minimum state time",
               "exercise": "Valve exercise",
               "overrun": "Boiler overrun",
