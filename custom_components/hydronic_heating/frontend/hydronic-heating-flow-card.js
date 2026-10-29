@@ -246,7 +246,6 @@ const STYLE = `
   .vsym.opening .stem, .vsym.closing .stem { stroke: #000; }
   .vsym.opening .stem { animation: hh-open 2.4s ease-in-out infinite; }
   .vsym.closing .stem { animation: hh-close 2.4s ease-in-out infinite; }
-  .vsym.tracked .stem { animation: none; transition: none; }
   @keyframes hh-open { 0%, 15% { transform: rotate(90deg); } 85%, 100% { transform: rotate(0deg); } }
   @keyframes hh-close { 0%, 15% { transform: rotate(0deg); } 85%, 100% { transform: rotate(90deg); } }
   .vsym.vfault circle { stroke: var(--error-color, #db4437); stroke-width: 2.6; }
@@ -297,8 +296,7 @@ const STYLE = `
   ha-card.has-banner { padding-top: 34px; }
   @media (prefers-reduced-motion: reduce) {
     .flow.on, .boiler.burning .flame, .boiler.burning .glow { animation: none; }
-    .vsym.opening:not(.tracked) .stem, .vsym.closing:not(.tracked) .stem {
-      animation: none; transform: rotate(45deg); }
+    .vsym.opening .stem, .vsym.closing .stem { animation: none; transform: rotate(45deg); }
   }
   .texts.single { grid-template-columns: 1fr; }
   ha-card.compact { padding: 8px 10px 10px; }
@@ -664,7 +662,6 @@ class HydronicHeatingFlowCard extends HTMLElement {
     const burning = actual ? actual.state === "on" : boiler?.state === "on" && phase === "firing";
     const slow = phase === "overrun";
     const flowing = {};
-    this._moving = {};
 
     for (const [id, room] of Object.entries(this._layoutRooms())) {
       const valve = this._state(room.valve);
@@ -680,19 +677,14 @@ class HydronicHeatingFlowCard extends HTMLElement {
       const sensorFault = problem?.attributes?.sensor_failure
         || (problem?.attributes?.invalid_sensors || []).length > 0;
 
-      // Ball valve: the lever along the pipe is open, across it closed; at rest an
-      // open valve without current is an empty ring, cyan only while water flows.
+      // Ball valve: the lever along the pipe is open, across it closed, it turns in a
+      // loop while the head moves; at rest an open valve without current is an empty
+      // ring, cyan only while water flows.
       let vs = { open: "open", closed: "closed", opening: "opening", closing: "closing" }[vstate]
         || (vstate === "mixed" ? "closing" : "unknown");
       if (vs === "open" && !pump) vs = "rest";
-      const since = Date.parse(valve?.attributes?.moving_since);
-      const until = Date.parse(valve?.attributes?.moving_until);
-      const tracked = (vs === "opening" || vs === "closing") && until > since;
-      if (tracked) this._moving[id] = { since, until, opening: vs === "opening" };
-      const vsym = root.querySelector(`[data-vsym="${id}"]`);
-      vsym?.setAttribute("class", ["vsym", vs, tracked && "tracked", valveFault && "vfault"]
-        .filter(Boolean).join(" "));
-      if (vsym && !tracked) vsym.querySelector(".stem").style.transform = "";
+      root.querySelector(`[data-vsym="${id}"]`)
+        ?.setAttribute("class", `vsym ${vs}${valveFault ? " vfault" : ""}`);
 
       // Radiator: bright while water flows, faded while it still gives heat.
       const rad = root.querySelector(`[data-radiator="${id}"]`);
@@ -867,14 +859,6 @@ class HydronicHeatingFlowCard extends HTMLElement {
     if (countdown) countdown.textContent = text;
     const slText = root.querySelector("[data-sl-text]");
     if (slText) slText.textContent = text;
-    // The lever turns with the real travel of the valve head (from the model).
-    const now = Date.now();
-    for (const [id, move] of Object.entries(this._moving || {})) {
-      const done = Math.max(0, Math.min(1, (now - move.since) / (move.until - move.since)));
-      const angle = move.opening ? 90 * (1 - done) : 90 * done;
-      const stem = root.querySelector(`[data-vsym="${id}"] .stem`);
-      if (stem) stem.style.transform = `rotate(${angle}deg)`;
-    }
   }
 }
 

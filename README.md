@@ -167,7 +167,7 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 - Voda proudí jen tam, kam opravdu teče, v doběhu pomaleji. Kotel při běhu svítí a hoří.
 - **Jedna barva = jeden význam:**
   - **Radiátor:** sytě oranžový = teď jím teče teplá voda. Tlumeně oranžový = ještě hřeje a do 30 min po průtoku vybledne do šedé (pamatuje si to i přes restart). Teplota trubky barvu neovlivňuje, je jen číslem vlevo od ventilu.
-  - **Ventil** je kulový kohout: páčka podél trubky = otevřeno, napříč = zavřeno. Při přestavování se žlutě otáčí podle skutečné doby přestavení hlavice. Tyrkysový = otevřený a teče voda, prázdný kroužek = otevřený bez proudu v klidu, šedý = zavřený.
+  - **Ventil** je kulový kohout: páčka podél trubky = otevřeno, napříč = zavřeno. Při přestavování je žlutý a páčka se pořád dokola točí směrem, kterým se ventil přestavuje, dokud hlavice nedojede. Tyrkysový = otevřený a teče voda, prázdný kroužek = otevřený bez proudu v klidu, šedý = zavřený.
   - **Místnost, která volá kotel** (požadavek aspoň práh místnosti), má oranžový rámeček a plamínek. Pod radiátorem je pruh požadavku 0–100 %, pod názvem „teplota → cíl“, u vypnuté místnosti „vypnuto“.
   - **Poruchy:** červený čárkovaný rámeček = porucha místnosti, červený okraj ventilu = porucha ventilu, „čidlo!“ = neplatné čidlo, červený kotel a „porucha“ = porucha kotle nebo kotel netopí.
   - **Větrání:** okénko nad radiátorem = okno nebo větrání místnosti, tyrkysový pás přes patro = větrá celé patro.

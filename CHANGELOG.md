@@ -5,6 +5,14 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.20.1 — 2026-10-29
+
+### 🎨 Vzhled
+
+- **Ventil ve schématu při přestavování.** Dokud se ventil otevírá nebo zavírá, je kroužek žlutý a páčka se točí pořád dokola ve směru pohybu, takže je hned vidět, že se něco děje. Ve v0.20.0 se páčka natáčela tak pomalu jako skutečná hlavice (90° za asi 2 min) a pohyb skoro nebyl vidět. Když hlavice dojede, páčka se dotočí do koncové polohy.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.20.0 — 2026-10-28
 
 ### ✨ Novinky
