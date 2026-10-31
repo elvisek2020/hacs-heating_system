@@ -706,8 +706,10 @@ class HydronicHeatingFlowCard extends HTMLElement {
       // A room that calls the boiler, a fault, airing.
       const demandState = this._state(room.demand);
       const demand = Number(demandState?.state);
+      // The integration reports the call with its hysteresis; older versions only the threshold.
+      const latched = demandState?.attributes?.calling;
       const threshold = Number(demandState?.attributes?.call_threshold ?? cfg.call_threshold ?? 50);
-      const calling = !off && !airing && demand >= threshold;
+      const calling = !off && !airing && (typeof latched === "boolean" ? latched : demand >= threshold);
       root.querySelector(`[data-room="${id}"]`)?.setAttribute("class", ["room",
         calling && "calling", problem?.state === "on" && "fault", airing && "airing"]
         .filter(Boolean).join(" "));

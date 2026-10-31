@@ -5,6 +5,15 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.20.2 — 2026-10-31
+
+### 🐛 Opravy
+
+- **Kotel opakovaně nenastartoval a hlavice cvakaly každou minutu.** Když ke startu musí volat víc místností a čidlo jedné z nich kolísá kolem prahu volání (např. o 1/16 °C), místnost minutu volala a minutu ne. Start se v čekání na zavření ventilů pokaždé zrušil a ventily se otevíraly a zavíraly dokola. Místnost teď začne volat při prahu volání (výchozí 50 %) a přestane až pod prahem mínus hystereze požadavku (výchozí 40 %). Když požadavek opravdu zmizí, start se zruší jako dřív.
+- Plamínek ve schématu se řídí tím, jestli místnost opravdu volá (nový atribut `calling` na `sensor.hh_<místnost>_demand`). Text u volající místnosti ukazuje, kdy volat přestane: „46,9 % z 40 % (konec volání)“.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.20.1 — 2026-10-29
 
 ### 🎨 Vzhled

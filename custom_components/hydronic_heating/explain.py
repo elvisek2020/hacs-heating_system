@@ -909,6 +909,7 @@ RULES: dict[str, dict[str, str]] = {
         "or": "nebo",
         "and": "a",
         "room": "{value} % z {threshold} %",
+        "room_stop": "{value} % z {off} % (konec volání)",
     },
     "en": {
         "start": "{value} % of {threshold} % {join} {calling} of {rooms}",
@@ -918,6 +919,7 @@ RULES: dict[str, dict[str, str]] = {
         "or": "or",
         "and": "and",
         "room": "{value} % of {threshold} %",
+        "room_stop": "{value} % of {off} % (stops calling)",
     },
 }
 
@@ -944,10 +946,17 @@ def demand_rule(hass: HomeAssistant, ctrl: Any) -> str:
 
 
 def room_call(hass: HomeAssistant, room: Any, ctrl: Any) -> str:
-    """Compare the room demand with the threshold from which it calls: "75 % z 50 %"."""
-    return RULES[language(hass)]["room"].format(
+    """Compare the room demand with the threshold from which it calls: "75 % z 50 %".
+
+    A calling room stops below the threshold less the hysteresis, marked like the
+    stop of the boiler: "47 % z 40 % (konec volání)".
+    """
+    cfg = ctrl.cfg
+    texts = RULES[language(hass)]
+    return texts["room_stop" if room.calls_boiler else "room"].format(
         value=number(hass, round(room.demand, 1)),
-        threshold=number(hass, ctrl.cfg.room_call_threshold),
+        threshold=number(hass, cfg.room_call_threshold),
+        off=number(hass, cfg.room_call_threshold - cfg.demand_hysteresis),
     )
 
 

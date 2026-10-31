@@ -22,6 +22,8 @@ class RoomDemand:
     weight: float
     area_m2: float
     frost: bool
+    # Whether the room calls, with its hysteresis; None = by the threshold alone.
+    calling: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +42,11 @@ def arbitrate(rooms: Sequence[RoomDemand], cfg: SystemConfig, prev_request: bool
     weighted = (
         sum(r.demand * w for r, w in zip(rooms, weights, strict=True)) / total if total else 0.0
     )
-    calling = sum(1 for r in rooms if r.demand >= cfg.room_call_threshold)
+    calling = sum(
+        1
+        for r in rooms
+        if (r.demand >= cfg.room_call_threshold if r.calling is None else r.calling)
+    )
     if any(r.frost for r in rooms):
         return Arbitration(True, round(weighted, 1), calling)
     threshold = cfg.demand_threshold - (cfg.demand_hysteresis if prev_request else 0)

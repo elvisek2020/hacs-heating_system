@@ -235,7 +235,10 @@ ROOM_SENSORS: tuple[RoomSensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda room, now: room.demand,
-        attrs_fn=lambda room, ctrl: {"call_threshold": ctrl.cfg.room_call_threshold},
+        attrs_fn=lambda room, ctrl: {
+            "call_threshold": ctrl.cfg.room_call_threshold,
+            "calling": room.calls_boiler,
+        },
         text_fn=lambda hass, room, ctrl: {"call": room_call(hass, room, ctrl)},
     ),
     RoomSensorDescription(

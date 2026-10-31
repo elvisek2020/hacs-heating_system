@@ -182,6 +182,8 @@ class RoomController:
         self.fallback_active = False
         self.frost_active = False
         self.calling = False
+        # The room calls the boiler (FR-ARB-02), with hysteresis; see `update_call`.
+        self.calls_boiler = False
         self.demand = 0.0
         self.target: float | None = None
         self.schedule_entity: str | None = None
@@ -233,6 +235,7 @@ class RoomController:
         for name in (
             "frost_active",
             "calling",
+            "calls_boiler",
             "window",
             "vent",
             "vent_quiet_until",
@@ -722,6 +725,20 @@ class RoomController:
         t_out = ctx.outdoor_damped if ctx.outdoor_damped is not None else target
         power = cfg.tpi_coef_int * (target - t) + cfg.tpi_coef_ext * (target - t_out)
         return round(max(0.0, min(100.0, power * 100.0)), 1)
+
+    def update_call(self, threshold: float, hysteresis: float) -> bool:
+        """Whether the room calls the boiler (FR-ARB-02).
+
+        The room starts calling at the threshold and stops below the threshold less
+        the hysteresis. A sensor that flickers by 1/16 K near the threshold would
+        otherwise toggle the number of calling rooms every minute, cancel the start
+        in pre_close again and again and switch the valve heads with it.
+        """
+        if self.demand >= threshold:
+            self.calls_boiler = True
+        elif self.demand <= 0 or self.demand < threshold - hysteresis:
+            self.calls_boiler = False
+        return self.calls_boiler
 
     def _track_not_reached(self, now: datetime) -> None:
         """Deviation > 1.5 K after 3 h of heating (FR-SAFE-04)."""

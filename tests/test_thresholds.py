@@ -38,10 +38,13 @@ async def test_demand_rule_sentences(hass: HomeAssistant) -> None:
     assert demand_rule(hass, _ctrl(request=False, combine="all", rooms=1)) == (
         "0,6 % z 30 % a 1 z 1 místnosti"
     )
-    room = SimpleNamespace(demand=49.6)
+    room = SimpleNamespace(demand=49.6, calls_boiler=False)
     assert room_call(hass, room, _ctrl(request=False)) == "49,6 % z 50 %"
     room.demand = 0.0
     assert room_call(hass, room, _ctrl(request=False)) == "0 % z 50 %"
+    # A calling room stops below the threshold less the hysteresis.
+    room.demand, room.calls_boiler = 46.9, True
+    assert room_call(hass, room, _ctrl(request=False)) == "46,9 % z 40 % (konec volání)"
 
 
 async def test_threshold_attributes_and_season_limit(hass: HomeAssistant) -> None:

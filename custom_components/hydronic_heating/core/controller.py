@@ -281,7 +281,13 @@ class HydronicController:
         frost_request = self._frost_request(now)
         self.arbitration = arbitrate(
             [
-                RoomDemand(r.demand, r.cfg.weight, r.cfg.area_m2, r.frost_active)
+                RoomDemand(
+                    r.demand,
+                    r.cfg.weight,
+                    r.cfg.area_m2,
+                    r.frost_active,
+                    r.update_call(cfg.room_call_threshold, cfg.demand_hysteresis),
+                )
                 for r in self.rooms.values()
             ],
             cfg,

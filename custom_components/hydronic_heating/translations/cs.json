@@ -208,7 +208,7 @@
         "data_description": {
           "boiler_overrun": "Tak dlouho zůstanou ventily po vypnutí kotle otevřené. Má být aspoň tak dlouhý jako doběh čerpadla v kotli.",
           "boiler_demand_threshold": "Vážený požadavek všech místností, při kterém se kotel zapne.",
-          "boiler_demand_hysteresis": "Kotel se vypne pod prahem mínus hystereze.",
+          "boiler_demand_hysteresis": "Kotel se vypne pod prahem mínus hystereze. Místnost přestane volat pod prahem volání mínus hystereze.",
           "room_call_threshold": "Místnost s alespoň tímto požadavkem se počítá jako volající.",
           "combine": "Jak se kombinuje práh požadavku a počet volajících místností.",
           "area_weighting": "Vyžaduje vyplněnou plochu u všech místností.",

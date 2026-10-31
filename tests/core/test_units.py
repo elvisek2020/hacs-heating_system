@@ -641,6 +641,40 @@ def test_hysteresis_keeps_a_running_boiler_on() -> None:
     assert house.boiler_on
 
 
+def test_flickering_sensor_does_not_cancel_the_start_again_and_again() -> None:
+    """31. 10. 7:30: the kitchen sensor flickered by 1/16 K, its demand around 50 %.
+
+    Two rooms must call. The kitchen started and stopped calling every minute, each
+    start in pre_close was cancelled and the valve heads switched every minute. A
+    calling room now stops only below the threshold less the hysteresis (40 %).
+    """
+    rooms = [room(slug) for slug in ("obyvak", "kuchyn", "loznice", "pracovna")]
+    ctrl = controller(*rooms, **{c.CONF_HAS_BYPASS: True, c.CONF_MIN_ROOMS_CALLING: 2})
+    house = House(
+        ctrl, temperatures={"obyvak": 20.0625, "kuchyn": 20.125, "loznice": 25, "pracovna": 25}
+    )
+    kinds: list[str] = []
+    head_actions: list[str] = []
+    for minute in range(15):
+        house.temp("kuchyn", 20.125 if minute % 2 == 0 else 20.1875)  # 52.5 % / 48.75 %
+        for _ in range(2):
+            house.now += timedelta(seconds=30)
+            plan = house.step()
+            kinds += [d.kind for d in ctrl.decisions]
+            head_actions += [
+                cmd.action for cmd in plan.commands if cmd.entity_id == "switch.hlavice_loznice"
+            ]
+    assert ctrl.rooms["id_kuchyn"].calls_boiler
+    assert "start_cancelled" not in kinds
+    assert house.boiler_on
+    assert set(head_actions) == {"turn_on"}  # closed before the start, then keep-alive
+
+    house.temp("kuchyn", 20.4)  # 36 %: below 50 % less 10 %
+    house.run(60)
+    assert not ctrl.rooms["id_kuchyn"].calls_boiler
+    assert ctrl.arbitration.calling == 1
+
+
 def test_short_sensor_drop_out_keeps_the_last_value() -> None:
     """15. 10. 17:29: the Thread sensor was away for 16 s, the backup reads 0,9 K less."""
     sensors = [c.CONF_SENSORS, ["sensor.alpstuga", "sensor.loxone"]]

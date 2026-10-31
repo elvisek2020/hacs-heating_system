@@ -177,4 +177,7 @@ async def test_valve_state_tells_the_card_about_flow_and_travel(hass: HomeAssist
     await _settle(hass)
     attrs = hass.states.get("sensor.hh_obyvak_valve_state").attributes
     assert {"last_flow", "moving_since", "moving_until"} <= set(attrs)
-    assert hass.states.get("sensor.hh_obyvak_demand").attributes["call_threshold"] == 50
+    demand = hass.states.get("sensor.hh_obyvak_demand").attributes
+    assert demand["call_threshold"] == 50
+    assert demand["calling"] is True  # the living room is cold in `_setup`
+    assert hass.states.get("sensor.hh_loznice_demand").attributes["calling"] is False

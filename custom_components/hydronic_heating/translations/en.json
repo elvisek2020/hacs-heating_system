@@ -208,7 +208,7 @@
         "data_description": {
           "boiler_overrun": "Valves stay open this long after the boiler stops. It should be at least as long as the pump overrun of the boiler.",
           "boiler_demand_threshold": "Weighted demand of all rooms that starts the boiler.",
-          "boiler_demand_hysteresis": "The boiler stops below the threshold minus the hysteresis.",
+          "boiler_demand_hysteresis": "The boiler stops below the threshold minus the hysteresis. A room stops calling below its call threshold minus the hysteresis.",
           "room_call_threshold": "A room with at least this demand counts as calling.",
           "combine": "How the demand threshold and the number of calling rooms are combined.",
           "area_weighting": "Requires the area to be filled in for all rooms.",
