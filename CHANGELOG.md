@@ -5,6 +5,14 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.20.3 — 2026-10-31
+
+### 🐛 Opravy
+
+- **Kotel psal „teplo nikdo nechce“, i když místnost volala.** Když volá jen část místností a na start nebo další běh kotle to nestačí (třeba jen Kuchyně a potřeba jsou dvě), důvod kotle i logbook teď říkají, kdo volá a proč to nestačí: „Teplo chce jen Kuchyně (volajících místností: 1 z 2, celkem 16,9 % z 30 %), na start kotle to nestačí.“ Stejně při minimální době běhu a při vypnutí kotle. Práh je ten, který zrovna platil (při běžícím kotli snížený o hysterezi). Stejnou větu ukazuje řádek „Teď“ ve schématu.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.20.2 — 2026-10-31
 
 ### 🐛 Opravy

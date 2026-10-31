@@ -8,11 +8,12 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from custom_components.hydronic_heating.core.model import BoilerReason, BoilerStatus
+from custom_components.hydronic_heating.core.model import BoilerReason, BoilerStatus, Decision
 from custom_components.hydronic_heating.explain import (
     DAYS,
     MARK,
     clock,
+    decision_text,
     detail,
     finish,
     flow_phrase,
@@ -88,3 +89,57 @@ async def test_where_the_overrun_goes(hass: HomeAssistant) -> None:
         "The boiler is off, the pump runs on until 22:59:34 to the rooms Kuchyně and Obývák."
     )
     assert flow_phrase(hass, {"heated": ()}) == "only through the bypass at the boiler"
+
+
+async def test_rooms_that_call_too_few_are_named(hass: HomeAssistant) -> None:
+    """31. 10. 9:22: the kitchen called alone, two rooms must; "nobody" was wrong."""
+    wanted = {"callers": ("Kuchyně",), "calling": 1, "needed": 2, "demand": 16.9}
+    flow = {"heated": ("Kuchyně",), "heated_all": False}
+    at = dt_util.now().replace(hour=9, minute=27, second=26, microsecond=0)
+    hold = BoilerStatus(
+        BoilerReason.MIN_ON_HOLD, at, params={"minutes": 5, **flow, **wanted, "threshold": 20.0}
+    )
+    idle = BoilerStatus(BoilerReason.IDLE, params={**wanted, "threshold": 30.0})
+    overrun = BoilerStatus(BoilerReason.OVERRUN, at + timedelta(minutes=3), params=flow)
+    off = Decision("boiler_off", overrun, {"cause": "min_on_done", **wanted, "threshold": 20.0})
+    hass.config.language = "cs"
+    assert detail(hass, hold) == (
+        "Teplo chce jen Kuchyně (volajících místností: 1 z 2, celkem 16,9 % z 20 %), na další "
+        "běh kotle to nestačí. Kotel ale musí běžet minimální dobu 5 min. Vypne se v 9:27:26, "
+        "teplo jde do místnosti Kuchyně."
+    )
+    assert detail(hass, idle) == (
+        "Teplo chce jen Kuchyně (volajících místností: 1 z 2, celkem 16,9 % z 30 %), na start "
+        "kotle to nestačí."
+    )
+    assert decision_text(hass, off) == (
+        "Kotel vypnut: uplynula minimální doba běhu a teplo chce jen Kuchyně (volajících "
+        "místností: 1 z 2, celkem 16,9 % z 20 %). Čerpadlo dobíhá do 9:30:26 do místnosti Kuchyně."
+    )
+    # Several rooms; with `combine: all` enough rooms call, but the total is low.
+    three = BoilerStatus(
+        BoilerReason.IDLE,
+        params={**wanted, "callers": ("Kuchyně", "Obývák"), "needed": 3, "threshold": 30.0},
+    )
+    assert detail(hass, three).startswith("Teplo chtějí jen Kuchyně a Obývák (volajících ")
+    low = BoilerStatus(
+        BoilerReason.IDLE,
+        params={**wanted, "callers": ("Kuchyně", "Obývák"), "calling": 2, "threshold": 30.0},
+    )
+    assert detail(hass, low) == (
+        "Teplo chtějí Kuchyně a Obývák, ale celkem jen 16,9 % z 30 %, na start kotle to nestačí."
+    )
+    # Without a calling room the boiler still says that nobody wants heat.
+    assert detail(hass, BoilerStatus(BoilerReason.IDLE)) == (
+        "Žádná místnost nepotřebuje teplo, kotel stojí."
+    )
+    hass.config.language = "en"
+    assert detail(hass, idle) == (
+        "Heat is wanted only by Kuchyně (rooms calling: 1 of 2, 16.9 % of 30 % in total), not "
+        "enough to start the boiler."
+    )
+    no_demand = Decision("boiler_off", idle, {"cause": "no_demand", **wanted, "threshold": 20.0})
+    assert decision_text(hass, no_demand) == (
+        "Boiler off: heat is wanted only by Kuchyně (rooms calling: 1 of 2, 16.9 % of 20 % in "
+        "total)."
+    )

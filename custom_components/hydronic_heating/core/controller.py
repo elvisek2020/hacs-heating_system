@@ -69,7 +69,7 @@ class HydronicController:
         self.summer = False
         self.flow_setpoint: float | None = None
         self.duty: float | None = None
-        self.arbitration = Arbitration(False, 0.0, 0)
+        self.arbitration = Arbitration(False, 0.0, 0, 0.0)
         self.heat_request = False
         self.window_block = False
         self._window_pending_since: datetime | None = None
@@ -967,7 +967,7 @@ class HydronicController:
                     BoilerReason.MIN_ON_HOLD,
                     seq.min_on_until(cfg),
                     f"boiler_min_on = {minutes} min",
-                    {"minutes": minutes, **self._flow_params()},
+                    {"minutes": minutes, **self._flow_params(), **self._wanted_params()},
                 )
             params: dict[str, Any] = {
                 "rooms": self.arbitration.calling,
@@ -1009,7 +1009,24 @@ class HydronicController:
             return BoilerStatus(BoilerReason.SUMMER)
         if self.window_block:
             return BoilerStatus(BoilerReason.WINDOW_BLOCK)
-        return BoilerStatus(BoilerReason.IDLE)
+        return BoilerStatus(BoilerReason.IDLE, params=self._wanted_params())
+
+    def _wanted_params(self) -> dict[str, Any]:
+        """Rooms that call, though not enough for the boiler (FR-ARB-01, FR-ARB-02).
+
+        The texts name them instead of saying that nobody wants heat; empty when the
+        boiler is asked to heat or no room calls.
+        """
+        callers = tuple(room.cfg.name for room in self.rooms.values() if room.calls_boiler)
+        if self.heat_request or not callers:
+            return {}
+        return {
+            "callers": callers,
+            "calling": self.arbitration.calling,
+            "needed": self.cfg.min_rooms_calling,
+            "demand": self.arbitration.weighted,
+            "threshold": self.arbitration.threshold,
+        }
 
     def _pre_open_status(self, now: datetime, flow_ok: bool) -> BoilerStatus:
         """Heat is wanted but the boiler waits: valves, duty limit or anti-cycling."""
@@ -1087,7 +1104,9 @@ class HydronicController:
         if now_on and not was_on:
             decisions.append(Decision("boiler_on", status))
         elif was_on and not now_on:
-            decisions.append(Decision("boiler_off", status, {"cause": self._off_cause(previous)}))
+            cause = self._off_cause(previous)
+            wanted = self._wanted_params() if cause in ("min_on_done", "no_demand") else {}
+            decisions.append(Decision("boiler_off", status, {"cause": cause, **wanted}))
         elif (
             previous.reason in (BoilerReason.PRE_CLOSE, BoilerReason.PRE_OPEN)
             and status.reason is BoilerReason.IDLE

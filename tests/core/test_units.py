@@ -675,6 +675,48 @@ def test_flickering_sensor_does_not_cancel_the_start_again_and_again() -> None:
     assert ctrl.arbitration.calling == 1
 
 
+def test_rooms_that_call_too_few_are_named() -> None:
+    """31. 10. 9:22: the kitchen still called, but alone; two rooms must call.
+
+    The texts said that nobody wanted heat. The minimum run, the stop and the idle
+    boiler now name the calling rooms with the counts and the threshold that applied.
+    """
+    rooms = [room(slug) for slug in ("obyvak", "kuchyn", "loznice", "pracovna")]
+    ctrl = controller(*rooms, **{c.CONF_HAS_BYPASS: True, c.CONF_MIN_ROOMS_CALLING: 2})
+    house = House(
+        ctrl, temperatures={"obyvak": 20.0625, "kuchyn": 20.125, "loznice": 25, "pracovna": 25}
+    )
+    while not house.boiler_on:
+        house.now += timedelta(seconds=30)
+        house.step()
+    assert "callers" not in ctrl.boiler_status.params
+
+    house.temp("obyvak", 20.75)  # 15 %: the living room stops calling, 16,9 % in total
+    house.now += timedelta(seconds=30)
+    house.step()
+    wanted = {"callers": ("Kuchyn",), "calling": 1, "needed": 2, "demand": 16.9}
+    status = ctrl.boiler_status
+    assert status.reason is BoilerReason.MIN_ON_HOLD
+    assert status.params.items() >= {**wanted, "threshold": 20.0}.items()  # running
+
+    decisions = []
+    while house.boiler_on:
+        house.now += timedelta(seconds=30)
+        house.step()
+        decisions += ctrl.decisions
+    off = next(d for d in decisions if d.kind == "boiler_off")
+    assert off.params == {"cause": "min_on_done", **wanted, "threshold": 20.0}
+
+    house.run(10 * 60)
+    status = ctrl.boiler_status
+    assert status.reason is BoilerReason.IDLE
+    assert status.params == {**wanted, "threshold": 30.0}
+
+    house.temp("kuchyn", 20.4)  # 36 %: nobody calls any more
+    house.run(60)
+    assert ctrl.boiler_status.params == {}
+
+
 def test_short_sensor_drop_out_keeps_the_last_value() -> None:
     """15. 10. 17:29: the Thread sensor was away for 16 s, the backup reads 0,9 K less."""
     sensors = [c.CONF_SENSORS, ["sensor.alpstuga", "sensor.loxone"]]

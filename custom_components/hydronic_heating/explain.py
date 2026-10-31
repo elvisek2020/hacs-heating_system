@@ -21,6 +21,7 @@ DETAIL: dict[str, dict[str, str]] = {
     "cs": {
         "startup": "Integrace startuje a čeká na načtení entit, nejpozději do {until}.",
         "idle": "Žádná místnost nepotřebuje teplo, kotel stojí.",
+        "idle_calling": "{Wanted}, na start kotle to nestačí.",
         "off": "Režim je vypnutý, kotel netopí. Protimrazová ochrana platí dál.",
         "summer": ("Mimo topnou sezónu, kotel netopí. Protimrazová ochrana platí dál."),
         "window_block": "Otevřená okna blokují topení, kotel stojí.",
@@ -56,6 +57,10 @@ DETAIL: dict[str, dict[str, str]] = {
             "Teplo už nikdo nechce, ale kotel musí běžet minimální dobu {minutes} min. "
             "Vypne se v {until}, teplo jde {flow}."
         ),
+        "min_on_hold_calling": (
+            "{Wanted}, na další běh kotle to nestačí. Kotel ale musí běžet minimální dobu "
+            "{minutes} min. Vypne se v {until}, teplo jde {flow}."
+        ),
         "overrun": "Kotel je vypnutý, čerpadlo dobíhá do {until} {flow}.",
         "fault_safe": "Porucha: {fault}. Kotel je vypnutý, ventily jsou v klidovém stavu.",
         "fault_recovery": (
@@ -66,6 +71,7 @@ DETAIL: dict[str, dict[str, str]] = {
     "en": {
         "startup": "The integration is starting and waits for its entities, at most until {until}.",
         "idle": "No room needs heat, the boiler is idle.",
+        "idle_calling": "{Wanted}, not enough to start the boiler.",
         "off": "The mode is off, the boiler does not heat. Frost protection still applies.",
         "summer": (
             "Off the heating season, the boiler does not heat. Frost protection still applies."
@@ -103,6 +109,10 @@ DETAIL: dict[str, dict[str, str]] = {
             "Nobody needs heat any more, but the boiler must run its minimum time of "
             "{minutes} min. It stops at {until}, the heat goes {flow}."
         ),
+        "min_on_hold_calling": (
+            "{Wanted}, not enough to keep the boiler on. It must still run its minimum "
+            "time of {minutes} min. It stops at {until}, the heat goes {flow}."
+        ),
         "overrun": "The boiler is off, the pump runs on until {until} {flow}.",
         "fault_safe": "Fault: {fault}. The boiler is off, the valves are in their idle position.",
         "fault_recovery": (
@@ -122,6 +132,8 @@ DECISION: dict[str, dict[str, str]] = {
         "boiler_off": "Kotel vypnut: {cause}.",
         "off_min_on_done": "uplynula minimální doba běhu a teplo nikdo nechce",
         "off_no_demand": "teplo nikdo nechce",
+        "off_min_on_done_calling": "uplynula minimální doba běhu a {wanted}",
+        "off_no_demand_calling": "{wanted}",
         "off_mode_off": "režim vypnuto",
         "off_summer": "skončila topná sezóna",
         "season_start": (
@@ -206,6 +218,8 @@ DECISION: dict[str, dict[str, str]] = {
         "boiler_off": "Boiler off: {cause}.",
         "off_min_on_done": "the minimum run time is over and nobody needs heat",
         "off_no_demand": "nobody needs heat",
+        "off_min_on_done_calling": "the minimum run time is over and {wanted}",
+        "off_no_demand_calling": "{wanted}",
         "off_mode_off": "mode off",
         "off_summer": "the heating season ended",
         "season_start": (
@@ -428,6 +442,42 @@ def number(hass: HomeAssistant, value: Any) -> str:
     return text.replace(".", ",") if language(hass) == "cs" else text
 
 
+WANTED: dict[str, dict[str, str]] = {
+    "cs": {
+        "few": (
+            "teplo {want} jen {callers} (volajících místností: {calling} z {needed}, "
+            "celkem {demand} % z {threshold} %)"
+        ),
+        "low": "teplo {want} {callers}, ale celkem jen {demand} % z {threshold} %",
+        "want_1": "chce",
+        "want_n": "chtějí",
+    },
+    "en": {
+        "few": (
+            "heat {want} only by {callers} (rooms calling: {calling} of {needed}, "
+            "{demand} % of {threshold} % in total)"
+        ),
+        "low": "heat {want} by {callers}, but only {demand} % of {threshold} % in total",
+        "want_1": "is wanted",
+        "want_n": "is wanted",
+    },
+}
+
+
+def wanted_phrase(hass: HomeAssistant, values: Mapping[str, Any]) -> str:
+    """Who calls the boiler when it is not enough to run it (FR-ARB-01, FR-ARB-02).
+
+    Too few rooms call, or (`combine: all`) enough rooms but too little demand.
+    """
+    texts = WANTED[language(hass)]
+    callers = values["callers"]
+    key = "few" if values["calling"] < values["needed"] else "low"
+    want = texts["want_1" if len(callers) == 1 else "want_n"]
+    return texts[key].format_map(
+        _Defaults({**values, "callers": _names(hass, callers), "want": want})
+    )
+
+
 FLOW: dict[str, dict[str, str]] = {
     "cs": {
         "all": "do všech místností",
@@ -467,9 +517,12 @@ def _values(hass: HomeAssistant, status: BoilerStatus, extra: Mapping[str, Any])
     for key in ("expected_return", "preheat_until"):
         if key in values:
             values[key] = moment(values[key])
-    for key in ("demand", "comfort", "rate"):
+    for key in ("demand", "threshold", "comfort", "rate"):
         if key in values:
             values[key] = number(hass, values[key])
+    if values.get("callers"):
+        wanted = wanted_phrase(hass, values)
+        values["wanted"], values["Wanted"] = wanted, wanted[:1].upper() + wanted[1:]
     if "fault" in values:
         values["fault"] = reason_text(hass, str(values["fault"]))
     return values
@@ -482,6 +535,8 @@ def detail(hass: HomeAssistant, status: BoilerStatus) -> str:
     key = status.reason.value
     if status.reason is BoilerReason.PRE_OPEN and status.until is None:
         key = "pre_open_now"
+    elif "wanted" in values:
+        key = f"{key}_calling"
     text = texts[key].format_map(_Defaults(values))
     if status.reason.value.startswith("firing_") and status.until is not None:
         text += texts["duty_stop"].format_map(_Defaults(values))
@@ -521,6 +576,8 @@ def decision_text(
         if code.startswith("fault:"):
             fill["fault"] = reason_text(hass, code.partition(":")[2])
             code = "fault"
+        elif decision.params.get("callers"):
+            code = f"{code}_calling"
         cause = texts.get(f"off_{code}", code).format_map(fill)
         message = texts["boiler_off"].format(cause=cause)
         if status.reason is BoilerReason.OVERRUN:

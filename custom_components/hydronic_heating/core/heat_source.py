@@ -33,6 +33,8 @@ class Arbitration:
     request: bool
     weighted: float
     calling: int
+    # Threshold of the weighted demand that applied (less the hysteresis while running).
+    threshold: float
 
 
 def arbitrate(rooms: Sequence[RoomDemand], cfg: SystemConfig, prev_request: bool) -> Arbitration:
@@ -47,13 +49,13 @@ def arbitrate(rooms: Sequence[RoomDemand], cfg: SystemConfig, prev_request: bool
         for r in rooms
         if (r.demand >= cfg.room_call_threshold if r.calling is None else r.calling)
     )
-    if any(r.frost for r in rooms):
-        return Arbitration(True, round(weighted, 1), calling)
     threshold = cfg.demand_threshold - (cfg.demand_hysteresis if prev_request else 0)
+    if any(r.frost for r in rooms):
+        return Arbitration(True, round(weighted, 1), calling, threshold)
     a = weighted >= threshold and weighted > 0
     b = calling >= cfg.min_rooms_calling
     request = (a or b) if cfg.combine == "any" else (a and b)
-    return Arbitration(request, round(weighted, 1), calling)
+    return Arbitration(request, round(weighted, 1), calling, threshold)
 
 
 class BoilerSequencer:
