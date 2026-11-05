@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Teplovodní topení",
+        "title": "Systém topení (EK)",
         "description": "Základní nastavení. Místnosti přidáte potom v integraci tlačítkem Přidat místnost.",
         "data": {
           "name": "Název",
@@ -991,7 +991,7 @@
   },
   "exceptions": {
     "not_loaded": {
-      "message": "Integrace Heating Controller není načtená."
+      "message": "Integrace Systém topení (EK) není načtená."
     },
     "not_heating_entity": {
       "message": "Entita {entity_id} nepatří topení nebo nepatří žádné místnosti."

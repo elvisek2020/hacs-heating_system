@@ -1,6 +1,6 @@
 {
   "domain": "hydronic_heating",
-  "name": "Heating Controller",
+  "name": "Systém topení (EK)",
   "after_dependencies": [
     "frontend",
     "http",
@@ -16,5 +16,5 @@
   "issue_tracker": "https://github.com/elvisek2020/hacs-heating_system/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.20.4"
+  "version": "0.20.5"
 }

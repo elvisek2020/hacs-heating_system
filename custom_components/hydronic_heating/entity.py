@@ -13,7 +13,7 @@ from .core.room import RoomController
 from .demo import DemoSimulator
 from .runtime import HydronicHeatingRuntime
 
-MANUFACTURER = "Heating Controller"
+MANUFACTURER = "Systém topení (EK)"
 
 
 class HydronicEntity(Entity):

@@ -1,4 +1,4 @@
-# Heating Controller
+# Systém topení (EK)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 [![Release](https://img.shields.io/github/v/release/elvisek2020/hacs-heating_system)](https://github.com/elvisek2020/hacs-heating_system/releases)
@@ -31,7 +31,7 @@ Integrace pro Home Assistant, která řídí teplovodní ústřední topení: ko
 
 1. HACS → tři tečky vpravo nahoře → **Custom repositories**
 2. Vlož URL `https://github.com/elvisek2020/hacs-heating_system`, kategorie **Integration**
-3. Nainstaluj **Heating Controller**
+3. Nainstaluj **Systém topení (EK)**
 4. Restartuj Home Assistant a přidej ji v Nastavení → Zařízení a služby → Přidat integraci.
 
 HACS nabízí aktualizace z GitHub releases.

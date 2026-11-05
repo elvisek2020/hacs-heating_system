@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Hydronic heating",
+        "title": "Systém topení (EK)",
         "description": "Basic settings. Rooms are added afterwards in the integration with Add room.",
         "data": {
           "name": "Name",
@@ -991,7 +991,7 @@
   },
   "exceptions": {
     "not_loaded": {
-      "message": "Heating Controller is not loaded."
+      "message": "Systém topení (EK) is not loaded."
     },
     "not_heating_entity": {
       "message": "Entity {entity_id} does not belong to the heating or to any room."

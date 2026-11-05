@@ -1033,7 +1033,7 @@ window.customCards = window.customCards || [];
 if (!window.customCards.some((card) => card.type === TAG)) {
   window.customCards.push({
     type: TAG,
-    name: "Heating Controller – scheme",
+    name: "Systém topení (EK) – schéma",
     description: "Animated scheme of the boiler, pipes, valves and radiators.",
     documentationURL: "https://github.com/elvisek2020/hacs-heating_system#karta-na-jiném-dashboardu",
   });

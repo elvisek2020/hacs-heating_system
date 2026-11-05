@@ -5,6 +5,14 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.20.5 — 2026-11-05
+
+### 🎨 Vzhled
+
+- **Nový název: Systém topení (EK).** Integrace se dřív jmenovala Heating Controller. Nový název je v HACS (Marketplace a Aktualizace), v Zařízení a služby, v nastavení, jako výrobce zařízení a u karty schématu ve výběru karet. Doména `hydronic_heating`, entity `hh_…`, zařízení, místnosti ani nastavení se nemění, nic není potřeba přenastavovat.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.20.4 — 2026-11-05
 
 ### 🐛 Opravy
