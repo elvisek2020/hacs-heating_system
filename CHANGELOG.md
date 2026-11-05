@@ -5,6 +5,14 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.20.4 — 2026-11-05
+
+### 🐛 Opravy
+
+- **Varování v logu po aktualizaci na Home Assistant 2026.11.** HA 2026.11 přejmenovala u termostatů jednotku, aktuální a cílovou teplotu na názvy `native_*` a staré hlásí jako zastaralé („provides the deprecated _attr_temperature_unit…“, v HA 2027.11 přestanou fungovat). Termostaty integrace teď používají nové názvy, takže varování zmizí. Se staršími verzemi Home Assistantu (od 2026.3) integrace funguje dál.
+
+Po aktualizaci restartuj Home Assistant.
+
 ## v0.20.3 — 2026-10-31
 
 ### 🐛 Opravy

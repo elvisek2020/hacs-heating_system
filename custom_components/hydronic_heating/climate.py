@@ -43,13 +43,42 @@ def _iso(value: Any) -> str | None:
     return value.isoformat() if value is not None else None
 
 
-class SystemClimate(HydronicEntity, ClimateEntity):
+# Home Assistant 2026.11 renamed the temperature members to native_* and reports the
+# old names (gone in 2027.11). Drop the shim once hacs.json requires 2026.11.
+if hasattr(ClimateEntity, "native_temperature_unit"):
+    _Climate = ClimateEntity
+else:
+
+    class _Climate(ClimateEntity):  # type: ignore[no-redef]
+        """The native names before Home Assistant 2026.11, which reads the plain ones."""
+
+        _attr_native_temperature_unit: str
+        native_current_temperature: float | None = None
+        native_target_temperature: float | None = None
+
+        @property
+        def temperature_unit(self) -> str:
+            """Unit of the temperatures."""
+            return self._attr_native_temperature_unit
+
+        @property
+        def current_temperature(self) -> float | None:
+            """Current temperature."""
+            return self.native_current_temperature
+
+        @property
+        def target_temperature(self) -> float | None:
+            """Target temperature."""
+            return self.native_target_temperature
+
+
+class SystemClimate(HydronicEntity, _Climate):
     """Summary of the whole system (`climate.hh_system`)."""
 
     _attr_name = None
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.HEAT]
     _attr_supported_features = ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
 
     def __init__(self, runtime: Any) -> None:
         """Initialize."""
@@ -80,7 +109,7 @@ class SystemClimate(HydronicEntity, ClimateEntity):
         return HVACAction.IDLE
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Outdoor temperature, when configured."""
         return self.controller.outdoor.current
 
@@ -138,7 +167,7 @@ class SystemClimate(HydronicEntity, ClimateEntity):
         self.runtime.set_mode(SystemMode.OFF.value)
 
 
-class RoomClimate(HydronicEntity, ClimateEntity):
+class RoomClimate(HydronicEntity, _Climate):
     """Thermostat of one room (`climate.hh_<room>`, FR-MODE-02)."""
 
     _attr_name = None
@@ -150,7 +179,7 @@ class RoomClimate(HydronicEntity, ClimateEntity):
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
     _attr_min_temp = 5
     _attr_max_temp = 30
@@ -162,12 +191,12 @@ class RoomClimate(HydronicEntity, ClimateEntity):
         self._attr_translation_key = "room"
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Aggregated room temperature."""
         return self.room.temperature
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Effective target; None when the room does not heat."""
         return self.room.target
 
