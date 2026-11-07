@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -11,6 +12,10 @@ from .const import CONF_NOTIFY_SERVICE, SUBENTRY_ROOM
 from .runtime import HydronicConfigEntry
 
 TO_REDACT = {CONF_NOTIFY_SERVICE}
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
 
 
 async def async_get_config_entry_diagnostics(
@@ -30,6 +35,13 @@ async def async_get_config_entry_diagnostics(
             "ready": ctrl.ready,
             "heat_request": ctrl.heat_request,
             "window_block": ctrl.window_block,
+            "external_hold": {
+                "state": ctrl.external_hold.state,
+                "since": _iso(ctrl.external_hold.since),
+                "starts": _iso(ctrl.external_hold.starts),
+                "ends": _iso(ctrl.external_hold.ends),
+                "limit_at": _iso(ctrl.external_hold.limit_at),
+            },
             "summer": ctrl.summer,
             "season": {
                 "active": ctrl.season.active,

@@ -95,6 +95,11 @@ CONF_NOTIFY_SERVICE: Final = "notify_service"
 CONF_FLOW_CHECK_TIME: Final = "flow_check_time"
 CONF_FLOW_CHECK_RISE: Final = "flow_check_rise"
 
+# --- External hold of the boiler (FR-BOI-10) ------------------------------
+CONF_EXTERNAL_HOLD_ENTITY: Final = "external_hold_entity"
+CONF_EXTERNAL_HOLD_LEAD: Final = "external_hold_lead"
+CONF_EXTERNAL_HOLD_MAX: Final = "external_hold_max"
+
 # --- Valves, system level (FR-VAL-06, FR-VAL-07) -------------------------
 CONF_IDLE_VALVE_POLICY: Final = "idle_valve_policy"
 CONF_VALVE_CHECK_TIME: Final = "valve_check_time"
@@ -254,6 +259,9 @@ DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_HEARTBEAT_INTERVAL: 60,
     CONF_FLOW_CHECK_TIME: 15,
     CONF_FLOW_CHECK_RISE: 5,
+    # External hold (minutes)
+    CONF_EXTERNAL_HOLD_LEAD: 10,
+    CONF_EXTERNAL_HOLD_MAX: 90,
     # Valves (system)
     CONF_IDLE_VALVE_POLICY: "deenergize",
     CONF_VALVE_CHECK_TIME: 10,

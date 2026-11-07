@@ -102,6 +102,7 @@ class BoilerReason(StrEnum):
     FIRING_MANUAL = "firing_manual"
     FIRING_FROST = "firing_frost"
     MIN_ON_HOLD = "min_on_hold"
+    EXTERNAL_HOLD = "external_hold"
     OVERRUN = "overrun"
     FAULT_SAFE = "fault_safe"
     FAULT_RECOVERY = "fault_recovery"
@@ -117,6 +118,7 @@ HOLD_REASONS = frozenset(
         BoilerReason.MAX_STARTS_HOLD,
         BoilerReason.DUTY_HOLD,
         BoilerReason.MIN_ON_HOLD,
+        BoilerReason.EXTERNAL_HOLD,
         BoilerReason.FAULT_RECOVERY,
     }
 )
@@ -422,6 +424,9 @@ class SystemConfig:
     use_forecast: bool = False
     flow_check_s: float = 15 * 60
     flow_check_rise: float = 5.0
+    external_hold_entity: str | None = None
+    external_hold_lead_s: float = 10 * 60
+    external_hold_max_s: float = 90 * 60
     valve_check_s: float = 10 * 60
     valve_check_rise: float = 5.0
     valve_check_closed_rise: float = 3.0
@@ -523,6 +528,9 @@ class SystemConfig:
             use_forecast=bool(opt(c.CONF_USE_FORECAST)),
             flow_check_s=num(c.CONF_FLOW_CHECK_TIME) * 60,
             flow_check_rise=num(c.CONF_FLOW_CHECK_RISE),
+            external_hold_entity=options.get(c.CONF_EXTERNAL_HOLD_ENTITY) or None,
+            external_hold_lead_s=num(c.CONF_EXTERNAL_HOLD_LEAD) * 60,
+            external_hold_max_s=num(c.CONF_EXTERNAL_HOLD_MAX) * 60,
             valve_check_s=num(c.CONF_VALVE_CHECK_TIME) * 60,
             valve_check_rise=num(c.CONF_VALVE_CHECK_RISE),
             valve_check_closed_rise=num(c.CONF_VALVE_CHECK_CLOSED_RISE),

@@ -63,6 +63,9 @@ from .const import (
     CONF_EXERCISE_PARALLEL,
     CONF_EXERCISE_TIME,
     CONF_EXPECTED_RETURN_ENTITY,
+    CONF_EXTERNAL_HOLD_ENTITY,
+    CONF_EXTERNAL_HOLD_LEAD,
+    CONF_EXTERNAL_HOLD_MAX,
     CONF_FALLBACK_DEMAND,
     CONF_FALLBACK_HOLD,
     CONF_FAULT_RECOVERY_TIME,
@@ -194,6 +197,7 @@ OPTIONS_MENU = [
     "heat_source",
     "outdoor",
     "boiler",
+    "external_hold",
     "safety",
     "valves",
     "windows",
@@ -383,6 +387,19 @@ def _boiler_schema(values: Mapping[str, Any]) -> vol.Schema:
             _required(CONF_AREA_WEIGHTING, values): _BOOL,
             _required(CONF_HAS_BYPASS, values): _BOOL,
             _required(CONF_MIN_OPEN_VALVES, values): _number(0, 20),
+        }
+    )
+
+
+def _external_hold_schema(values: Mapping[str, Any]) -> vol.Schema:
+    """FR-BOI-10: an entity of another integration that holds the boiler off."""
+    return vol.Schema(
+        {
+            _optional(CONF_EXTERNAL_HOLD_ENTITY, values): _entity(
+                ["calendar", "binary_sensor", "input_boolean"]
+            ),
+            _required(CONF_EXTERNAL_HOLD_LEAD, values): _number(0, 60, unit="min"),
+            _required(CONF_EXTERNAL_HOLD_MAX, values): _number(0, 600, unit="min"),
         }
     )
 
@@ -894,6 +911,12 @@ class HydronicHeatingOptionsFlow(_SystemSteps, OptionsFlow):
             return {}, {}
 
         return await self._async_form("boiler", _boiler_schema, user_input, validate)
+
+    async def async_step_external_hold(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """External hold of the boiler (FR-BOI-10)."""
+        return await self._async_form("external_hold", _external_hold_schema, user_input)
 
     async def async_step_safety(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Command verification, watchdog and notifications."""

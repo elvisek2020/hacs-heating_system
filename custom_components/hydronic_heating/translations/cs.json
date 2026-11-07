@@ -109,6 +109,7 @@
           "heat_source": "Zdroj tepla",
           "outdoor": "Venkovní teplota",
           "boiler": "Kotel a požadavky",
+          "external_hold": "Blokování kotle",
           "safety": "Bezpečnost a notifikace",
           "valves": "Klidový stav a protáčení ventilů",
           "windows": "Okna",
@@ -214,6 +215,20 @@
           "area_weighting": "Vyžaduje vyplněnou plochu u všech místností.",
           "has_bypass": "Obtok, přepouštěcí ventil nebo radiátor bez hlavice, který protéká vždy.",
           "min_open_valves": "Podmínka startu kotle, když soustava nemá obtok."
+        }
+      },
+      "external_hold": {
+        "title": "Blokování kotle",
+        "description": "Jiná integrace může kotli zakázat start, například když střídač baterie bere proud ze sítě a přepnutí vyhodí hořák. Protimrazová ochrana a porucha mají vždy přednost, ruční topení se blokuje taky.",
+        "data": {
+          "external_hold_entity": "Blokovat kotel podle entity (volitelné)",
+          "external_hold_lead": "Předstih kalendáře",
+          "external_hold_max": "Maximální délka blokace"
+        },
+        "data_description": {
+          "external_hold_entity": "Kalendář, binární senzor nebo pomocník přepínač. Blokuje, když je zapnutý, kalendář během události. Prázdné = vypnuto.",
+          "external_hold_lead": "Jen kalendář: kotel nestartuje, když událost začne do této doby, běžící kotel se vypne po minimální době běhu. Nech aspoň tak dlouhý jako minimální dobu běhu.",
+          "external_hold_max": "Po této době kotel smí topit i při trvající blokaci a ohlásí se problém. 0 = bez omezení."
         }
       },
       "safety": {
@@ -735,6 +750,7 @@
           "firing_manual": "Topí manuálně",
           "firing_frost": "Protimrazová ochrana",
           "min_on_hold": "Minimální doba běhu",
+          "external_hold": "Blokace entitou",
           "overrun": "Doběh",
           "fault_safe": "Porucha",
           "fault_recovery": "Návrat z poruchy"
@@ -775,6 +791,7 @@
               "firing_manual": "Topí manuálně",
               "firing_frost": "Protimrazová ochrana",
               "min_on_hold": "Minimální doba běhu",
+              "external_hold": "Blokace entitou",
               "overrun": "Doběh",
               "fault_safe": "Porucha",
               "fault_recovery": "Návrat z poruchy"

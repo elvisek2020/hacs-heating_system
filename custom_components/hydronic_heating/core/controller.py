@@ -9,6 +9,7 @@ from typing import Any
 from .. import const as c
 from .equithermal import OutdoorEngine, duty_limit, flow_setpoint
 from .exercise import ExerciseScheduler
+from .external_hold import ExternalHold
 from .flow_check import FlowCheck
 from .heat_source import NO_FLOW_MARGIN_S, Arbitration, BoilerSequencer, RoomDemand, arbitrate
 from .model import (
@@ -86,6 +87,9 @@ class HydronicController:
         # FR-SAFE-08: measured flow temperature and the check that the boiler heats.
         self.flow_temperature: float | None = None
         self.flow_check = FlowCheck()
+        # FR-BOI-10: an entity of another integration holds the boiler off.
+        self.external_hold = ExternalHold()
+        self._held = False
         # FR-SAFE-09: pipe temperature checks of the valves, by valve entity.
         self.valve_checks: dict[str, ValveCheck] = {}
         # FR-WIN-07: the floor of each room (room ID -> floor ID), set by the runtime.
@@ -139,6 +143,7 @@ class HydronicController:
             cfg.house_presence_entity,
             cfg.long_away_entity,
             cfg.expected_return_entity,
+            cfg.external_hold_entity,
         ):
             if entity:
                 found.add(entity)
@@ -296,12 +301,15 @@ class HydronicController:
             self.sequencer.boiler_on,
         )
         self.heat_request = self.arbitration.request or manual or frost_request
+        # FR-BOI-10: the external hold stops manual heating too, frost overrides it.
+        self.external_hold.update(now, snap.get(cfg.external_hold_entity), cfg)
+        self._held = self.external_hold.holding and not frost_request
         # FR-MODE-03: frost and manual take priority over window block and summer.
         blocked = (
             (self.window_block or self.summer or mode is SystemMode.OFF)
             and not manual
             and not frost_request
-        )
+        ) or self._held
 
         self._observe_boiler(snap)
         self._observe_valves(snap)
@@ -653,7 +661,10 @@ class HydronicController:
         cfg = self.cfg
         plan: dict[str, bool] = {}
         status: dict[str, ValveStatus] = {}
-        boiler_idle = self.sequencer.phase is BoilerPhase.IDLE and not self.heat_request
+        # A held boiler cannot start: no head draws current (FR-VAL-07, FR-BOI-10).
+        boiler_idle = self.sequencer.phase is BoilerPhase.IDLE and (
+            not self.heat_request or self._held
+        )
         for room in self.rooms.values():
             forced, full = True, False
             want: bool | None
@@ -838,6 +849,7 @@ class HydronicController:
             and self.heat_request
             and heating_allowed
             and not self.fault_safe
+            and not self._held
         ):
             for room, valve in self.valve_configs:
                 physical = room.valves[valve.entity_id].physical(valve, now)
@@ -924,6 +936,8 @@ class HydronicController:
                 reasons.append("window_block")
             if self.summer:
                 reasons.append("summer")
+            if self._held:
+                reasons.append("external_hold")
         if self.sequencer.phase is BoilerPhase.PRE_OPEN:
             if not flow_ok:
                 reasons.append("waiting_for_valves")
@@ -967,7 +981,11 @@ class HydronicController:
                     BoilerReason.MIN_ON_HOLD,
                     seq.min_on_until(cfg),
                     f"boiler_min_on = {minutes} min",
-                    {"minutes": minutes, **self._flow_params(), **self._wanted_params()},
+                    {
+                        "minutes": minutes,
+                        **self._flow_params(),
+                        **(self._hold_params() if self._held else self._wanted_params()),
+                    },
                 )
             params: dict[str, Any] = {
                 "rooms": self.arbitration.calling,
@@ -1003,6 +1021,13 @@ class HydronicController:
                     **self._flow_params(),
                 },
             )
+        if self._held and self.heat_request:
+            return BoilerStatus(
+                BoilerReason.EXTERNAL_HOLD,
+                self.external_hold.until,
+                f"external_hold_entity = {cfg.external_hold_entity}",
+                self._hold_params(),
+            )
         if mode is SystemMode.OFF:
             return BoilerStatus(BoilerReason.OFF)
         if self.summer:
@@ -1010,6 +1035,17 @@ class HydronicController:
         if self.window_block:
             return BoilerStatus(BoilerReason.WINDOW_BLOCK)
         return BoilerStatus(BoilerReason.IDLE, params=self._wanted_params())
+
+    def _hold_params(self) -> dict[str, Any]:
+        """Return the entity and the times of the external hold for the texts (FR-BOI-10)."""
+        hold = self.external_hold
+        return {
+            "hold_entity": self.cfg.external_hold_entity,
+            "hold_state": hold.state,
+            "hold_starts": hold.starts,
+            "hold_ends": hold.ends,
+            "hold_limit": hold.limit_at,
+        }
 
     def _wanted_params(self) -> dict[str, Any]:
         """Rooms that call, though not enough for the boiler (FR-ARB-01, FR-ARB-02).
@@ -1105,8 +1141,12 @@ class HydronicController:
             decisions.append(Decision("boiler_on", status))
         elif was_on and not now_on:
             cause = self._off_cause(previous)
-            wanted = self._wanted_params() if cause in ("min_on_done", "no_demand") else {}
-            decisions.append(Decision("boiler_off", status, {"cause": cause, **wanted}))
+            extra: dict[str, Any] = {}
+            if cause in ("min_on_done", "no_demand"):
+                extra = self._wanted_params()
+            elif cause == "external_hold":
+                extra = self._hold_params()
+            decisions.append(Decision("boiler_off", status, {"cause": cause, **extra}))
         elif (
             previous.reason in (BoilerReason.PRE_CLOSE, BoilerReason.PRE_OPEN)
             and status.reason is BoilerReason.IDLE
@@ -1268,6 +1308,8 @@ class HydronicController:
             return f"fault:{self.fault_reason or ''}"
         if cause != "no_demand":
             return cause
+        if self._held:
+            return "external_hold"
         if previous.reason is BoilerReason.MIN_ON_HOLD:
             return "min_on_done"
         if self.modes.mode is SystemMode.OFF:
@@ -1321,6 +1363,15 @@ class HydronicController:
                     "rise": f"{self.cfg.flow_check_rise:g}",
                 },
                 repair=True,
+            )
+        if self.external_hold.state == "expired":
+            problems["external_hold_long"] = Problem(
+                "external_hold_long",
+                "external_hold_long",
+                {
+                    "entity": self.cfg.external_hold_entity or "",
+                    "minutes": f"{self.cfg.external_hold_max_s / 60:g}",
+                },
             )
         if self.ready:
             for room in self.rooms.values():

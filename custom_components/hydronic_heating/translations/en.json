@@ -109,6 +109,7 @@
           "heat_source": "Heat source",
           "outdoor": "Outdoor temperature",
           "boiler": "Boiler and demand",
+          "external_hold": "Boiler hold",
           "safety": "Safety and notifications",
           "valves": "Valve idle state and exercise",
           "windows": "Windows",
@@ -214,6 +215,20 @@
           "area_weighting": "Requires the area to be filled in for all rooms.",
           "has_bypass": "Bypass, differential pressure valve or a radiator without a valve head that always flows.",
           "min_open_valves": "Required before the boiler starts when the system has no bypass."
+        }
+      },
+      "external_hold": {
+        "title": "Boiler hold",
+        "description": "Another integration can hold the boiler off, for example while a battery inverter takes power from the grid and the switching trips the burner. Frost protection and the fault state always take priority, manual heating is held too.",
+        "data": {
+          "external_hold_entity": "Hold the boiler by an entity (optional)",
+          "external_hold_lead": "Calendar lead time",
+          "external_hold_max": "Maximum hold"
+        },
+        "data_description": {
+          "external_hold_entity": "Calendar, binary sensor or input boolean. It holds while it is on, a calendar while an event runs. Empty = off.",
+          "external_hold_lead": "Calendar only: the boiler does not start when an event begins within this time, a running boiler stops after its minimum run time. Keep it at least as long as the minimum run time.",
+          "external_hold_max": "After this time the boiler may run despite the hold and the problem is reported. 0 = no limit."
         }
       },
       "safety": {
@@ -735,6 +750,7 @@
           "firing_manual": "Manual heating",
           "firing_frost": "Frost protection",
           "min_on_hold": "Minimum run time",
+          "external_hold": "Held by entity",
           "overrun": "Overrun",
           "fault_safe": "Fault",
           "fault_recovery": "Recovering from fault"
@@ -775,6 +791,7 @@
               "firing_manual": "Manual heating",
               "firing_frost": "Frost protection",
               "min_on_hold": "Minimum run time",
+              "external_hold": "Held by entity",
               "overrun": "Overrun",
               "fault_safe": "Fault",
               "fault_recovery": "Recovering from fault"

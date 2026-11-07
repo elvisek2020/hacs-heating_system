@@ -136,6 +136,7 @@ const BLOCKS = new Set([
   "off",
   "summer",
   "window_block",
+  "external_hold",
   "no_flow_hold",
   "min_off_hold",
   "max_starts_hold",

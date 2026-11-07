@@ -68,6 +68,7 @@ async def test_menu_offers_all_sections(hass: HomeAssistant, config_entry: MockC
         "heat_source",
         "outdoor",
         "boiler",
+        "external_hold",
         "safety",
         "valves",
         "windows",
@@ -76,6 +77,33 @@ async def test_menu_offers_all_sections(hass: HomeAssistant, config_entry: MockC
         "frost",
         "presence",
     ]
+
+
+async def test_external_hold_saves_the_entity_and_clears_it(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """FR-BOI-10: the hold entity is optional, lead and maximum in minutes."""
+    result = await _open(hass, config_entry, "external_hold")
+    assert result["step_id"] == "external_hold"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "external_hold_entity": "calendar.nabijeni",
+            "external_hold_lead": 15,
+            "external_hold_max": 120,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    cfg = config_entry.runtime_data.controller.cfg
+    assert cfg.external_hold_entity == "calendar.nabijeni"
+    assert (cfg.external_hold_lead_s, cfg.external_hold_max_s) == (15 * 60, 120 * 60)
+
+    result = await _open(hass, config_entry, "external_hold")
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"external_hold_lead": 10, "external_hold_max": 90}
+    )
+    assert "external_hold_entity" not in config_entry.options
+    assert config_entry.runtime_data.controller.cfg.external_hold_entity is None
 
 
 async def test_presence_saves_entities_and_clears_them(

@@ -74,6 +74,7 @@
           "firing_manual": "mdi:fire",
           "firing_frost": "mdi:snowflake-alert",
           "min_on_hold": "mdi:timer-sand",
+          "external_hold": "mdi:lock-clock",
           "overrun": "mdi:pump",
           "fault_safe": "mdi:alert",
           "fault_recovery": "mdi:alert-outline"

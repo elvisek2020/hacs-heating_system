@@ -5,6 +5,20 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v0.21.0 — 2026-11-07
+
+### ✨ Novinky
+
+- **Blokování kotle podle entity.** V Konfigurovat → Blokování kotle můžeš vybrat kalendář, binární senzor nebo pomocník přepínač, podle kterého kotel nesmí startovat. Hodí se třeba pro nabíjení baterie ze sítě, kdy přepnutí střídače kotli vyhodí plamen.
+  - Binární senzor a přepínač blokují, když jsou zapnuté. Kalendář blokuje během události a v předstihu před ní (výchozí 10 min), aby okno nezačalo během hoření.
+  - Hořící kotel se při blokaci vypne po minimální době běhu. Předstih nastav aspoň tak dlouhý jako minimální dobu běhu, pak se kotel vypne ještě před oknem.
+  - Blokuje i ruční topení. Protimrazová ochrana a porucha mají vždy přednost.
+  - Po maximální délce blokace (výchozí 90 min) kotel smí topit i při trvající blokaci a přijde upozornění „Blokace kotle trvá dlouho“.
+  - Nový důvod kotle „Blokace entitou“ s větou, kdo blokuje a kdy kotel nejdřív nastartuje. Zápisy v logbooku, atributy `external_hold` a `external_hold_until` na `climate.hh_system`.
+  - Prázdná entita blokování vypne, ve shadow režimu se blokace jen počítá.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.20.5 — 2026-11-05
 
 ### 🎨 Vzhled

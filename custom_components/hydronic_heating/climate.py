@@ -142,6 +142,9 @@ class SystemClimate(HydronicEntity, _Climate):
             "last_reverted_override": ctrl.last_revert,
             "presence": ctrl.presence_state,
             "expected_return": _iso(ctrl.expected_return),
+            # FR-BOI-10: off, upcoming, active or expired; None without a hold entity.
+            "external_hold": ctrl.external_hold.state if ctrl.cfg.external_hold_entity else None,
+            "external_hold_until": _iso(ctrl.external_hold.until),
         }
         if ctrl.cfg.shadow_mode:
             would = ctrl.would_command()

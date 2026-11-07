@@ -235,6 +235,18 @@ Volitelné čidlo **Teplota vody** (Konfigurovat → Zdroj tepla), například n
   - Kotel se kvůli tomu nevypíná. Porucha zmizí sama, až teplota vody při běhu kotle zase stoupne.
   - Stav kontroly ukazuje atribut `flow_check` u `binary_sensor.hh_boiler_command`.
 
+## Blokování kotle podle entity
+
+Jiná integrace může kotli zakázat start, například když střídač baterie bere proud ze sítě a jeho přepnutí kotli vyhodí plamen (porucha F1). Nastavuje se v Konfigurovat → Blokování kotle. Prázdná entita blokování vypne.
+
+- **Binární senzor nebo pomocník přepínač** blokuje, když je zapnutý.
+- **Kalendář** blokuje během události a navíc v **předstihu** před ní (výchozí 10 min). Kotel tak nenastartuje, když by se okno otevřelo během jeho běhu. Kalendář se čte průběžně, posunutá okna platí hned.
+- **Hořící kotel** se při začátku blokace nebo jejího předstihu vypne, ale až po minimální době běhu. Předstih proto nastav aspoň tak dlouhý jako minimální dobu běhu, pak se kotel vypne ještě před oknem.
+- Blokuje i ruční topení. **Protimrazová ochrana a porucha mají vždy přednost.**
+- **Maximální délka blokace** (výchozí 90 min, 0 = bez omezení): potom kotel smí topit i při trvající blokaci, aby dům nevychladl, a přijde upozornění „Blokace kotle trvá dlouho“.
+- Důvod kotle je „Blokace entitou“ (`external_hold`) s větou, kdo blokuje a kdy kotel nejdřív nastartuje. Atributy `external_hold` (`off`, `upcoming`, `active`, `expired`) a `external_hold_until` jsou na `climate.hh_system`, vypnutí a odložení startu zapisuje logbook. Ve shadow režimu se blokace jen počítá.
+- Když entita není dostupná, kotel neblokuje.
+
 ## Kontrola ventilů podle trubky
 
 Termoelektrické hlavice neříkají, jestli ventil opravdu otevřely. Čidlo teploty na trubce u ventilu (např. DS18B20 na 1-Wire sběrnici Loxone) to pozná. Nastavuje se u každého ventilu (Překonfigurovat místnost → ventil), prahy v Konfigurovat → Ventily.

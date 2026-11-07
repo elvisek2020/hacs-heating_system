@@ -19,6 +19,11 @@ MESSAGES: dict[str, dict[str, tuple[str, str]]] = {
             "Zkontrolujte kotel (porucha, tlak vody), zavřený okruh nebo vzduch v systému. "
             "Hlášení zmizí, až teplota vody při běhu kotle zase stoupne.",
         ),
+        "external_hold_long": (
+            "Blokace kotle trvá dlouho",
+            "Kotel blokuje {entity} déle než {minutes} min. Aby dům nevychladl, kotel teď "
+            "smí topit i při trvající blokaci. Hlášení zmizí, až blokace skončí.",
+        ),
         "sensor_failure": (
             "Výpadek čidel: {room}",
             "Žádné teplotní čidlo místnosti {room} nemá platnou hodnotu. Místnost jede "
@@ -61,6 +66,12 @@ MESSAGES: dict[str, dict[str, tuple[str, str]]] = {
             "The boiler has run for {minutes} min but the water temperature has not risen by "
             "{rise} °C. Check the boiler (fault, water pressure), a closed circuit or air in "
             "the system. The message clears when the water warms up again while the boiler runs.",
+        ),
+        "external_hold_long": (
+            "Long boiler hold",
+            "{entity} has held the boiler for more than {minutes} min. So the house does not "
+            "cool down, the boiler may now heat despite the hold. The message clears when the "
+            "hold ends.",
         ),
         "sensor_failure": (
             "Sensor failure: {room}",

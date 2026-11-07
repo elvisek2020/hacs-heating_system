@@ -36,6 +36,7 @@ BOILER_EVENTS = {
     BoilerReason.MIN_OFF_HOLD: "boiler_may_start",
     BoilerReason.MAX_STARTS_HOLD: "boiler_may_start",
     BoilerReason.DUTY_HOLD: "boiler_may_start",
+    BoilerReason.EXTERNAL_HOLD: "boiler_may_start",
     BoilerReason.MIN_ON_HOLD: "boiler_off",
     BoilerReason.OVERRUN: "valves_idle",
     BoilerReason.FAULT_RECOVERY: "fault_recovery",

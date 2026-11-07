@@ -61,6 +61,16 @@ DETAIL: dict[str, dict[str, str]] = {
             "{Wanted}, na další běh kotle to nestačí. Kotel ale musí běžet minimální dobu "
             "{minutes} min. Vypne se v {until}, teplo jde {flow}."
         ),
+        "min_on_hold_held": (
+            "{Hold}, kotel ale musí běžet minimální dobu {minutes} min. Vypne se v {until}, "
+            "teplo jde {flow}."
+        ),
+        "external_hold": (
+            "Teplo je potřeba, ale {hold}, proto kotel nestartuje. Start nejdříve v {until}."
+        ),
+        "external_hold_open": (
+            "Teplo je potřeba, ale {hold}, proto kotel nestartuje, dokud blokace neskončí."
+        ),
         "overrun": "Kotel je vypnutý, čerpadlo dobíhá do {until} {flow}.",
         "fault_safe": "Porucha: {fault}. Kotel je vypnutý, ventily jsou v klidovém stavu.",
         "fault_recovery": (
@@ -113,6 +123,17 @@ DETAIL: dict[str, dict[str, str]] = {
             "{Wanted}, not enough to keep the boiler on. It must still run its minimum "
             "time of {minutes} min. It stops at {until}, the heat goes {flow}."
         ),
+        "min_on_hold_held": (
+            "{Hold}, but the boiler must run its minimum time of {minutes} min. It stops at "
+            "{until}, the heat goes {flow}."
+        ),
+        "external_hold": (
+            "Heat is needed, but {hold}, so the boiler does not start. Start at {until} at the "
+            "earliest."
+        ),
+        "external_hold_open": (
+            "Heat is needed, but {hold}, so the boiler does not start until the hold ends."
+        ),
         "overrun": "The boiler is off, the pump runs on until {until} {flow}.",
         "fault_safe": "Fault: {fault}. The boiler is off, the valves are in their idle position.",
         "fault_recovery": (
@@ -135,6 +156,7 @@ DECISION: dict[str, dict[str, str]] = {
         "off_min_on_done_calling": "uplynula minimální doba běhu a {wanted}",
         "off_no_demand_calling": "{wanted}",
         "off_mode_off": "režim vypnuto",
+        "off_external_hold": "{hold}",
         "off_summer": "skončila topná sezóna",
         "season_start": (
             "Začala topná sezóna: průměr venkovní teploty za 4 h {mean} °C klesl pod "
@@ -166,6 +188,8 @@ DECISION: dict[str, dict[str, str]] = {
             "přejde topení v {until} do poruchy."
         ),
         "hold_fault_recovery": "Porucha odeznívá, návrat do provozu v {until}.",
+        "hold_external_hold": "Start odložen do {until}: {hold}.",
+        "hold_external_hold_open": "Start odložen: {hold}.",
         "reverted": "Přepnuto mimo řízení na {found}, integrace výstup vrátila na {set_to}. {why}",
         "reverted_subject": "Výstup {name} ({entity_id}) byl přepnut mimo řízení na {found}, "
         "integrace ho vrátila na {set_to}. {why}",
@@ -221,6 +245,7 @@ DECISION: dict[str, dict[str, str]] = {
         "off_min_on_done_calling": "the minimum run time is over and {wanted}",
         "off_no_demand_calling": "{wanted}",
         "off_mode_off": "mode off",
+        "off_external_hold": "{hold}",
         "off_summer": "the heating season ended",
         "season_start": (
             "Heating season started: the 4 h mean outdoor temperature {mean} °C dropped "
@@ -251,6 +276,8 @@ DECISION: dict[str, dict[str, str]] = {
             "goes to the fault state at {until}."
         ),
         "hold_fault_recovery": "The fault is clearing, control resumes at {until}.",
+        "hold_external_hold": "Start delayed until {until}: {hold}.",
+        "hold_external_hold_open": "Start delayed: {hold}.",
         "reverted": "Switched outside the controller to {found}, the integration set it back "
         "to {set_to}. {why}",
         "reverted_subject": "Output {name} ({entity_id}) was switched outside the controller to "
@@ -478,6 +505,29 @@ def wanted_phrase(hass: HomeAssistant, values: Mapping[str, Any]) -> str:
     )
 
 
+HOLD: dict[str, dict[str, str]] = {
+    "cs": {
+        "active": "kotel blokuje {source}",
+        "upcoming": "v {hold_starts} začíná blokace kotle ({source})",
+    },
+    "en": {
+        "active": "{source} holds the boiler",
+        "upcoming": "the boiler hold ({source}) starts at {hold_starts}",
+    },
+}
+
+
+def hold_phrase(hass: HomeAssistant, values: Mapping[str, Any]) -> str:
+    """Who holds the boiler and whether the hold runs or comes (FR-BOI-10)."""
+    entity_id = str(values["hold_entity"])
+    state = hass.states.get(entity_id)
+    texts = HOLD[language(hass)]
+    key = "upcoming" if values.get("hold_state") == "upcoming" else "active"
+    return texts[key].format_map(
+        _Defaults({**values, "source": state.name if state is not None else entity_id})
+    )
+
+
 FLOW: dict[str, dict[str, str]] = {
     "cs": {
         "all": "do všech místností",
@@ -514,7 +564,7 @@ def _values(hass: HomeAssistant, status: BoilerStatus, extra: Mapping[str, Any])
     for key in ("manual_until", "next_start", "valve_until"):
         if key in values:
             values[key] = clock(values[key])
-    for key in ("expected_return", "preheat_until"):
+    for key in ("expected_return", "preheat_until", "hold_starts"):
         if key in values:
             values[key] = moment(values[key])
     for key in ("demand", "threshold", "comfort", "rate"):
@@ -523,6 +573,9 @@ def _values(hass: HomeAssistant, status: BoilerStatus, extra: Mapping[str, Any])
     if values.get("callers"):
         wanted = wanted_phrase(hass, values)
         values["wanted"], values["Wanted"] = wanted, wanted[:1].upper() + wanted[1:]
+    if values.get("hold_entity"):
+        hold = hold_phrase(hass, values)
+        values["hold"], values["Hold"] = hold, hold[:1].upper() + hold[1:]
     if "fault" in values:
         values["fault"] = reason_text(hass, str(values["fault"]))
     return values
@@ -535,8 +588,12 @@ def detail(hass: HomeAssistant, status: BoilerStatus) -> str:
     key = status.reason.value
     if status.reason is BoilerReason.PRE_OPEN and status.until is None:
         key = "pre_open_now"
+    elif status.reason is BoilerReason.EXTERNAL_HOLD and status.until is None:
+        key = "external_hold_open"
     elif "wanted" in values:
         key = f"{key}_calling"
+    elif "hold" in values and status.reason is BoilerReason.MIN_ON_HOLD:
+        key = "min_on_hold_held"
     text = texts[key].format_map(_Defaults(values))
     if status.reason.value.startswith("firing_") and status.until is not None:
         text += texts["duty_stop"].format_map(_Defaults(values))
@@ -583,7 +640,10 @@ def decision_text(
         if status.reason is BoilerReason.OVERRUN:
             message += texts["overrun_suffix"].format_map(fill)
     elif decision.kind == "hold":
-        message = texts.get(f"hold_{status.reason.value}", "{until}").format_map(fill)
+        key = f"hold_{status.reason.value}"
+        if status.reason is BoilerReason.EXTERNAL_HOLD and status.until is None:
+            key = "hold_external_hold_open"
+        message = texts.get(key, "{until}").format_map(fill)
     elif decision.kind == "presence":
         state = str(decision.params.get("state"))
         fill["preset_word"] = texts.get(f"preset_{decision.params.get('preset')}", "")

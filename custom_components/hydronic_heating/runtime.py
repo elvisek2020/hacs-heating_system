@@ -572,11 +572,15 @@ class HydronicHeatingRuntime:
         placeholders = dict(problem.placeholders)
         if "reason" in placeholders:
             placeholders["reason"] = reason_text(self.hass, placeholders["reason"])
+        if problem.kind == "external_hold_long" and (
+            state := self.hass.states.get(placeholders["entity"])
+        ):
+            placeholders["entity"] = state.name
         return placeholders
 
     def _problem_keys(self) -> set[str]:
         """All problem keys the current configuration can produce."""
-        keys = {"fault_safe", "no_heat"}
+        keys = {"fault_safe", "no_heat", "external_hold_long"}
         for room in [*self.rooms, *(r.cfg for r in self.controller.rooms.values())]:
             keys.update(f"{kind}_{room.slug}" for kind in ROOM_PROBLEM_KINDS)
             keys.update(
