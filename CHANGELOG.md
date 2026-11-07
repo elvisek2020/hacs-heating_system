@@ -5,6 +5,16 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v1.0.0 — 2026-11-07
+
+První stabilní verze. Funkčně stejná jako v0.21.0.
+
+### ✨ Novinky
+
+- **README s aktuálními screenshoty:** schéma topení jako náhled, přehled dashboardu (topení, kotel, provoz kotle) a místnosti jednoho patra.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v0.21.0 — 2026-11-07
 
 ### ✨ Novinky

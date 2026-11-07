@@ -9,6 +9,8 @@
 
 Integrace pro Home Assistant, která řídí teplovodní ústřední topení: kotel spínaný beznapěťovým kontaktem, radiátory a termoelektrické hlavice NO/NC. Staví jen na obecných entitách HA, takže výměna hardwaru (dnes Loxone přes PyLoxone) znamená jen přemapovat entity v nastavení.
 
+![Systém topení (EK) — náhled](docs/preview.png)
+
 - místnosti s 1..n teplotními čidly a ventily, regulace TPI nebo hystereze, PWM ventilů s ohledem na pomalé hlavice
 - kotel se sekvencí ventily → kotel → doběh a s ochranou proti cyklování (minimální běh, pauza, počet startů)
 - režimy, manuální topení s odpočtem, rozvrhy, okna, protimrazová ochrana, topná sezóna podle venkovní teploty
@@ -145,6 +147,8 @@ Bez nastavené přítomnosti a bez rozvrhu se nic nemění.
 
 Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instalaci (vložit přes ⋮ → Upravit → ⋮ → Editor kódu YAML).
 
+![Dashboard: topení, kotel a provoz kotle](docs/dashboard.png)
+
 - **Nahoře jedna řada:**
   - Topení: systém, režim, topná sezóna, rozvrh domu, manuál.
   - Kotel: proč, další změna, celkový požadavek proti pravidlům startu („0,6 % z 30 % nebo 0 z 2 místností“, při běžícím kotli s prahem vypnutí), měřená teplota vody, venku a 4h průměr s hranicí topné sezóny v názvu (jako čára v Grafech).
@@ -159,6 +163,8 @@ Služba `hydronic_heating.generate_dashboard` vrátí dashboard pro tuto instala
 - **Vysvětlivky** otevře odznak vpravo v horní liště. Jsou na samostatném skrytém pohledu: každá dlaždice a každý odznak se stejnou ikonou a jednou až dvěma větami, co znamená.
 - **Jen nastavené funkce.** Okna, blokace okny, omezení střídy, žádaná teplota z křivky, teplota vody ani rozvrh domu se negenerují, když je nepoužíváte. Po změně nastavení dashboard přegenerujte.
 - **Barvy podle významu:** kotel oranžově, požadavky a sezóna jantarově, voda a porucha červeně, venek modře, ventily a okna tyrkysově, osoby zeleně. Dvoustavové dlaždice svítí jen v aktivním stavu, termostaty mají barvy HA.
+
+![Dashboard: místnosti jednoho patra](docs/mistnosti.png)
 
 ## Schéma topení
 
