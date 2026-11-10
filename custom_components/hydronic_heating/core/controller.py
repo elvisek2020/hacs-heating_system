@@ -47,6 +47,8 @@ BOILER_KEY = "boiler"
 CIRCULATION_S = 10 * 60
 # Without a flow sensor the water counts as hot after this long of firing (FR-SAFE-09).
 VALVE_CHECK_WARMUP_S = 5 * 60
+# Once hot, the water counts as hot down to `valve_check_hot` less this (FR-SAFE-09).
+VALVE_CHECK_HOT_HYSTERESIS_K = 5.0
 STORAGE_FORMAT = 1
 
 
@@ -95,6 +97,7 @@ class HydronicController:
         # FR-WIN-07: the floor of each room (room ID -> floor ID), set by the runtime.
         self.floors: dict[str, str] = {}
         self._firing_since: datetime | None = None
+        self._valve_water_hot = False
         self._valve_check_changes: list[tuple[RoomController, ValveConfig, str, str]] = []
         self.valve_desired: dict[str, bool] = {}
         self.exercising: set[str] = set()
@@ -400,8 +403,15 @@ class HydronicController:
             and self.burner_running is not False
         )
         self._firing_since = (self._firing_since or now) if firing else None
+        hot_limit = cfg.valve_check_hot
         if cfg.heat_source.flow_temp_entity:
-            hot = self.flow_temperature is not None and self.flow_temperature >= cfg.valve_check_hot
+            # Water that swings around the limit (a house heated with 40 °C) must not
+            # restart the check window: once hot it stays hot down to the limit less
+            # the hysteresis, and an open valve passes once its pipe reaches that.
+            low = cfg.valve_check_hot - VALVE_CHECK_HOT_HYSTERESIS_K
+            limit = low if self._valve_water_hot else cfg.valve_check_hot
+            hot = self.flow_temperature is not None and self.flow_temperature >= limit
+            hot_limit = low
         else:
             # Without a flow sensor the water counts as hot after a while of firing.
             hot = (
@@ -409,6 +419,7 @@ class HydronicController:
                 and (now - self._firing_since).total_seconds() >= VALVE_CHECK_WARMUP_S
             )
         ready = firing and hot
+        self._valve_water_hot = ready
         self._valve_check_changes = []
         for room, valve in self.valve_configs:
             check = self.valve_checks.setdefault(valve.entity_id, ValveCheck())
@@ -425,7 +436,7 @@ class HydronicController:
                 check_s=cfg.valve_check_s,
                 rise=cfg.valve_check_rise,
                 closed_rise=cfg.valve_check_closed_rise,
-                hot=cfg.valve_check_hot,
+                hot=hot_limit,
             )
             if change is not None:
                 self._valve_check_changes.append((room, valve, *change))

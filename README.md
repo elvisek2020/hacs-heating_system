@@ -257,8 +257,8 @@ Jiná integrace může kotli zakázat start, například když střídač bateri
 
 Termoelektrické hlavice neříkají, jestli ventil opravdu otevřely. Čidlo teploty na trubce u ventilu (např. DS18B20 na 1-Wire sběrnici Loxone) to pozná. Nastavuje se u každého ventilu (Překonfigurovat místnost → ventil), prahy v Konfigurovat → Ventily.
 
-- Kontroluje se jen, když kotel topí a voda je teplá (měřená voda aspoň 40 °C, bez čidla vody po 5 min topení), a jen u ventilu, který je celý otevřený nebo celý zavřený.
-- **Otevřený ventil** musí trubku do 10 min ohřát aspoň o 5 K (nebo nad 40 °C). Jinak porucha „Ventil asi neotvírá“.
+- Kontroluje se jen, když kotel topí a voda je teplá (měřená voda aspoň 40 °C, za běhu kotle pak až do 35 °C, aby voda kolísající kolem 40 °C kontrolu nepřerušovala; bez čidla vody po 5 min topení), a jen u ventilu, který je celý otevřený nebo celý zavřený.
+- **Otevřený ventil** musí trubku do 10 min ohřát aspoň o 5 K (nebo aspoň na 35 °C). Jinak porucha „Ventil asi neotvírá“.
 - **Zavřený ventil** nesmí trubku ohřát o víc než 3 K. Jinak „Ventil asi nezavírá“.
 - Je to jen hlášení (oznámení, Opravy, deník). Řízení se nemění a hlášení zmizí samo, až kontrola projde.
 - Výsledek je v atributech `valve_check` a `valve_temp` termostatu místnosti a na dashboardu u Ventilu. Ve shadow režimu a v demu se nekontroluje.

@@ -273,9 +273,9 @@
           "exercise_interval_days": "0 = off.",
           "exercise_duration": "At least the valve travel time + 60 s.",
           "valve_check_time": "Only valves with a pipe temperature sensor. Checked only while the boiler heats and the water is hot. 0 = off.",
-          "valve_check_rise": "How much the pipe of an open valve must warm up. A pipe warmer than the hot-water limit is enough too.",
+          "valve_check_rise": "How much the pipe of an open valve must warm up. A pipe that reaches the hot-water limit less 5 °C is enough too.",
           "valve_check_closed_rise": "When the pipe of a closed valve warms up more, the valve does not seem to close.",
-          "valve_check_hot": "Measured water temperature from which valves are checked. Without a flow sensor after 5 minutes of firing."
+          "valve_check_hot": "Measured water temperature from which valves are checked; while the boiler runs the check goes on down to 5 °C less. Without a flow sensor after 5 minutes of firing."
         }
       },
       "windows": {

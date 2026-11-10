@@ -273,9 +273,9 @@
           "exercise_interval_days": "0 = vypnuto.",
           "exercise_duration": "Aspoň doba přestavení ventilu + 60 s.",
           "valve_check_time": "Jen u ventilů s čidlem teploty trubky. Kontroluje se, jen když kotel topí a voda je teplá. 0 = vypnuto.",
-          "valve_check_rise": "O kolik se musí trubka otevřeného ventilu ohřát. Stačí i trubka teplejší než hranice teplé vody.",
+          "valve_check_rise": "O kolik se musí trubka otevřeného ventilu ohřát. Stačí i trubka, která dosáhne hranice teplé vody minus 5 °C.",
           "valve_check_closed_rise": "Když se trubka zavřeného ventilu ohřeje víc, ventil asi nezavírá.",
-          "valve_check_hot": "Měřená teplota vody, od které se kontroluje. Bez čidla vody se kontroluje po 5 minutách topení."
+          "valve_check_hot": "Měřená teplota vody, od které se kontroluje; za běhu kotle se kontroluje dál až do teploty o 5 °C nižší. Bez čidla vody se kontroluje po 5 minutách topení."
         }
       },
       "windows": {

@@ -5,6 +5,14 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v1.0.3 — 2026-11-10
+
+### 🐛 Opravy
+
+- **Kontrola ventilů podle trubky nic nehlásila, když voda kolísala kolem hranice teplé vody.** V domě, který topí vodou kolem 40 °C, každý pokles vody pod 40 °C kontrolu přerušil a začala znovu, takže nikdy nedoběhla a nenahlásila ventil, který neotevírá ani nezavírá. Kontrola teď za běhu kotle pokračuje až do poklesu vody o 5 °C pod hranici. Otevřený ventil projde i tehdy, když se trubka ohřeje aspoň na hranici minus 5 °C.
+
+Po aktualizaci restartuj Home Assistant.
+
 ## v1.0.2 — 2026-11-10
 
 ### 🎨 Vzhled
