@@ -175,7 +175,7 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
   - **Radiátor:** sytě oranžový = teď jím teče teplá voda. Tlumeně oranžový = ještě hřeje a do 30 min po průtoku vybledne do šedé (pamatuje si to i přes restart). Teplota trubky barvu neovlivňuje, je jen číslem vlevo od ventilu.
   - **Ventil** je kulový kohout: páčka podél trubky = otevřeno, napříč = zavřeno. Při přestavování je žlutý a páčka se pořád dokola točí směrem, kterým se ventil přestavuje, dokud hlavice nedojede. Tyrkysový = otevřený a teče voda, prázdný kroužek = otevřený bez proudu v klidu, šedý = zavřený.
   - **Místnost, která volá kotel** (požadavek aspoň práh místnosti, volá až do poklesu pod práh mínus hystereze), má oranžový rámeček a plamínek. Pod radiátorem je pruh požadavku 0–100 %, pod názvem „teplota → cíl“, u vypnuté místnosti „vypnuto“.
-  - **Poruchy:** červený čárkovaný rámeček = porucha místnosti, červený okraj ventilu = porucha ventilu, „čidlo!“ = neplatné čidlo, červený kotel a „porucha“ = porucha kotle nebo kotel netopí.
+  - **Poruchy:** červený čárkovaný rámeček = porucha místnosti (čidlo, ventil nebo nedosažená teplota), červený okraj ventilu = porucha ventilu, červený kotel a „porucha“ = porucha kotle nebo kotel netopí.
   - **Větrání:** okénko nad radiátorem = okno nebo větrání místnosti, tyrkysový pás přes patro = větrá celé patro.
   - **Shadow a demo:** žlutočerný pruh přes horní okraj karty, řízení nic nespíná.
 - Pod schématem je pruh fází **Klid → Ventily → Kotel topí → Doběh** s odpočtem („kotel zapne za 1:12“, „doběh ještě 2:10“) a se štítkem, když kotel něco drží (minimální pauza, mimo sezónu, porucha…).

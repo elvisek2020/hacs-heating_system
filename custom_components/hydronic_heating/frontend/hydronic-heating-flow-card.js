@@ -54,7 +54,6 @@ const TEXTS = {
     running: "běží",
     stopped: "stojí",
     fault: "porucha",
-    sensor: "čidlo!",
     off: "vypnuto",
     shadow: "SHADOW · řízení nic nespíná, schéma ukazuje jen výpočet",
     demo: "DEMO · povely jdou jen na virtuální kotel a hlavice",
@@ -97,7 +96,6 @@ const TEXTS = {
     running: "running",
     stopped: "stopped",
     fault: "fault",
-    sensor: "sensor!",
     off: "off",
     shadow: "SHADOW · the control switches nothing, the scheme shows the computation only",
     demo: "DEMO · commands go to the virtual boiler and valve heads only",
@@ -203,7 +201,6 @@ const STYLE = `
   text { fill: var(--primary-text-color); font-family: var(--ha-font-family-body, inherit); }
   .label { font-size: 13px; font-weight: 500; }
   .info, .floor, .muted, .pipe-t { font-size: 12px; fill: var(--secondary-text-color); }
-  .info .warn { fill: var(--error-color, #db4437); font-weight: 600; }
   .pipe-t { font-size: 11px; font-variant-numeric: tabular-nums; }
   .floor { font-weight: 600; letter-spacing: 0.04em; }
   .floor.airable { cursor: pointer; text-decoration: underline dotted; }
@@ -675,8 +672,6 @@ class HydronicHeatingFlowCard extends HTMLElement {
       const airing = Boolean(windowState) && windowState !== "closed";
       const off = climate?.state === "off";
       const valveFault = (problem?.attributes?.valve_failures || []).length > 0;
-      const sensorFault = problem?.attributes?.sensor_failure
-        || (problem?.attributes?.invalid_sensors || []).length > 0;
 
       // Ball valve: the lever along the pipe is open, across it closed, it turns in a
       // loop while the head moves; at rest an open valve without current is an empty
@@ -721,7 +716,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
         bar.setAttribute("width", String(share * full));
       }
       const info = root.querySelector(`[data-info="${id}"]`);
-      if (info) info.innerHTML = this._roomInfo(climate, off, sensorFault);
+      if (info) info.innerHTML = this._roomInfo(climate, off);
     }
     const rows = this._layoutRows || [];
     rows.forEach((row, r) => {
@@ -808,8 +803,9 @@ class HydronicHeatingFlowCard extends HTMLElement {
     this._tick();
   }
 
-  // The line under the room: temperature and its target, or off; a faulty sensor.
-  _roomInfo(climate, off, sensorFault) {
+  // The line under the room: temperature and its target, or off. A faulty sensor shows
+  // only as the room fault frame, the small card has no room for a word.
+  _roomInfo(climate, off) {
     const t = this._t;
     const cur = climate?.attributes?.current_temperature;
     const target = climate?.attributes?.temperature;
@@ -819,7 +815,6 @@ class HydronicHeatingFlowCard extends HTMLElement {
       parts.push(`${this._num(cur)}${target != null ? ` → ${this._num(target)}` : ""} °C`);
     }
     if (!off && climate?.state === "heat") parts.push(esc(t.manual));
-    if (sensorFault) parts.push(`<tspan class="warn">${esc(t.sensor)}</tspan>`);
     return parts.join(" · ");
   }
 

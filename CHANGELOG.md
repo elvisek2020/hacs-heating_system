@@ -5,6 +5,14 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v1.0.1 — 2026-11-10
+
+### 🎨 Vzhled
+
+- **Schéma bez nápisu „čidlo!“.** Na malém schématu pro něj nebylo místo. Místnost s neplatným čidlem dál ukazuje červený čárkovaný rámeček poruchy, na malé i velké kartě. Vysvětlivky v dashboardu to popisují (porucha místnosti = čidlo, ventil nebo nedosažená teplota), nové znění se ukáže po přegenerování dashboardu.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v1.0.0 — 2026-11-07
 
 První stabilní verze. Funkčně stejná jako v0.21.0.

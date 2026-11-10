@@ -534,8 +534,8 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:alert-circle-outline",
             "Porucha ve schématu",
             (
-                "Červený čárkovaný rámeček = porucha místnosti, „čidlo!“ = neplatné čidlo, "
-                "červený kotel = porucha kotle nebo kotel netopí."
+                "Červený čárkovaný rámeček = porucha místnosti (čidlo, ventil nebo nedosažená "
+                "teplota), červený kotel = porucha kotle nebo kotel netopí."
             ),
         ),
         (
@@ -872,8 +872,8 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "mdi:alert-circle-outline",
             "Fault in the scheme",
             (
-                'Red dashed frame = room fault, "sensor!" = invalid sensor, red boiler = boiler '
-                "fault or the boiler does not heat."
+                "Red dashed frame = room fault (sensor, valve or target not reached), red boiler "
+                "= boiler fault or the boiler does not heat."
             ),
         ),
         (
