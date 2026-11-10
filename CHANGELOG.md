@@ -5,6 +5,16 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v1.0.2 — 2026-11-10
+
+### 🎨 Vzhled
+
+- **Nižší malé schéma.** Stav s odpočtem („Topí manuálně“, „min. běh ještě 4:53“) je vpravo vedle kotle místo řádku pod schématem a kotel je o 25 % menší. Karta je asi o 40 px nižší, potrubí dál vede do kotle.
+- **Pruh požadavku** pod radiátorem je jen na velkém schématu a je výraznější (vyšší a o kousek širší než radiátor). Malé schéma ho nemá.
+- **Text vedle kotle** („Kotel“, teplota, stav) je svisle vystředěný na ikonu kotle, na velkém schématu byl o kousek výš.
+
+Po aktualizaci restartuj Home Assistant a obnov stránku prohlížeče.
+
 ## v1.0.1 — 2026-11-10
 
 ### 🎨 Vzhled

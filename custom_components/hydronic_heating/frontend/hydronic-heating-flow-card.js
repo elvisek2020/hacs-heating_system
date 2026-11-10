@@ -21,9 +21,9 @@
  *
  * Options (FR-UI-25): `layout: compact` is lower and without the texts,
  * `show_text`, `show_now`, `show_upcoming`, `upcoming_max`, `show_phases` and
- * `show_outdoor` hide parts, `show_status` is the one-line state of the compact
- * layout, `interactive: false` makes the parts not
- * clickable and `tap_action` is a standard action of the whole card. The
+ * `show_outdoor` hide parts, `show_status` is the state with its countdown next to
+ * the boiler (on by default in the compact layout), `interactive: false` makes the
+ * parts not clickable and `tap_action` is a standard action of the whole card. The
  * defaults keep the full, clickable scheme.
  */
 
@@ -173,17 +173,22 @@ const FIRE =
 // Geometry of a floor row and of the boiler, relative to their top; the
 // compact layout is lower for the main dashboard. The demand bar sits under the
 // return pipe; the window icon and the flame sit `icon` above the radiator,
-// clear of its frame.
+// clear of its frame. The demand bar is `barH` high and `barX` wider than the
+// radiator on each side; the compact layout has none. The boiler texts (`textY`)
+// are centred on the boiler case. The state line sits right of them at `statusX`,
+// on the lines of the label and the temperature.
 const GEOMETRY = {
   full: {
-    row: 158, floor: 14, supply: 30, valve: 36, body: 56, bodyH: 40, ret: 108, bar: 116, label: 135,
+    row: 158, floor: 14, supply: 30, valve: 36, body: 56, bodyH: 40, ret: 108, bar: 114, barH: 6,
+    barX: 6, label: 135,
     info: 151, icon: 19, boiler: 124, caseY: 16, caseW: 108, caseH: 90, flameX: 37, flameY: 33,
-    flame: 2.1, textX: 132, textY: [40, 60, 78],
+    flame: 2.1, textX: 132, textY: [46.5, 66.5, 84.5], statusX: 200,
   },
   compact: {
-    row: 122, floor: 12, supply: 22, valve: 27, body: 42, bodyH: 30, ret: 82, bar: 89, label: 104,
-    info: 117, icon: 17, boiler: 88, caseY: 12, caseW: 84, caseH: 66, flameX: 31, flameY: 26,
-    flame: 1.6, textX: 108, textY: [30, 48, 64],
+    row: 122, floor: 12, supply: 22, valve: 27, body: 42, bodyH: 30, ret: 82, barH: 0, barX: 0,
+    label: 104,
+    info: 117, icon: 17, boiler: 72, caseY: 12, caseW: 63, caseH: 50, flameX: 25, flameY: 23,
+    flame: 1.2, textX: 87, textY: [26.5, 42.5, 56.5], statusX: 162,
   },
 };
 const LEFT = 64;
@@ -282,12 +287,9 @@ const STYLE = `
   .texts p { margin: 0 0 4px; line-height: 1.4; }
   .texts ul { margin: 0; padding-left: 18px; line-height: 1.45; }
   @media (max-width: 600px) { .texts { grid-template-columns: 1fr; } }
-  .statusline { display: flex; align-items: center; gap: 8px; margin: 4px 4px 0; font-size: 0.95em;
-    flex-wrap: wrap; }
-  .statusline .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--sl, var(--hh-idle));
-    flex: none; }
-  .statusline b { font-weight: 600; }
-  .statusline span { color: var(--secondary-text-color); font-variant-numeric: tabular-nums; }
+  .sl-dot { fill: var(--sl, var(--hh-idle)); }
+  .sl-title { font-size: 13px; font-weight: 600; }
+  .sl-text { font-variant-numeric: tabular-nums; }
   .banner { position: absolute; left: 0; right: 0; top: 0; padding: 4px 12px; font-size: 0.82em;
     font-weight: 600; letter-spacing: 0.04em; color: #000; text-align: center;
     background: repeating-linear-gradient(135deg, var(--hh-moving) 0 14px, #ffd65a 14px 28px); }
@@ -337,8 +339,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
     const opt = options(this._config);
     const g = GEOMETRY[opt.layout];
     const rows = this._layoutRows?.length || this._config?.floors?.length || 1;
-    const px = rows * g.row + g.boiler + (opt.phases ? 70 : 0) + (opt.status ? 30 : 0)
-      + (opt.now || opt.upcoming ? 120 : 0);
+    const px = rows * g.row + g.boiler + (opt.phases ? 70 : 0) + (opt.now || opt.upcoming ? 120 : 0);
     return Math.ceil(px / 50);
   }
 
@@ -419,7 +420,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
     return { rows, slots };
   }
 
-  _build(g, interactive) {
+  _build(g, interactive, status) {
     const width = Math.max(300, this._width || this.clientWidth || 900);
     const { rows, slots } = this._rows(width);
     const slot = Math.max(MIN_SLOT, (width - LEFT - 8) / Math.max(1, Math.min(slots,
@@ -463,7 +464,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
         parts.push(this._room(g, room, xs[i], y0, rw, slot, `${r}-${i}`, interactive));
       });
     });
-    parts.push(this._boiler(g, boilerY, interactive));
+    parts.push(this._boiler(g, boilerY, interactive, status));
     return { svg: `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"
       role="img">${parts.join("")}</svg>`, rows };
   }
@@ -489,6 +490,15 @@ class HydronicHeatingFlowCard extends HTMLElement {
     // left of the valve), above the frame; the flame of a calling room 2 px higher.
     const wx = left + rw - 13;
     const wy = top - g.icon;
+    // The demand bar under the return pipe, only in the full layout.
+    const bx = left - g.barX;
+    const bw = rw + 2 * g.barX;
+    const bar = g.barH
+      ? `<rect class="dbar-bg" x="${bx}" y="${y0 + g.bar}" width="${bw}" height="${g.barH}"
+              rx="${g.barH / 2}"/>
+        <rect class="dbar" data-dbar="${id}" x="${bx}" y="${y0 + g.bar}" width="0"
+              height="${g.barH}" rx="${g.barH / 2}"/>`
+      : "";
     return `
       <g class="room" data-room="${id}"${interactive ? ` tabindex="0" role="button"` : ""}
          aria-label="${esc(room.name || "")}">
@@ -505,9 +515,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
         <g class="win"><rect x="${wx}" y="${wy}" width="12" height="11" rx="1.5"/>
           <line x1="${wx + 6}" y1="${wy}" x2="${wx + 6}" y2="${wy + 11}"/>
           <line x1="${wx}" y1="${wy + 5.5}" x2="${wx + 12}" y2="${wy + 5.5}"/></g>
-        <rect class="dbar-bg" x="${left + 2}" y="${y0 + g.bar}" width="${rw - 4}" height="4" rx="2"/>
-        <rect class="dbar" data-dbar="${id}" x="${left + 2}" y="${y0 + g.bar}" width="0" height="4"
-              rx="2"/>
+        ${bar}
         <text class="pipe-t" data-pipe="${id}" x="${sx - 11}" y="${vy + 10}" text-anchor="end"></text>
         <g class="vsym unknown" data-vsym="${id}" transform="translate(${sx} ${vy + 6})">
           <circle r="7.5"/><line class="stem" x1="0" y1="-5" x2="0" y2="5"/></g>
@@ -517,10 +525,20 @@ class HydronicHeatingFlowCard extends HTMLElement {
       </g>`;
   }
 
-  _boiler(g, y, interactive) {
+  _boiler(g, y, interactive, status) {
     const [label, temp, state] = g.textY;
     const role = interactive ? ` tabindex="0" role="button"` : "";
-    return `
+    // The one-line state of the compact card, next to the boiler: the reason, then
+    // its countdown under it.
+    const sx = g.statusX;
+    const line = status
+      ? `<g class="sl" data-sl>
+          <circle class="sl-dot" cx="${sx + 5}" cy="${y + label - 4.5}" r="5"/>
+          <text class="sl-title" data-sl-title x="${sx + 16}" y="${y + label}"></text>
+          <text class="info sl-text" data-sl-text x="${sx + 16}" y="${y + temp}"></text>
+        </g>`
+      : "";
+    return `${line}
       <g class="boiler" data-boiler${role} aria-label="${this._t.boiler}">
         <rect class="glow" x="2" y="${y + g.caseY - 6}" width="${g.caseW + 12}"
               height="${g.caseH + 12}" rx="16"/>
@@ -548,7 +566,7 @@ class HydronicHeatingFlowCard extends HTMLElement {
     if (key !== this._layoutKey) {
       this._layoutKey = key;
       const opt = options(this._config);
-      const { svg, rows } = this._build(GEOMETRY[opt.layout], opt.interactive);
+      const { svg, rows } = this._build(GEOMETRY[opt.layout], opt.interactive, opt.status);
       this._layoutRows = rows;
       const t = this._t;
       const title = this._config.title ? `<div class="title">${esc(this._config.title)}</div>` : "<div></div>";
@@ -563,10 +581,6 @@ class HydronicHeatingFlowCard extends HTMLElement {
           </div>
           <div class="status"><span class="chip" data-chip hidden></span>
             <span class="countdown" data-countdown></span></div>`
-        : "";
-      const status = opt.status
-        ? `<div class="statusline" data-sl><span class="dot"></span><b data-sl-title></b>
-            <span data-sl-text></span></div>`
         : "";
       const columns = [
         opt.now ? `<div><h4>${t.now}</h4><div data-now></div></div>` : "",
@@ -584,7 +598,6 @@ class HydronicHeatingFlowCard extends HTMLElement {
           <div class="banner" data-banner hidden></div>
           ${head}
           ${svg}
-          ${status}
           ${phases}
           ${texts}
         </ha-card>`;

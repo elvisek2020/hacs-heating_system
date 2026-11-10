@@ -174,7 +174,7 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 - **Jedna barva = jeden význam:**
   - **Radiátor:** sytě oranžový = teď jím teče teplá voda. Tlumeně oranžový = ještě hřeje a do 30 min po průtoku vybledne do šedé (pamatuje si to i přes restart). Teplota trubky barvu neovlivňuje, je jen číslem vlevo od ventilu.
   - **Ventil** je kulový kohout: páčka podél trubky = otevřeno, napříč = zavřeno. Při přestavování je žlutý a páčka se pořád dokola točí směrem, kterým se ventil přestavuje, dokud hlavice nedojede. Tyrkysový = otevřený a teče voda, prázdný kroužek = otevřený bez proudu v klidu, šedý = zavřený.
-  - **Místnost, která volá kotel** (požadavek aspoň práh místnosti, volá až do poklesu pod práh mínus hystereze), má oranžový rámeček a plamínek. Pod radiátorem je pruh požadavku 0–100 %, pod názvem „teplota → cíl“, u vypnuté místnosti „vypnuto“.
+  - **Místnost, která volá kotel** (požadavek aspoň práh místnosti, volá až do poklesu pod práh mínus hystereze), má oranžový rámeček a plamínek. Pod radiátorem je na velké kartě pruh požadavku 0–100 % (malá karta ho nemá), pod názvem „teplota → cíl“, u vypnuté místnosti „vypnuto“.
   - **Poruchy:** červený čárkovaný rámeček = porucha místnosti (čidlo, ventil nebo nedosažená teplota), červený okraj ventilu = porucha ventilu, červený kotel a „porucha“ = porucha kotle nebo kotel netopí.
   - **Větrání:** okénko nad radiátorem = okno nebo větrání místnosti, tyrkysový pás přes patro = větrá celé patro.
   - **Shadow a demo:** žlutočerný pruh přes horní okraj karty, řízení nic nespíná.
@@ -189,7 +189,7 @@ Dashboard má pohled **Schéma**: animované schéma s kotlem, přívodem a zpá
 Schéma jde dát i na hlavní dashboard, třeba vedle kamer. Entity a patra do karty vkládá služba `generate_dashboard`, proto kartu zkopírujte z pohledu Schéma:
 
 1. Na pohledu Schéma: Upravit dashboard → upravit kartu schématu → Zobrazit editor kódu, zkopírovat YAML.
-2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact` a `interactive: false`, aby se na mobilu při posouvání omylem nespustilo větrání patra. Kompaktní karta má pod schématem jeden řádek stavu s barevnou tečkou podle fáze a odpočtem („Doběh · doběh ještě 1:33“). Jestli se karta ukazuje jen při běhu kotle, je nastavení viditelnosti dashboardu, ne karty.
+2. Na jiném dashboardu: Přidat kartu → Ruční, vložit a doplnit volby, například `layout: compact` a `interactive: false`, aby se na mobilu při posouvání omylem nespustilo větrání patra. Kompaktní karta má vpravo vedle kotle stav s barevnou tečkou podle fáze a pod ním odpočet („Doběh“, „doběh ještě 1:33“), kotel je menší, takže je karta nižší. Jestli se karta ukazuje jen při běhu kotle, je nastavení viditelnosti dashboardu, ne karty.
 
 ```yaml
 type: custom:hydronic-heating-flow-card
@@ -222,7 +222,7 @@ Kartu zkopírovanou ze starší verze přegenerujte: nové značky potřebují `
 | `show_now`, `show_upcoming` | podle `show_text` | jen sloupec Teď, jen sloupec Pak |
 | `upcoming_max` | všechny | nejvýš tolik řádků v Pak |
 | `show_phases` | `true`, u `compact` `false` | pruh fází (Klid, Ventily, Kotel topí, Doběh) se štítkem a odpočtem |
-| `show_status` | `false`, u `compact` `true` | jeden řádek stavu: barevná tečka podle fáze, důvod a odpočet |
+| `show_status` | `false`, u `compact` `true` | stav vedle kotle: barevná tečka podle fáze, důvod a pod ním odpočet |
 | `show_outdoor` | `true` | venkovní teplota vpravo nahoře |
 | `interactive` | `true` | `false` = prvky nejdou klepnout: místnost neotevře termostat, kotel důvod a patro nepřepne větrání |
 | `tap_action` | nic | standardní akce Home Assistantu po klepnutí na kartu, například `navigate` na pohled Schéma. S `interactive: true` mají přednost prvky. |
