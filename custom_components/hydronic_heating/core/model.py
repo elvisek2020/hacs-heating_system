@@ -647,9 +647,8 @@ class Decision:
 
 @dataclass(frozen=True, slots=True)
 class Problem:
-    """An active problem, reported as notification and repair issue (FR-SAFE-04)."""
+    """An active problem, reported as a notification and by the notify service (FR-SAFE-04)."""
 
     key: str
     kind: str
     placeholders: Mapping[str, str] = field(default_factory=dict)
-    repair: bool = False

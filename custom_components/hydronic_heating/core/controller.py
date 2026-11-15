@@ -1359,11 +1359,11 @@ class HydronicController:
         self.tracker.reverts.clear()
 
     def _collect_problems(self, now: datetime) -> None:
-        """Active problems for notifications and repair issues (FR-SAFE-04)."""
+        """Active problems for notifications and the notify service (FR-SAFE-04)."""
         problems: dict[str, Problem] = {}
         if self.fault_safe:
             problems["fault_safe"] = Problem(
-                "fault_safe", "fault_safe", {"reason": self.fault_reason or ""}, repair=True
+                "fault_safe", "fault_safe", {"reason": self.fault_reason or ""}
             )
         if self.flow_check.failed:
             problems["no_heat"] = Problem(
@@ -1373,7 +1373,6 @@ class HydronicController:
                     "minutes": f"{self.cfg.flow_check_s / 60:g}",
                     "rise": f"{self.cfg.flow_check_rise:g}",
                 },
-                repair=True,
             )
         if self.external_hold.state == "expired":
             problems["external_hold_long"] = Problem(
@@ -1389,7 +1388,7 @@ class HydronicController:
                 name = {"room": room.cfg.name}
                 if room.sensor_failure_reported(now):
                     key = f"sensor_failure_{room.cfg.slug}"
-                    problems[key] = Problem(key, "sensor_failure", name, repair=True)
+                    problems[key] = Problem(key, "sensor_failure", name)
                 if room.window.long_block:
                     key = f"window_long_{room.cfg.slug}"
                     problems[key] = Problem(key, "window_long", name)
@@ -1404,7 +1403,6 @@ class HydronicController:
                         key,
                         f"valve_{check.result}",
                         {"room": room.cfg.name, "entity": valve.entity_id},
-                        repair=True,
                     )
                 if self.tracker.failed(valve.entity_id):
                     key = f"valve_command_{valve.entity_id}"

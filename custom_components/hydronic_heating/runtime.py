@@ -566,7 +566,7 @@ class HydronicHeatingRuntime:
         except Exception as err:
             _LOGGER.warning("%s.%s for %s failed: %s", domain, service, command.entity_id, err)
 
-    # --- Problems, notifications and repairs (FR-SAFE-04) ---------------------
+    # --- Problems and notifications (FR-SAFE-04) ------------------------------
 
     def _placeholders(self, problem: Problem) -> dict[str, str]:
         placeholders = dict(problem.placeholders)
@@ -592,15 +592,16 @@ class HydronicHeatingRuntime:
 
     @callback
     def _cleanup_stale_problems(self) -> None:
-        """Remove issues and notifications left by a previous instance.
+        """Remove notifications left by a previous instance, and all repair issues.
 
         A problem that is still real is reported again as soon as the controller
-        detects it.
+        detects it. Problems are no repair issues any more: those of older versions
+        are removed (2026-11-15, one channel in Home Assistant).
         """
         current = set(self.controller.problems)
         registry = ir.async_get(self.hass)
         for domain, issue_id in list(registry.issues):
-            if domain == DOMAIN and issue_id not in current:
+            if domain == DOMAIN:
                 ir.async_delete_issue(self.hass, DOMAIN, issue_id)
         for key in self._problem_keys() - current:
             persistent_notification.async_dismiss(self.hass, f"{DOMAIN}_{key}")
@@ -634,22 +635,10 @@ class HydronicHeatingRuntime:
                 ),
                 eager_start=True,
             )
-        if problem.repair:
-            ir.async_create_issue(
-                self.hass,
-                DOMAIN,
-                problem.key,
-                is_fixable=False,
-                severity=ir.IssueSeverity.ERROR,
-                translation_key=problem.kind,
-                translation_placeholders=placeholders,
-            )
 
     @callback
     def _clear(self, problem: Problem) -> None:
         persistent_notification.async_dismiss(self.hass, f"{DOMAIN}_{problem.key}")
-        if problem.repair:
-            ir.async_delete_issue(self.hass, DOMAIN, problem.key)
 
     # --- Manual timer mirror (FR-MAN-02) ----------------------------------------
 

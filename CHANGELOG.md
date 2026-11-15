@@ -5,6 +5,15 @@ text vydání na GitHubu — a ten Home Assistant / HACS ukazuje v okně aktuali
 
 Nejnovější verze je nahoře. Starší historie je v [GitHub releases](https://github.com/elvisek2020/hacs-heating_system/releases).
 
+## v1.1.0 — 2026-11-15
+
+### ⚠️ Změny, které vyžadují zásah
+
+- **Poruchy jen do oznámení a na mobil, ne do Oprav.** Jedna porucha už nepřijde v Home Assistantu dvakrát. Integrace ji hlásí jen oznámením a notifikací přes nastavenou službu, jednou za každé ohlášení. Opravy (Nastavení → Opravy) už nevytváří a staré po restartu sama smaže. Pokud jsi na Opravy navázal automatizaci, přepni ji na oznámení nebo na `binary_sensor.hh_problem`.
+- Vysvětlivka „Porucha“ v dashboardu odkazuje jen na oznámení, nové znění se ukáže po přegenerování dashboardu.
+
+Po aktualizaci restartuj Home Assistant.
+
 ## v1.0.3 — 2026-11-10
 
 ### 🐛 Opravy

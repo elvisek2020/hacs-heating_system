@@ -75,7 +75,6 @@ def test_boiler_that_does_not_heat_is_a_problem() -> None:
     assert ctrl.flow_check.state == "waiting"
     house.run(15 * 60)
     problem = ctrl.problems["no_heat"]
-    assert problem.repair
     assert dict(problem.placeholders) == {"minutes": "15", "rise": "5"}
     # The water warms up: the problem is gone at once.
     house.set(FLOW, "36.0", 36.0)

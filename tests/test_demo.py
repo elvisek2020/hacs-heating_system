@@ -131,7 +131,7 @@ async def test_virtual_boiler_ignoring_commands_goes_fault_safe(
     await _run(hass, freezer, 7 * 60)
     assert hass.states.get("switch.hh_demo_boiler").state == "off"
     assert hass.states.get("sensor.hh_state").state == "fault_safe"
-    assert ir.async_get(hass).async_get_issue(DOMAIN, "fault_safe") is not None
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "fault_safe") is None  # no Repairs
     notifications = hass.data.get("persistent_notification", {})
     assert any(n["title"].startswith("[Demo]") for n in notifications.values())
 

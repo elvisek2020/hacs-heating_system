@@ -940,28 +940,6 @@
       }
     }
   },
-  "issues": {
-    "fault_safe": {
-      "title": "Topení je v poruše",
-      "description": "Kotel byl přepnut do bezpečného stavu: {reason}. Topení je vypnuté a ventily jsou v klidovém stavu. Systém se vrátí sám, jakmile bude kotel dostupný a bude poslouchat povely."
-    },
-    "sensor_failure": {
-      "title": "Výpadek teplotních čidel: {room}",
-      "description": "Žádné teplotní čidlo místnosti {room} nemá platnou hodnotu. Místnost jede v záložním režimu podle svého nastavení. Zkontrolujte čidla nebo je změňte v nastavení místnosti."
-    },
-    "no_heat": {
-      "title": "Kotel běží, ale netopí",
-      "description": "Kotel běží {minutes} min, ale teplota vody nestoupla ani o {rise} °C. Zkontrolujte kotel (porucha, tlak vody), zavřený okruh nebo vzduch v systému. Hlášení zmizí samo, až teplota vody při běhu kotle zase stoupne."
-    },
-    "valve_not_opening": {
-      "title": "Ventil asi neotvírá: {room}",
-      "description": "Ventil {entity} v místnosti {room} má být otevřený a kotel topí, ale trubka u ventilu se neohřála. Zkontrolujte hlavici a ventil. Hlášení zmizí samo, až kontrola projde."
-    },
-    "valve_not_closing": {
-      "title": "Ventil asi nezavírá: {room}",
-      "description": "Ventil {entity} v místnosti {room} má být zavřený, ale trubka u ventilu se ohřívá. Zkontrolujte hlavici a ventil. Hlášení zmizí samo, až kontrola projde."
-    }
-  },
   "services": {
     "start_manual": {
       "name": "Spustit manuál",

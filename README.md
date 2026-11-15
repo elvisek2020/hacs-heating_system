@@ -235,7 +235,7 @@ Volby jdou naklikat i ve vizuálním editoru karty, entity a patra editor neměn
 Volitelné čidlo **Teplota vody** (Konfigurovat → Zdroj tepla), například na stoupačce od kotle:
 
 - Dashboard ukazuje měřenou teplotu vody místo žádané teploty z topné křivky. Ta se u kotle spínaného kontaktem neuplatní, proto je vidět jen se zapnutým omezením střídy podle křivky.
-- **Kontrola topení** (Konfigurovat → Bezpečnost): když kotel běží 15 min a teplota vody nestoupne aspoň o 5 °C nad nejnižší hodnotu běhu, ohlásí se porucha „Kotel běží, ale netopí“ (oznámení, Opravy, `binary_sensor.hh_problem`). Příčinou může být porucha kotle, nízký tlak vody, zavřený okruh nebo vzduch v systému.
+- **Kontrola topení** (Konfigurovat → Bezpečnost): když kotel běží 15 min a teplota vody nestoupne aspoň o 5 °C nad nejnižší hodnotu běhu, ohlásí se porucha „Kotel běží, ale netopí“ (oznámení, notifikace na mobil, `binary_sensor.hh_problem`). Příčinou může být porucha kotle, nízký tlak vody, zavřený okruh nebo vzduch v systému.
   - Doba a nárůst se dají nastavit, doba 0 kontrolu vypne.
   - Se zpětnou vazbou hořáku se počítá jen doba, kdy hořák opravdu běží. Ve shadow režimu a v demu se nekontroluje.
   - Kotel se kvůli tomu nevypíná. Porucha zmizí sama, až teplota vody při běhu kotle zase stoupne.
@@ -260,7 +260,7 @@ Termoelektrické hlavice neříkají, jestli ventil opravdu otevřely. Čidlo te
 - Kontroluje se jen, když kotel topí a voda je teplá (měřená voda aspoň 40 °C, za běhu kotle pak až do 35 °C, aby voda kolísající kolem 40 °C kontrolu nepřerušovala; bez čidla vody po 5 min topení), a jen u ventilu, který je celý otevřený nebo celý zavřený.
 - **Otevřený ventil** musí trubku do 10 min ohřát aspoň o 5 K (nebo aspoň na 35 °C). Jinak porucha „Ventil asi neotvírá“.
 - **Zavřený ventil** nesmí trubku ohřát o víc než 3 K. Jinak „Ventil asi nezavírá“.
-- Je to jen hlášení (oznámení, Opravy, deník). Řízení se nemění a hlášení zmizí samo, až kontrola projde.
+- Je to jen hlášení (oznámení, notifikace na mobil, deník). Řízení se nemění a hlášení zmizí samo, až kontrola projde.
 - Výsledek je v atributech `valve_check` a `valve_temp` termostatu místnosti a na dashboardu u Ventilu. Ve shadow režimu a v demu se nekontroluje.
 
 ## Proč kotel topí nebo stojí

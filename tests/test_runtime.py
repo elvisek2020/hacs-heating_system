@@ -16,6 +16,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
+    async_mock_service,
 )
 
 from custom_components.hydronic_heating.const import (
@@ -24,6 +25,7 @@ from custom_components.hydronic_heating.const import (
     CONF_HAS_BYPASS,
     CONF_HEAT_SOURCE_ENTITY,
     CONF_MIRROR_TIMER_ENTITY,
+    CONF_NOTIFY_SERVICE,
     CONF_ROOM_NAME,
     CONF_ROOM_ORDER,
     CONF_SENSORS,
@@ -344,19 +346,27 @@ async def test_new_room_reloads_with_new_entities(hass: HomeAssistant) -> None:
     assert hass.states.get("climate.hh_kuchyn") is not None
 
 
-async def test_fault_creates_repair_and_recovers(
+async def test_fault_is_notified_and_recovers(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Boiler unavailable: fault_safe, repair issue and notification; then recovery."""
-    await _setup(hass, **{CONF_SHADOW_MODE: False})
+    """Boiler unavailable: fault_safe, a notification and the phone; then recovery.
+
+    Problems go to one channel in Home Assistant, the notifications, not to Repairs
+    (2026-11-15); the notify service gets each report.
+    """
+    sent = async_mock_service(hass, "notify", "mobile_app_telefon")
+    await _setup(
+        hass, **{CONF_SHADOW_MODE: False, CONF_NOTIFY_SERVICE: "notify.mobile_app_telefon"}
+    )
     hass.states.async_set("input_boolean.kotel", "unavailable")
     await _settle(hass)
     assert hass.states.get("sensor.hh_state").state == "fault_safe"
     assert hass.states.get("binary_sensor.hh_problem").state == "on"
     issues = ir.async_get(hass)
-    assert issues.async_get_issue(DOMAIN, "fault_safe") is not None
+    assert not [key for key in issues.issues if key[0] == DOMAIN]
     notifications = hass.data.get("persistent_notification", {})
-    assert any("fault_safe" in key for key in notifications)
+    assert f"{DOMAIN}_fault_safe" in notifications
+    assert [call.data["title"] for call in sent] == [notifications[f"{DOMAIN}_fault_safe"]["title"]]
 
     hass.states.async_set("input_boolean.kotel", "off")
     await _settle(hass)
@@ -365,10 +375,10 @@ async def test_fault_creates_repair_and_recovers(
         async_fire_time_changed(hass)
         await _settle(hass)
     assert hass.states.get("sensor.hh_state").state == "auto"
-    assert issues.async_get_issue(DOMAIN, "fault_safe") is None
+    assert f"{DOMAIN}_fault_safe" not in hass.data.get("persistent_notification", {})
 
 
-async def test_boiler_without_heat_creates_repair(
+async def test_boiler_without_heat_is_notified(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
     """The measured water does not warm up while the boiler runs (FR-SAFE-08)."""
@@ -380,12 +390,12 @@ async def test_boiler_without_heat_creates_repair(
     assert command.state == "on"
     assert command.attributes["flow_check"] == "waiting"
     await _wait(hass, freezer, 15 * 60)
-    issues = ir.async_get(hass)
-    assert issues.async_get_issue(DOMAIN, "no_heat") is not None
     assert hass.states.get("binary_sensor.hh_problem").attributes["problems"] == ["no_heat"]
+    assert f"{DOMAIN}_no_heat" in hass.data.get("persistent_notification", {})
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "no_heat") is None
     hass.states.async_set("sensor.stoupacka", "36.0", CELSIUS)
     await _settle(hass)
-    assert issues.async_get_issue(DOMAIN, "no_heat") is None
+    assert f"{DOMAIN}_no_heat" not in hass.data.get("persistent_notification", {})
     command = hass.states.get("binary_sensor.hh_boiler_command")
     assert command.attributes["flow_check"] == "ok"
 
@@ -425,21 +435,21 @@ async def test_service_without_entry_raises(hass: HomeAssistant) -> None:
 
 
 async def test_stale_issue_and_notification_are_removed_at_start(hass: HomeAssistant) -> None:
-    """Leftovers of a previous instance disappear when no fault is active."""
-    ir.async_create_issue(
-        hass,
-        DOMAIN,
-        "fault_safe",
-        is_fixable=False,
-        severity=ir.IssueSeverity.ERROR,
-        translation_key="fault_safe",
-        translation_placeholders={"reason": "x"},
-    )
+    """Leftovers of a previous instance disappear; Repairs of older versions always."""
+    for key in ("fault_safe", "valve_not_closing_switch.hlavice_obyvak"):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            key,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=key.split("_switch")[0],
+        )
     persistent_notification.async_create(hass, "old", "old", f"{DOMAIN}_fault_safe")
     persistent_notification.async_create(hass, "old", "old", f"{DOMAIN}_window_long_obyvak")
     persistent_notification.async_create(hass, "keep", "keep", "something_else")
     await _setup(hass)
-    assert ir.async_get(hass).async_get_issue(DOMAIN, "fault_safe") is None
+    assert not [key for key in ir.async_get(hass).issues if key[0] == DOMAIN]
     notifications = hass.data.get("persistent_notification", {})
     assert f"{DOMAIN}_fault_safe" not in notifications
     assert f"{DOMAIN}_window_long_obyvak" not in notifications

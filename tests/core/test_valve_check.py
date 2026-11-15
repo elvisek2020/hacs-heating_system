@@ -98,7 +98,6 @@ def test_stuck_valve_is_reported_and_logged() -> None:
     assert ctrl.valve_checks["switch.hlavice_obyvak"].result == OK
     problem = ctrl.problems["valve_not_closing_switch.hlavice_loznice"]
     assert problem.kind == "valve_not_closing"
-    assert problem.repair
     assert ctrl.room_valve_check(ctrl.rooms["id_loznice"]) == (NOT_CLOSING, 27.0)
     assert ctrl.room_valve_check(ctrl.rooms["id_obyvak"]) == (OK, 45.0)
 

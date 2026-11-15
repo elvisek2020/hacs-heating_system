@@ -172,7 +172,6 @@ def test_6_sensor_failure_falls_back() -> None:
     assert obyvak.sensor_failure
     assert obyvak.temperature == 19.0  # last known within fallback_hold
     assert "sensor_failure_obyvak" in ctrl.problems
-    assert ctrl.problems["sensor_failure_obyvak"].repair
 
     # The hold counts after the short drop-out grace (5 min) of the sensor.
     house.run(36 * 60)
@@ -197,7 +196,7 @@ def test_7_boiler_ignoring_commands_goes_fault_safe() -> None:
     assert ctrl.fault_safe
     assert ctrl.fault_reason == "boiler_command"
     assert ctrl.state is SystemState.FAULT_SAFE
-    assert ctrl.problems["fault_safe"].repair
+    assert "fault_safe" in ctrl.problems
     house.commands.clear()
     house.run(60, every=30)
     assert [cmd.action for cmd in house.commands if cmd.entity_id == BOILER] == [

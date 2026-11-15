@@ -940,28 +940,6 @@
       }
     }
   },
-  "issues": {
-    "fault_safe": {
-      "title": "Heating is in fault state",
-      "description": "The boiler was switched to the safe state: {reason}. Heating is off and the valves are in their idle position. The system returns by itself once the boiler is available and follows commands again."
-    },
-    "sensor_failure": {
-      "title": "Temperature sensors of {room} failed",
-      "description": "No temperature sensor of {room} has a valid value. The room runs in the fallback mode from its settings. Check the sensors or change them in the room settings."
-    },
-    "no_heat": {
-      "title": "Boiler runs but does not heat",
-      "description": "The boiler has run for {minutes} min but the water temperature has not risen by {rise} °C. Check the boiler (fault, water pressure), a closed circuit or air in the system. The issue clears by itself when the water warms up again while the boiler runs."
-    },
-    "valve_not_opening": {
-      "title": "Valve does not seem to open: {room}",
-      "description": "Valve {entity} in {room} should be open and the boiler heats, but the pipe at the valve did not warm up. Check the head and the valve. The issue clears when the check passes."
-    },
-    "valve_not_closing": {
-      "title": "Valve does not seem to close: {room}",
-      "description": "Valve {entity} in {room} should be closed, but the pipe at the valve warms up. Check the head and the valve. The issue clears when the check passes."
-    }
-  },
   "services": {
     "start_manual": {
       "name": "Start manual heating",

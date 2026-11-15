@@ -338,10 +338,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "",
             "mdi:alert-circle",
             "Porucha",
-            (
-                "Něco nefunguje (kotel, čidlo, ventil, kotel netopí). Podrobnosti "
-                "v oznámeních a v Opravách."
-            ),
+            ("Něco nefunguje (kotel, čidlo, ventil, kotel netopí). Podrobnosti v oznámeních."),
         ),
         (
             "",
@@ -672,10 +669,7 @@ LEGEND: dict[str, list[tuple[str, str, str, str]]] = {
             "",
             "mdi:alert-circle",
             "Problem",
-            (
-                "Something does not work (boiler, sensor, valve, no heat). Details in "
-                "notifications and Repairs."
-            ),
+            ("Something does not work (boiler, sensor, valve, no heat). Details in notifications."),
         ),
         (
             "",
